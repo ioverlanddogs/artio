@@ -4,6 +4,8 @@ import { decodeNearbyCursor, encodeNearbyCursor } from "../../lib/nearby-cursor"
 import { START_AT_ID_ORDER_BY } from "../../lib/cursor-predicate";
 import { decodeSubmissionsCursor, encodeSubmissionsCursor } from "../../lib/admin-submissions-cursor";
 import { decideSubmission, ModerationDecisionError } from "../../lib/moderation-decision-service";
+import { markNotificationsReadWithDb } from "../../lib/notification-inbox";
+import { scopedReadBatchIds } from "../../lib/notifications-read-batch";
 
 function makeModerationDbState() {
   return {
@@ -143,7 +145,49 @@ test("admin submissions pagination: no duplicates/skips across cursor pages unde
   assert.deepEqual(combined, ordered.slice(0, combined.length).map((item) => item.id));
 });
 
-test.todo("notification read-batch sets readAt consistently", {
-  // Current read-batch route updates only `status: \"READ\"` and does not set readAt.
-  // Phase 2 note: will be fixed by centralizing read semantics in lib/notification-inbox.ts.
+test("notification read-batch sets readAt consistently", async () => {
+  const notifications = [
+    { id: "n1", userId: "user-1", status: "UNREAD" as const, readAt: null as Date | null },
+    { id: "n2", userId: "user-1", status: "UNREAD" as const, readAt: null as Date | null },
+    { id: "n3", userId: "user-2", status: "UNREAD" as const, readAt: null as Date | null },
+  ];
+
+  const inboxDb = {
+    notification: {
+      findMany: async ({ where }: { where: { userId: string; id: { in: string[] } } }) => notifications
+        .filter((notification) => notification.userId === where.userId && where.id.in.includes(notification.id))
+        .map((notification) => ({ id: notification.id })),
+      updateMany: async ({ where, data }: { where: { userId: string; id: { in: string[] }; readAt: null }; data: { status: "READ"; readAt: Date } }) => {
+        let count = 0;
+        for (const notification of notifications) {
+          if (notification.userId !== where.userId) continue;
+          if (!where.id.in.includes(notification.id)) continue;
+          if (notification.readAt !== null) continue;
+          notification.status = data.status;
+          notification.readAt = data.readAt;
+          count += 1;
+        }
+        return { count };
+      },
+    },
+  };
+
+  const requestedIds = ["n1", "n2", "n3"];
+  const owned = await inboxDb.notification.findMany({ where: { userId: "user-1", id: { in: requestedIds } } });
+  const ids = scopedReadBatchIds(requestedIds, owned.map((item) => item.id));
+
+  const updatedCount = await markNotificationsReadWithDb(inboxDb as never, { userId: "user-1", notificationIds: ids });
+  assert.equal(updatedCount, 2);
+
+  assert.equal(notifications[0]?.status, "READ");
+  assert.ok(notifications[0]?.readAt);
+  assert.equal(notifications[1]?.status, "READ");
+  assert.ok(notifications[1]?.readAt);
+  assert.equal(notifications[2]?.status, "UNREAD");
+  assert.equal(notifications[2]?.readAt, null);
+
+  const firstReadAt = notifications[0]?.readAt;
+  const updatedAgain = await markNotificationsReadWithDb(inboxDb as never, { userId: "user-1", notificationIds: ["n1"] });
+  assert.equal(updatedAgain, 0);
+  assert.equal(notifications[0]?.readAt, firstReadAt);
 });

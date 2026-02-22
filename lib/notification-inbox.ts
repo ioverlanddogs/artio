@@ -4,22 +4,40 @@ import { buildNotification, NotificationTemplatePayload } from "@/lib/notificati
 
 type InboxDb = Pick<typeof db, "notification">;
 
+type MarkReadBatchParams = {
+  userId: string;
+  notificationIds: string[];
+};
+
 export function buildInboxNotification(type: NotificationType, payload: NotificationTemplatePayload) {
   return buildNotification({ type, payload });
 }
 
 export async function markNotificationReadWithDb(inboxDb: InboxDb, userId: string, notificationId: string) {
+  const now = new Date();
   const result = await inboxDb.notification.updateMany({
-    where: { id: notificationId, userId },
-    data: { status: "READ", readAt: new Date() },
+    where: { id: notificationId, userId, readAt: null },
+    data: { status: "READ", readAt: now },
   });
   return result.count > 0;
 }
 
-export async function markAllNotificationsReadWithDb(inboxDb: InboxDb, userId: string) {
+export async function markNotificationsReadWithDb(inboxDb: InboxDb, params: MarkReadBatchParams) {
+  if (!params.notificationIds.length) return 0;
+  const now = new Date();
   const result = await inboxDb.notification.updateMany({
-    where: { userId, status: "UNREAD" },
-    data: { status: "READ", readAt: new Date() },
+    where: { userId: params.userId, id: { in: params.notificationIds }, readAt: null },
+    data: { status: "READ", readAt: now },
+  });
+
+  return result.count;
+}
+
+export async function markAllNotificationsReadWithDb(inboxDb: InboxDb, userId: string) {
+  const now = new Date();
+  const result = await inboxDb.notification.updateMany({
+    where: { userId, readAt: null },
+    data: { status: "READ", readAt: now },
   });
   return result.count;
 }

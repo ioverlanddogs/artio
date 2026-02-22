@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notificationsReadBatchSchema, parseBody, zodDetails } from "@/lib/validators";
 import { scopedReadBatchIds } from "@/lib/notifications-read-batch";
+import { markNotificationsReadWithDb } from "@/lib/notification-inbox";
 
 export const runtime = "nodejs";
 
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
 
     if (!ids.length) return NextResponse.json({ ok: true, updated: 0 });
 
-    const result = await db.notification.updateMany({ where: { userId: user.id, id: { in: ids } }, data: { status: "READ" } });
-    return NextResponse.json({ ok: true, updated: result.count });
+    const updated = await markNotificationsReadWithDb(db, { userId: user.id, notificationIds: ids });
+    return NextResponse.json({ ok: true, updated });
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") {
       return apiError(401, "unauthorized", "Authentication required");
