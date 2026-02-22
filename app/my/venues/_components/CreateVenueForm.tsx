@@ -6,9 +6,16 @@ import { Button } from "@/components/ui/button";
 
 type CreateVenuePayload = {
   name: string;
+  addressLine1?: string;
+  addressLine2?: string;
   city?: string;
+  region?: string;
   country?: string;
+  postcode?: string;
+  lat?: number;
+  lng?: number;
   websiteUrl?: string;
+  instagramUrl?: string;
 };
 
 type Props = { buttonLabel?: string };
@@ -56,31 +63,46 @@ export function CreateVenueForm({ buttonLabel = "Create venue" }: Props) {
         />
       </label>
       <label className="block">
+        <span className="text-sm">Address line 1 (optional)</span>
+        <input className="w-full rounded border p-2" maxLength={120} value={form.addressLine1 ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, addressLine1: event.target.value || undefined }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">Address line 2 (optional)</span>
+        <input className="w-full rounded border p-2" maxLength={120} value={form.addressLine2 ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, addressLine2: event.target.value || undefined }))} />
+      </label>
+      <label className="block">
         <span className="text-sm">City (optional)</span>
-        <input
-          className="w-full rounded border p-2"
-          maxLength={80}
-          value={form.city ?? ""}
-          onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value || undefined }))}
-        />
+        <input className="w-full rounded border p-2" maxLength={80} value={form.city ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value || undefined }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">Region (optional)</span>
+        <input className="w-full rounded border p-2" maxLength={80} value={form.region ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, region: event.target.value || undefined }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">Postcode (optional)</span>
+        <input className="w-full rounded border p-2" maxLength={20} value={form.postcode ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, postcode: event.target.value || undefined }))} />
       </label>
       <label className="block">
         <span className="text-sm">Country (optional)</span>
-        <input
-          className="w-full rounded border p-2"
-          maxLength={80}
-          value={form.country ?? ""}
-          onChange={(event) => setForm((prev) => ({ ...prev, country: event.target.value || undefined }))}
-        />
+        <input className="w-full rounded border p-2" maxLength={80} value={form.country ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, country: event.target.value || undefined }))} />
       </label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-sm">Latitude (optional)</span>
+          <input className="w-full rounded border p-2" type="number" step="any" value={form.lat ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, lat: event.target.value === "" ? undefined : Number(event.target.value) }))} />
+        </label>
+        <label className="block">
+          <span className="text-sm">Longitude (optional)</span>
+          <input className="w-full rounded border p-2" type="number" step="any" value={form.lng ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, lng: event.target.value === "" ? undefined : Number(event.target.value) }))} />
+        </label>
+      </div>
       <label className="block">
         <span className="text-sm">Website (optional)</span>
-        <input
-          className="w-full rounded border p-2"
-          type="url"
-          value={form.websiteUrl ?? ""}
-          onChange={(event) => setForm((prev) => ({ ...prev, websiteUrl: event.target.value || undefined }))}
-        />
+        <input className="w-full rounded border p-2" type="url" value={form.websiteUrl ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, websiteUrl: event.target.value || undefined }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">Instagram URL (optional)</span>
+        <input className="w-full rounded border p-2" type="url" value={form.instagramUrl ?? ""} onChange={(event) => setForm((prev) => ({ ...prev, instagramUrl: event.target.value || undefined }))} />
       </label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating..." : buttonLabel}</Button>

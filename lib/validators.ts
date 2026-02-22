@@ -507,10 +507,23 @@ export const myVenuePatchSchema = z.object({
 
 export const myVenueCreateSchema = z.object({
   name: z.string().trim().min(2).max(80),
+  addressLine1: z.string().trim().min(1).max(120).optional(),
+  addressLine2: z.string().trim().max(120).optional(),
+  address: z.string().trim().min(1).max(120).optional(),
   city: z.string().trim().max(80).optional().nullable(),
+  region: z.string().trim().max(80).optional(),
   country: z.string().trim().max(80).optional().nullable(),
+  postcode: z.string().trim().max(20).optional(),
+  lat: z.number().finite().min(-90).max(90).optional(),
+  lng: z.number().finite().min(-180).max(180).optional(),
   websiteUrl: httpUrlSchema.optional().nullable(),
-});
+  website: httpUrlSchema.optional().nullable(),
+  instagramUrl: httpUrlSchema.optional().nullable(),
+}).transform((data) => ({
+  ...data,
+  addressLine1: data.addressLine1 ?? data.address,
+  websiteUrl: data.websiteUrl ?? data.website,
+}));
 
 const eventImageSchema = z.object({
   assetId: z.string().uuid().optional().nullable(),

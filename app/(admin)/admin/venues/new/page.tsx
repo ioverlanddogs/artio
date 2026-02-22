@@ -10,12 +10,16 @@ export default function AdminNewVenue() {
       redirectPath="/admin/venues"
       uploadTargetType="venue"
       uploadTargetId="new"
-      initial={{ name: "", slug: "", description: "", city: "", country: "", lat: "", lng: "", websiteUrl: "", instagramUrl: "", contactEmail: "", featuredImageUrl: "", featuredAssetId: "", isPublished: false }}
+      initial={{ name: "", slug: "", description: "", addressLine1: "", addressLine2: "", city: "", region: "", postcode: "", country: "", lat: "", lng: "", websiteUrl: "", instagramUrl: "", contactEmail: "", featuredImageUrl: "", featuredAssetId: "", isPublished: false }}
       fields={[
         { name: "name", label: "Name" },
         { name: "slug", label: "Slug" },
         { name: "description", label: "Description" },
+        { name: "addressLine1", label: "Address Line 1" },
+        { name: "addressLine2", label: "Address Line 2" },
         { name: "city", label: "City" },
+        { name: "region", label: "Region" },
+        { name: "postcode", label: "Postcode" },
         { name: "country", label: "Country" },
         { name: "lat", label: "Latitude" },
         { name: "lng", label: "Longitude" },

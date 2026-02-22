@@ -19,9 +19,16 @@ type Deps = {
   createVenue: (data: {
     name: string;
     slug: string;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
     city?: string | null;
+    region?: string | null;
     country?: string | null;
+    postcode?: string | null;
+    lat?: number | null;
+    lng?: number | null;
     websiteUrl?: string | null;
+    instagramUrl?: string | null;
   }) => Promise<VenueRecord>;
   ensureOwnerMembership: (venueId: string, userId: string) => Promise<void>;
   upsertVenueDraftSubmission: (venueId: string, userId: string) => Promise<void>;
@@ -37,6 +44,11 @@ function normalizeKeyPart(input?: string | null) {
 
 function buildCreateKey(input: { name: string; city?: string | null; country?: string | null }) {
   return [normalizeKeyPart(input.name), normalizeKeyPart(input.city), normalizeKeyPart(input.country)].join("|");
+}
+
+function normalizeOptionalText(input?: string | null) {
+  const trimmed = input?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export async function handlePostMyVenue(req: NextRequest, deps: Deps) {
@@ -73,9 +85,16 @@ export async function handlePostMyVenue(req: NextRequest, deps: Deps) {
     const venue = await deps.createVenue({
       name: parsedBody.data.name,
       slug,
-      city: parsedBody.data.city ?? null,
-      country: parsedBody.data.country ?? null,
-      websiteUrl: parsedBody.data.websiteUrl ?? null,
+      addressLine1: normalizeOptionalText(parsedBody.data.addressLine1),
+      addressLine2: normalizeOptionalText(parsedBody.data.addressLine2),
+      city: normalizeOptionalText(parsedBody.data.city ?? undefined),
+      region: normalizeOptionalText(parsedBody.data.region),
+      country: normalizeOptionalText(parsedBody.data.country ?? undefined),
+      postcode: normalizeOptionalText(parsedBody.data.postcode),
+      lat: parsedBody.data.lat,
+      lng: parsedBody.data.lng,
+      websiteUrl: normalizeOptionalText(parsedBody.data.websiteUrl ?? undefined),
+      instagramUrl: normalizeOptionalText(parsedBody.data.instagramUrl ?? undefined),
     });
 
     await deps.ensureOwnerMembership(venue.id, user.id);
