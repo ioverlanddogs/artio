@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
 import { enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { geocodeQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
+import { normalizeGeoNames } from "@/lib/geocode/geonames";
 
 export const runtime = "nodejs";
 
@@ -11,32 +12,6 @@ type MapboxFeature = {
   text?: string;
   center?: [number, number];
 };
-
-type GeoNamesPlace = {
-  name?: string;
-  adminName1?: string;
-  countryName?: string;
-  lat?: string | number | null;
-  lng?: string | number | null;
-};
-
-export function normalizeGeoNames(places: GeoNamesPlace[]) {
-  return places
-    .map((place) => {
-      if (place.lat == null || place.lng == null) return null;
-      const lat = Number(place.lat);
-      const lng = Number(place.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-      const labelParts = [place.name, place.adminName1, place.countryName].map((value) => value?.trim()).filter(Boolean);
-      return {
-        label: labelParts.join(", "),
-        lat,
-        lng,
-      };
-    })
-    .filter((item): item is { label: string; lat: number; lng: number } => item !== null);
-}
 
 export async function GET(req: NextRequest) {
   const parsed = geocodeQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
@@ -73,8 +48,8 @@ export async function GET(req: NextRequest) {
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) return apiError(502, "provider_error", "Geocoding provider request failed");
 
-      const json = (await response.json()) as { geonames?: GeoNamesPlace[] };
-      const results = normalizeGeoNames(json.geonames ?? []);
+      const json = (await response.json()) as Parameters<typeof normalizeGeoNames>[0];
+      const { results } = normalizeGeoNames(json);
       return NextResponse.json({ results });
     }
 
