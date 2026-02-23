@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { enqueueToast } from "@/lib/toast";
 
 type VenueOption = { id: string; name: string };
 
@@ -12,6 +13,8 @@ type Props = {
   buttonLabel?: string;
   defaultStartAt?: string;
   defaultEndAt?: string;
+  defaultVenueId?: string;
+  showCreateAnotherAction?: boolean;
 };
 
 function isoToLocalDatetimeValue(iso?: string) {
@@ -21,12 +24,12 @@ function isoToLocalDatetimeValue(iso?: string) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-export function CreateEventForm({ venues, buttonLabel = "Create event", defaultStartAt, defaultEndAt }: Props) {
+export function CreateEventForm({ venues, buttonLabel = "Create event", defaultStartAt, defaultEndAt, defaultVenueId, showCreateAnotherAction = false }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState(isoToLocalDatetimeValue(defaultStartAt));
   const [endAt, setEndAt] = useState(isoToLocalDatetimeValue(defaultEndAt));
-  const [venueId, setVenueId] = useState(venues.length === 1 ? venues[0]!.id : "");
+  const [venueId, setVenueId] = useState(defaultVenueId ?? (venues.length === 1 ? venues[0]!.id : ""));
   const [ticketUrl, setTicketUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +39,8 @@ export function CreateEventForm({ venues, buttonLabel = "Create event", defaultS
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const createAnother = submitter?.value === "create-another";
     if (!canSubmit) return;
     setError(null);
     setIsSubmitting(true);
@@ -60,6 +65,14 @@ export function CreateEventForm({ venues, buttonLabel = "Create event", defaultS
     if (!res.ok) {
       setError(body?.error?.message ?? "Failed to create event");
       setIsSubmitting(false);
+      return;
+    }
+
+    enqueueToast({ title: "Event created", variant: "success" });
+
+    if (createAnother) {
+      const destination = venueId ? `/my/events/new?venueId=${encodeURIComponent(venueId)}` : "/my/events/new";
+      router.push(destination);
       return;
     }
 
@@ -99,7 +112,14 @@ export function CreateEventForm({ venues, buttonLabel = "Create event", defaultS
         <input className="w-full rounded border p-2" type="url" value={ticketUrl} onChange={(event) => setTicketUrl(event.target.value)} />
       </label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" disabled={!canSubmit || isSubmitting}>{isSubmitting ? "Creating..." : buttonLabel}</Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={!canSubmit || isSubmitting}>{isSubmitting ? "Creating..." : buttonLabel}</Button>
+        {showCreateAnotherAction ? (
+          <Button type="submit" value="create-another" variant="outline" disabled={!canSubmit || isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create & create another"}
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

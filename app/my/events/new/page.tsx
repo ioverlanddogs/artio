@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
-import { NewEventAutoCreate } from "@/app/my/events/new/page-client";
+import { CreateEventForm } from "@/app/my/events/_components/CreateEventForm";
 
 export default async function NewEventPage({
   searchParams,
@@ -13,7 +13,7 @@ export default async function NewEventPage({
 
   const memberships = await db.venueMembership.findMany({
     where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] } },
-    select: { venueId: true },
+    select: { venueId: true, venue: { select: { name: true } } },
   });
 
   const now = new Date();
@@ -29,16 +29,17 @@ export default async function NewEventPage({
       ? memberships[0]!.venueId
       : undefined;
 
+  const venues = memberships.map((membership) => ({ id: membership.venueId, name: membership.venue.name }));
+
   return (
-    <main className="p-6">
-      <NewEventAutoCreate
-        defaultPayload={{
-          title: "Untitled event",
-          startAt,
-          endAt,
-          venueId: preselectedVenueId,
-          timezone: "UTC",
-        }}
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Create event</h1>
+      <CreateEventForm
+        venues={venues}
+        defaultStartAt={startAt}
+        defaultEndAt={endAt}
+        defaultVenueId={preselectedVenueId}
+        showCreateAnotherAction
       />
     </main>
   );

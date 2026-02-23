@@ -13,7 +13,7 @@ function toLocalDatetime(date: string) {
   return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
 }
 
-export function EditEventForm({ event, readyToSubmit, submission }: { event: { id: string; title: string; startAt: Date; endAt: Date | null; slug: string | null; isPublished: boolean; featuredAssetId: string | null; featuredAsset: { url: string | null } | null }; readyToSubmit: boolean; submission: { status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | null; submittedAt: string | null; reviewedAt: string | null; rejectionReason: string | null } }) {
+export function EditEventForm({ event, readyToSubmit, submission }: { event: { id: string; title: string; startAt: Date; endAt: Date | null; slug: string | null; venueId: string | null; isPublished: boolean; featuredAssetId: string | null; featuredAsset: { url: string | null } | null }; readyToSubmit: boolean; submission: { status: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | null; submittedAt: string | null; reviewedAt: string | null; rejectionReason: string | null } }) {
   const router = useRouter();
   const [title, setTitle] = useState(event.title);
   const [startAt, setStartAt] = useState(toLocalDatetime(event.startAt.toISOString()));
@@ -53,6 +53,8 @@ export function EditEventForm({ event, readyToSubmit, submission }: { event: { i
       <FeaturedEventImagePanel eventId={event.id} featuredAssetId={event.featuredAssetId} featuredImageUrl={event.featuredAsset?.url ?? null} />
       <form onSubmit={async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+        const createAnother = submitter?.value === "create-another";
         setSaving(true);
         setError(null);
         const res = await fetch(`/api/my/events/${event.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, startAt: new Date(startAt).toISOString(), endAt: endAt ? new Date(endAt).toISOString() : null }) });
@@ -62,6 +64,12 @@ export function EditEventForm({ event, readyToSubmit, submission }: { event: { i
           setSaving(false);
           return;
         }
+        enqueueToast({ title: "Event saved", variant: "success" });
+        if (createAnother) {
+          const destination = event.venueId ? `/my/events/new?venueId=${encodeURIComponent(event.venueId)}` : "/my/events/new";
+          router.push(destination);
+          return;
+        }
         router.refresh();
         setSaving(false);
       }} className="max-w-2xl space-y-3 rounded border p-4">
@@ -69,7 +77,10 @@ export function EditEventForm({ event, readyToSubmit, submission }: { event: { i
         <label className="block"><span className="text-sm">Start at</span><input className="w-full rounded border p-2" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></label>
         <label className="block"><span className="text-sm">End at</span><input className="w-full rounded border p-2" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex gap-2"><Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save changes"}</Button></div>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save changes"}</Button>
+          <Button type="submit" value="create-another" variant="outline" disabled={saving}>{saving ? "Saving..." : "Save & create another"}</Button>
+        </div>
       </form>
     </>
   );
