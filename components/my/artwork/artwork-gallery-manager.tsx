@@ -9,20 +9,20 @@ import { Input } from "@/components/ui/input";
 import { buildLoginRedirectUrl } from "@/lib/auth-redirect";
 import { enqueueToast } from "@/lib/toast";
 
-type ArtworkImage = { id: string; url: string; alt: string | null };
+type ArtworkImage = { id: string; url: string; alt: string | null; assetId: string };
 
 export function ArtworkGalleryManager({
   artworkId,
   initialImages,
-  initialCoverImageId,
+  initialCoverAssetId,
 }: {
   artworkId: string;
   initialImages: ArtworkImage[];
-  initialCoverImageId: string | null;
+  initialCoverAssetId: string | null;
 }) {
   const router = useRouter();
   const [images, setImages] = useState<ArtworkImage[]>(initialImages);
-  const [coverImageId, setCoverImageId] = useState<string | null>(initialCoverImageId);
+  const [coverAssetId, setCoverAssetId] = useState<string | null>(initialCoverAssetId);
   const [isUploading, setIsUploading] = useState(false);
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
   const [altDraftMap, setAltDraftMap] = useState<Record<string, string>>(
@@ -80,10 +80,16 @@ export function ArtworkGalleryManager({
           continue;
         }
 
-        const body = (await createRes.json()) as { image?: ArtworkImage };
+        const body = (await createRes.json()) as { image?: { id: string; alt: string | null; assetId: string; url?: string; asset?: { url: string } } };
         if (body.image) {
-          setImages((current) => [...current, body.image as ArtworkImage]);
-          setAltDraftMap((current) => ({ ...current, [body.image!.id]: body.image!.alt ?? "" }));
+          const nextImage: ArtworkImage = {
+            id: body.image.id,
+            alt: body.image.alt,
+            assetId: body.image.assetId,
+            url: body.image.url ?? body.image.asset?.url ?? "",
+          };
+          setImages((current) => [...current, nextImage]);
+          setAltDraftMap((current) => ({ ...current, [nextImage.id]: nextImage.alt ?? "" }));
         } else {
           router.refresh();
         }
@@ -159,12 +165,17 @@ export function ArtworkGalleryManager({
     if (!window.confirm("Delete this image?")) return;
 
     const previousImages = images;
-    const previousCover = coverImageId;
+    const previousCover = coverAssetId;
+    const deletedImage = images.find((image) => image.id === imageId);
+    const nextImages = images.filter((image) => image.id !== imageId);
+    const nextCoverImage = deletedImage?.assetId === coverAssetId ? nextImages[0] ?? null : null;
 
     setLoadingMap((prev) => ({ ...prev, [imageId]: true }));
-    setImages((current) => current.filter((image) => image.id !== imageId));
-    if (coverImageId === imageId) {
-      setCoverImageId(null);
+    setImages(nextImages);
+    if (nextCoverImage) {
+      setCoverAssetId(nextCoverImage.assetId);
+    } else if (deletedImage?.assetId === coverAssetId) {
+      setCoverAssetId(null);
     }
 
     const res = await fetch(`/api/my/artwork/images/${imageId}`, { method: "DELETE" });
@@ -173,18 +184,35 @@ export function ArtworkGalleryManager({
 
     if (!res.ok) {
       setImages(previousImages);
-      setCoverImageId(previousCover);
+      setCoverAssetId(previousCover);
       enqueueToast({ title: "Failed to delete image", variant: "error" });
       return;
+    }
+
+    if (deletedImage?.assetId === previousCover) {
+      const coverRes = await fetch(`/api/my/artwork/${artworkId}/cover`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageId: nextCoverImage?.id ?? null }),
+      });
+
+      if (handleAuth(coverRes) || !coverRes.ok) {
+        router.refresh();
+        enqueueToast({ title: "Image deleted, but failed to update cover", variant: "error" });
+        return;
+      }
     }
 
     enqueueToast({ title: "Image deleted", variant: "success" });
   }
 
   async function setAsCover(imageId: string) {
-    const previous = coverImageId;
+    const nextCover = images.find((image) => image.id === imageId);
+    if (!nextCover) return;
+
+    const previous = coverAssetId;
     setLoadingMap((prev) => ({ ...prev, [`cover:${imageId}`]: true }));
-    setCoverImageId(imageId);
+    setCoverAssetId(nextCover.assetId);
 
     try {
       const res = await fetch(`/api/my/artwork/${artworkId}/cover`, {
@@ -195,7 +223,7 @@ export function ArtworkGalleryManager({
 
       if (handleAuth(res)) return;
       if (!res.ok) {
-        setCoverImageId(previous);
+        setCoverAssetId(previous);
         enqueueToast({ title: "Failed to set cover", variant: "error" });
         return;
       }
@@ -226,7 +254,7 @@ export function ArtworkGalleryManager({
               <div className="relative h-36 w-full overflow-hidden rounded border">
                 <Image src={image.url} alt={image.alt ?? "Artwork image"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
               </div>
-              {coverImageId === image.id ? <p className="text-xs font-medium text-emerald-700">Current cover</p> : null}
+              {coverAssetId === image.assetId ? <p className="text-xs font-medium text-emerald-700">Current cover</p> : null}
               <div className="flex gap-2">
                 <Input
                   value={altDraftMap[image.id] ?? ""}
@@ -249,7 +277,7 @@ export function ArtworkGalleryManager({
                   type="button"
                   variant="outline"
                   onClick={() => setAsCover(image.id)}
-                  disabled={coverImageId === image.id || Boolean(loadingMap[`cover:${image.id}`])}
+                  disabled={coverAssetId === image.assetId || Boolean(loadingMap[`cover:${image.id}`])}
                 >
                   Set Cover
                 </Button>
