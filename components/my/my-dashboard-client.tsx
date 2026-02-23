@@ -34,6 +34,11 @@ type DashboardPayload = {
     venuesHref: string;
     venuesNewHref: string;
   };
+  publisher?: {
+    approval?: {
+      showBanner?: boolean;
+    };
+  };
 };
 
 function getVenueStatus(venue: DashboardPayload["entities"]["venues"][number]) {
@@ -46,6 +51,7 @@ function getVenueStatus(venue: DashboardPayload["entities"]["venues"][number]) {
 export function MyDashboardClient() {
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publisherApprovalDismissed, setPublisherApprovalDismissed] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +64,17 @@ export function MyDashboardClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("publisherApprovalDismissed")) {
+      setPublisherApprovalDismissed(false);
+    }
+  }, []);
+
+  const dismissPublisherApprovalBanner = useCallback(() => {
+    window.localStorage.setItem("publisherApprovalDismissed", "1");
+    setPublisherApprovalDismissed(true);
+  }, []);
 
   if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, idx) => <Skeleton key={idx} className="h-32 w-full" />)}</div>;
   if (!data) return null;
@@ -76,6 +93,23 @@ export function MyDashboardClient() {
 
   return (
     <div className="space-y-6">
+      {data.publisher?.approval?.showBanner && !publisherApprovalDismissed ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Publisher access approved</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">You can now create venues, events, and artworks.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild><Link href="/my/venues/new">Create venue</Link></Button>
+              <Button asChild><Link href="/my/events/new">Create event</Link></Button>
+              <Button asChild><Link href="/my/artwork/new">Create artwork</Link></Button>
+              <Button type="button" variant="outline" onClick={dismissPublisherApprovalBanner}>Dismiss</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-base">Artworks</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{data.stats.artworks.total}</p><p className="text-xs text-muted-foreground">{data.stats.artworks.published} published · {data.stats.artworks.drafts} drafts</p><div className="mt-2 flex items-center gap-2"><Badge variant="secondary">Missing cover: {data.stats.artworks.missingCover}</Badge></div><Link className="mt-2 block text-sm underline" href={data.links.artworksHref}>Manage artworks</Link></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Events</CardTitle></CardHeader><CardContent><p className="text-2xl font-semibold">{data.stats.events.total}</p><p className="text-xs text-muted-foreground">{data.stats.events.upcoming30} in next 30 days</p><div className="mt-2 flex items-center gap-2"><Badge variant="secondary">Missing venue: {data.stats.events.missingVenue}</Badge></div><Link className="mt-2 block text-sm underline" href={data.links.eventsHref}>Manage events</Link></CardContent></Card>
