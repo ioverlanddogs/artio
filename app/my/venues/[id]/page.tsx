@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -13,6 +14,7 @@ import VenuePublishPanel from "@/app/my/_components/VenuePublishPanel";
 import VenueArtistRequestsPanel from "@/app/my/_components/VenueArtistRequestsPanel";
 import { evaluateVenueReadiness } from "@/lib/publish-readiness";
 import { PublishReadinessChecklist } from "@/components/publishing/publish-readiness-checklist";
+import { Button } from "@/components/ui/button";
 import { resolveVenueIdFromRouteParam } from "./route-param";
 
 export default async function MyVenueEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -105,7 +107,18 @@ export default async function MyVenueEditPage({ params }: { params: Promise<{ id
 
   return (
     <main className="space-y-6 p-6">
-      <PageHeader title="Edit Venue" subtitle="Update venue details and team access settings." />
+      <PageHeader
+        title="Edit Venue"
+        subtitle="Update venue details and team access settings."
+        actions={(
+          <div className="flex flex-col items-start gap-1 md:items-end">
+            <Button asChild>
+              <Link href={`/my/venues/${venueId}/submit-event`}>Submit Event</Link>
+            </Button>
+            <p className="text-xs text-muted-foreground">Create and submit events for this venue</p>
+          </div>
+        )}
+      />
 
       <PublishReadinessChecklist title="Venue publish readiness" ready={readiness.ready} blocking={readiness.blocking} warnings={readiness.warnings} />
 
