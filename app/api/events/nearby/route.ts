@@ -21,13 +21,19 @@ type NearbyEventWithJoin = {
   eventTags?: Array<{ tag: { name: string; slug: string } }>;
 };
 
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function GET(req: NextRequest) {
   const parsed = nearbyEventsQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
   if (!parsed.success) return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
 
   const { lat, lng, radiusKm, days, cursor, limit, q, tags, from, to, sort } = parsed.data;
   const now = new Date();
-  const dateFrom = from ? new Date(from) : now;
+  const dateFrom = from ? new Date(from) : startOfDay(now);
   const dateTo = to ? new Date(to) : (() => {
     const next = new Date(dateFrom);
     next.setDate(next.getDate() + (days ?? 30));
@@ -43,7 +49,17 @@ export async function GET(req: NextRequest) {
   while (pageItems.length < limit && dbHasMore && iterations < 5) {
     iterations += 1;
     const nearbyFilters = buildNearbyEventsFilters({ cursor: workingCursor, from: dateFrom, to: dateTo });
+    const dateWindowFilters: Prisma.EventWhereInput[] = [
+      { startAt: { lte: dateTo } },
+      {
+        OR: [
+          { endAt: { gte: dateFrom } },
+          { endAt: null, startAt: { gte: dateFrom } },
+        ],
+      },
+    ];
     const andFilters: Prisma.EventWhereInput[] = [
+      ...dateWindowFilters,
       {
         OR: [
           { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } },
@@ -58,7 +74,6 @@ export async function GET(req: NextRequest) {
     const batch = (await db.event.findMany({
       where: {
         isPublished: true,
-        startAt: nearbyFilters.startAt,
         AND: andFilters,
       },
       take: batchSize,
