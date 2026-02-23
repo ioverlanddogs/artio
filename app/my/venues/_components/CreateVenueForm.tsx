@@ -19,9 +19,9 @@ type CreateVenuePayload = {
   instagramUrl?: string;
 };
 
-type Props = { buttonLabel?: string };
+type Props = { buttonLabel?: string; showTopSubmit?: boolean };
 
-export function CreateVenueForm({ buttonLabel = "Create venue" }: Props) {
+export function CreateVenueForm({ buttonLabel = "Create venue", showTopSubmit = false }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<CreateVenuePayload>({ name: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,8 +58,15 @@ export function CreateVenueForm({ buttonLabel = "Create venue" }: Props) {
     router.push(`/my/venues/${body.venue.id}`);
   }
 
+  const submitButtonLabel = isSubmitting ? "Creating..." : buttonLabel;
+
   return (
     <form onSubmit={onSubmit} className="max-w-xl space-y-3 rounded border p-4">
+      {showTopSubmit ? (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isSubmitting}>{submitButtonLabel}</Button>
+        </div>
+      ) : null}
       <label className="block">
         <span className="text-sm">Venue name</span>
         <input
@@ -122,7 +129,7 @@ export function CreateVenueForm({ buttonLabel = "Create venue" }: Props) {
         </div>
       ) : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating..." : buttonLabel}</Button>
+      <Button type="submit" disabled={isSubmitting}>{submitButtonLabel}</Button>
     </form>
   );
 }
