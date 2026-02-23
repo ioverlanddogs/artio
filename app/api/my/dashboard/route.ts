@@ -32,7 +32,6 @@ async function findPublisherApprovalNotice(userId: string) {
 
 
 async function listEventsPipelineByUserId(userId: string) {
-  const now = new Date();
   const eventSelect = Prisma.validator<Prisma.EventSelect>()({
     id: true,
     title: true,
@@ -70,27 +69,14 @@ async function listEventsPipelineByUserId(userId: string) {
     },
   } satisfies Prisma.EventWhereInput;
 
-  const upcoming = await db.event.findMany({
-    where: { ...where, startAt: { gte: now } },
+  const events = await db.event.findMany({
+    where,
     select: eventSelect,
-    orderBy: [{ startAt: "asc" }, { updatedAt: "desc" }],
-    take: 5,
+    orderBy: { updatedAt: "desc" },
+    take: 25,
   });
 
-  const remaining = 5 - upcoming.length;
-  const fallback = remaining > 0
-    ? await db.event.findMany({
-      where: {
-        ...where,
-        id: { notIn: upcoming.map((event) => event.id) },
-      },
-      select: eventSelect,
-      orderBy: { updatedAt: "desc" },
-      take: remaining,
-    })
-    : [];
-
-  return [...upcoming, ...fallback].map((event) => {
+  return events.map((event) => {
     const latestSubmission = event.submissions[0] ?? null;
     const latestSubmissionStatus = latestSubmission?.status ?? null;
     const feedback = latestSubmission?.decisionReason ?? latestSubmission?.rejectionReason ?? latestSubmission?.note ?? null;
@@ -98,6 +84,7 @@ async function listEventsPipelineByUserId(userId: string) {
       id: event.id,
       title: event.title,
       startAtISO: event.startAt ? event.startAt.toISOString() : null,
+      updatedAtISO: event.updatedAt.toISOString(),
       venueName: event.venue?.name ?? null,
       statusLabel: event.isPublished
         ? "Published"

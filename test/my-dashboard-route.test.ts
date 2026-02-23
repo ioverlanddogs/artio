@@ -76,6 +76,102 @@ test("/api/my/dashboard includes events pipeline when provided", async () => {
   assert.equal(body.eventsPipeline.items[0].feedback, "Please update the event details before publishing.");
 });
 
+
+test("/api/my/dashboard sorts events pipeline by actionable priority", async () => {
+  const deps = baseDeps();
+  const now = new Date();
+  const iso = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString();
+
+  deps.listEventsPipelineByUserId = async () => [
+    {
+      id: "submitted",
+      title: "Submitted",
+      startAtISO: iso(7 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-1 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Submitted",
+      submissionStatus: "SUBMITTED",
+      isPublished: false,
+      featuredAssetId: "asset-submitted",
+    },
+    {
+      id: "draft-ready",
+      title: "Draft Ready",
+      startAtISO: iso(5 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-2 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Draft",
+      submissionStatus: null,
+      isPublished: false,
+      featuredAssetId: "asset-ready",
+    },
+    {
+      id: "needs-image",
+      title: "Needs Image",
+      startAtISO: iso(3 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-3 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Draft",
+      submissionStatus: null,
+      isPublished: false,
+      featuredAssetId: null,
+      featuredImageUrl: null,
+    },
+    {
+      id: "changes-requested",
+      title: "Changes Requested",
+      startAtISO: iso(2 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-4 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Changes requested",
+      submissionStatus: "REJECTED",
+      isPublished: false,
+      featuredAssetId: "asset-changes",
+    },
+    {
+      id: "approved",
+      title: "Approved",
+      startAtISO: iso(9 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-5 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Approved",
+      submissionStatus: "APPROVED",
+      isPublished: false,
+      featuredAssetId: "asset-approved",
+    },
+    {
+      id: "published-upcoming",
+      title: "Published Upcoming",
+      startAtISO: iso(10 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-6 * 60 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Published",
+      submissionStatus: null,
+      isPublished: true,
+      featuredAssetId: "asset-published",
+    },
+    {
+      id: "published-past",
+      title: "Published Past",
+      startAtISO: iso(-2 * 24 * 60 * 60 * 1000),
+      updatedAtISO: iso(-30 * 60 * 1000),
+      venueName: "Main Hall",
+      statusLabel: "Published",
+      submissionStatus: null,
+      isPublished: true,
+      featuredAssetId: "asset-past",
+    },
+  ];
+
+  const res = await handleGetMyDashboard(deps);
+  const body = await res.json();
+
+  assert.deepEqual(
+    body.eventsPipeline.items.map((item: { id: string }) => item.id),
+    ["changes-requested", "needs-image", "draft-ready", "submitted", "approved"],
+  );
+});
+
 test("/api/my/dashboard includes venues quick-pick when provided", async () => {
   const deps = baseDeps();
   deps.listVenuesQuickPickByUserId = async () => [

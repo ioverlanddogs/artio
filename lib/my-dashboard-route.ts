@@ -82,6 +82,7 @@ type Deps = {
     id: string;
     title: string;
     startAtISO: string | null;
+    updatedAtISO?: string | null;
     venueName: string | null;
     statusLabel: string | null;
     submissionStatus?: string | null;
@@ -97,6 +98,66 @@ type Deps = {
     name: string;
   }>>;
 };
+
+type EventsPipelineItem = {
+  id: string;
+  title: string;
+  startAtISO: string | null;
+  updatedAtISO?: string | null;
+  venueName: string | null;
+  statusLabel: string | null;
+  submissionStatus?: string | null;
+  submittedAtISO?: string | null;
+  decidedAtISO?: string | null;
+  feedback?: string | null;
+  isPublished?: boolean | null;
+  featuredAssetId?: string | null;
+  featuredImageUrl?: string | null;
+};
+
+function getPipelineTier(item: EventsPipelineItem) {
+  const submissionStatus = item.submissionStatus ?? null;
+  const isPublished = Boolean(item.isPublished);
+  const hasFeaturedImage = Boolean(item.featuredAssetId || item.featuredImageUrl);
+  const isDraft = !isPublished && !submissionStatus;
+  const isSubmitted = submissionStatus === "SUBMITTED";
+  const isApproved = submissionStatus === "APPROVED";
+  const needsResubmit = submissionStatus === "REJECTED";
+
+  if (needsResubmit) return 0;
+  if (isDraft && !hasFeaturedImage) return 1;
+  if (isDraft && hasFeaturedImage) return 2;
+  if (isSubmitted) return 3;
+  if (isApproved && !isPublished) return 4;
+  if (isPublished) return 5;
+  return 6;
+}
+
+function getPipelineSortKey(item: EventsPipelineItem, now: Date) {
+  const startAtMs = item.startAtISO ? Date.parse(item.startAtISO) : Number.NaN;
+  const isUpcoming = Number.isFinite(startAtMs) && startAtMs >= now.getTime();
+  const updatedAtMs = item.updatedAtISO ? Date.parse(item.updatedAtISO) : Number.NaN;
+  return {
+    tier: getPipelineTier(item),
+    upcomingKey: isUpcoming ? startAtMs : Number.MAX_SAFE_INTEGER,
+    updatedKey: Number.isFinite(updatedAtMs) ? -updatedAtMs : 0,
+  };
+}
+
+function sortEventsPipeline(items: EventsPipelineItem[], now: Date) {
+  return items
+    .map((item, index) => ({ item, index, key: getPipelineSortKey(item, now) }))
+    .sort((a, b) => {
+      const byTier = a.key.tier - b.key.tier;
+      if (byTier !== 0) return byTier;
+      const byUpcoming = a.key.upcomingKey - b.key.upcomingKey;
+      if (byUpcoming !== 0) return byUpcoming;
+      const byUpdated = a.key.updatedKey - b.key.updatedKey;
+      if (byUpdated !== 0) return byUpdated;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.item);
+}
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 
@@ -339,7 +400,7 @@ export async function handleGetMyDashboard(deps: Deps) {
       recent: recent.length > 0 ? recent : synthesizeRecent(artworks, events),
       eventsPipeline: eventsPipelineItems
         ? {
-          items: eventsPipelineItems,
+          items: sortEventsPipeline(eventsPipelineItems, now).slice(0, 5),
         }
         : undefined,
       venuesQuickPick: venuesQuickPick && venuesQuickPick.length > 0
