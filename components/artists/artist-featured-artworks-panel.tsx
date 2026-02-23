@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type ArtworkOption = { id: string; title: string; slug: string | null; coverUrl: string | null; isPublished: boolean };
@@ -67,7 +69,13 @@ export function ArtistFeaturedArtworksPanel({ initialFeatured, options }: { init
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {initialFeatured.length === 0 ? <p className="text-sm text-muted-foreground">No featured artworks yet.</p> : initialFeatured.map((item) => (
           <div key={item.id} className="rounded border p-2 text-sm">
-            <div className="font-medium">{item.title}</div>
+            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded border bg-muted">
+              {item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image</div>}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium">{item.title}</div>
+              <Link href={`/my/artwork/${item.id}`} className="text-xs text-muted-foreground underline">Edit</Link>
+            </div>
           </div>
         ))}
       </div>
@@ -86,7 +94,12 @@ export function ArtistFeaturedArtworksPanel({ initialFeatured, options }: { init
           <div className="space-y-1">
             {selectedDetails.map((item, index) => (
               <div key={item.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-                <span>{item.title}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="relative h-10 w-10 flex-none overflow-hidden rounded border bg-muted">
+                    {item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill sizes="40px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">No image</div>}
+                  </div>
+                  <span className="truncate">{item.title}</span>
+                </div>
                 <div className="space-x-1">
                   <button type="button" onClick={() => moveAt(index, -1)} className="rounded border px-2" disabled={index === 0}>↑</button>
                   <button type="button" onClick={() => moveAt(index, 1)} className="rounded border px-2" disabled={index === selectedDetails.length - 1}>↓</button>
