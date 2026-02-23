@@ -1,58 +1,32 @@
 import Link from "next/link";
-import { redirectToLogin } from "@/lib/auth-redirect";
-import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
+import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MyArtworkEmptyState } from "@/components/artwork/my-artwork-empty-state";
-import { computeArtworkCompleteness } from "@/lib/artwork-completeness";
-import { parseArtworkFilter } from "@/lib/my-filters";
 
-export default async function MyArtworkPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function MyArtworkPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; sort?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my/artwork");
+  const { q = "", status, sort = "updated" } = await searchParams;
 
-  const { filter } = await searchParams;
-  const parsedFilter = parseArtworkFilter(filter);
   const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
-
-  const items = await db.artwork.findMany({
-    where: {
-      ...(user.role === "ADMIN" ? {} : { artistId: artist?.id }),
-      ...(parsedFilter === "draft" ? { isPublished: false } : {}),
-      ...(parsedFilter === "missingCover" ? { featuredAssetId: null, images: { none: {} } } : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, title: true, isPublished: true, description: true, year: true, medium: true, featuredAssetId: true, _count: { select: { images: true } } },
-  });
+  const items = artist ? await db.artwork.findMany({
+    where: { artistId: artist.id, title: q ? { contains: q, mode: "insensitive" } : undefined, isPublished: status === "Published" ? true : status === "Draft" ? false : undefined },
+    orderBy: sort === "title" ? { title: "asc" } : { updatedAt: "desc" },
+    select: { id: true, title: true, slug: true, isPublished: true, updatedAt: true },
+  }) : [];
 
   return (
-    <main className="space-y-4 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">My Artwork</h1>
-        <Button asChild><Link href="/my/artwork/new">Add artwork</Link></Button>
+    <main className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <form className="flex gap-2"><input name="q" defaultValue={q} className="h-9 rounded border px-2 text-sm" placeholder="Search artwork" /><Button size="sm">Search</Button></form>
+        {(["Draft", "Published"] as const).map((chip) => <Link key={chip} className="rounded border px-2 py-1 text-xs" href={`/my/artwork?status=${chip}`}>{chip}</Link>)}
+        <Link className="rounded border px-2 py-1 text-xs" href="/my/artwork?sort=title">Sort: Title</Link>
+        <Button asChild size="sm"><Link href="/my/artwork/new">Add artwork</Link></Button>
       </div>
-      {items.length === 0 ? (
-        <MyArtworkEmptyState />
-      ) : (
-        <ul className="space-y-2">
-          {items.map((item) => {
-            const completeness = computeArtworkCompleteness(item, item._count.images);
-            return (
-              <li key={item.id} className="rounded border p-3">
-                <Link className="underline" href={`/my/artwork/${item.id}`}>{item.title}</Link>{" "}
-                <span className="text-sm text-muted-foreground">({item.isPublished ? "Published" : "Draft"})</span>
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Completeness:</span>
-                  <Badge variant={completeness.required.ok ? "default" : "secondary"}>{completeness.required.ok ? "Ready" : "Needs work"}</Badge>
-                  <span className="text-muted-foreground">{completeness.scorePct}%</span>
-                </div>
-                {!completeness.required.ok ? <p className="mt-1 text-xs text-muted-foreground">Add a title and at least one image to publish.</p> : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => <article key={item.id} className="rounded border p-3"><h3 className="font-medium">{item.title}</h3><p className="text-xs text-muted-foreground">{item.isPublished ? "Published" : "Draft"}</p><div className="mt-2 space-x-2 text-sm"><Link className="underline" href={`/my/artwork/${item.id}`}>Edit</Link><Link className="underline" href={`/api/my/artwork/${item.id}/publish`}>{item.isPublished ? "Unpublish" : "Publish"}</Link><Link className="underline" href={`/artwork/${item.slug ?? item.id}`}>View Public</Link></div></article>)}
+      </div>
     </main>
   );
 }

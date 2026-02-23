@@ -2,45 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("/my dashboard page includes key publisher actions", () => {
+test("/my dashboard page includes command center sections", () => {
   const source = readFileSync("app/my/page.tsx", "utf8");
-  assert.match(source, /Publisher Dashboard/);
-  assert.match(source, /\+ Add artwork/);
-  assert.match(source, /\+ Create event/);
-  assert.match(source, /\+ Create venue/);
-  assert.match(source, /View analytics/);
+  assert.match(source, /Needs attention/);
+  assert.match(source, /Recent activity/);
+  assert.match(source, /Venue drafts/);
+  assert.match(source, /Events submitted/);
 });
 
-test("dashboard client renders venues empty-state CTA", () => {
-  const source = readFileSync("components/my/my-dashboard-client.tsx", "utf8");
-  assert.match(source, /My venues/);
-  assert.match(source, /Create your first venue/);
-  assert.match(source, /\+ Create venue/);
-  assert.match(source, /venuesNewHref/);
-});
-
-test("dashboard client renders venue rows and view-all link", () => {
-  const source = readFileSync("components/my/my-dashboard-client.tsx", "utf8");
-  assert.match(source, /entities\.venues\.map/);
-  assert.match(source, /View all venues/);
-  assert.match(source, /\/my\/venues\/\$\{venue\.id\}/);
-});
-
-
-test("dashboard client includes events pipeline card content", () => {
-  const source = readFileSync("components/my/my-dashboard-client.tsx", "utf8");
-  assert.match(source, /Events pipeline/);
-  assert.match(source, /Create event/);
-  assert.match(source, /View all events/);
-  assert.match(source, /Changes requested/);
-  assert.match(source, /View feedback/);
-  assert.match(source, /Resubmit/);
-  assert.match(source, /\/my\/events\/\$\{event\.id\}/);
-});
-
-test("dashboard client includes fix-now guidance for actionable pipeline rows", () => {
-  const source = readFileSync("components/my/my-dashboard-client.tsx", "utf8");
-  assert.match(source, /Fix now: Address reviewer feedback, then Resubmit\./);
-  assert.match(source, /Fix now: Add a featured image, then Submit\./);
-  assert.match(source, /Fix now: Submit for review\./);
+test("/my layout includes shared shell components", () => {
+  const layout = readFileSync("app/my/layout.tsx", "utf8");
+  const header = readFileSync("app/my/_components/my-header-bar.tsx", "utf8");
+  assert.match(layout, /MyShell/);
+  assert.match(header, /Publisher Command Center/);
 });

@@ -2,137 +2,59 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
-import { OnboardingPanel } from "@/components/onboarding/onboarding-panel";
-import { hasDatabaseUrl } from "@/lib/runtime-db";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { CreateVenueForm } from "@/app/my/venues/_components/CreateVenueForm";
-import { parseVenueFilter } from "@/lib/my-filters";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyVenuesPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function MyVenuesPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; sort?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my/venues");
-
-  if (!hasDatabaseUrl()) {
-    return (
-      <main className="space-y-4 p-6">
-        <PageHeader title="My Venues" subtitle="Manage your venues, members, and submission status." />
-        <p>Set DATABASE_URL to manage venues locally.</p>
-      </main>
-    );
-  }
-
-  const { filter } = await searchParams;
-  const parsedFilter = parseVenueFilter(filter);
+  const { q = "", status, sort = "updated" } = await searchParams;
 
   const memberships = await db.venueMembership.findMany({
-    where: { userId: user.id },
-    include: {
-      venue: {
-        include: {
-          targetSubmissions: {
-            where: { type: "VENUE" },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
+    where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] } },
+    include: { venue: { include: { targetSubmissions: { where: { type: "VENUE" }, orderBy: { updatedAt: "desc" }, take: 1 } } } },
+    orderBy: sort === "name" ? { venue: { name: "asc" } } : { venue: { updatedAt: "desc" } },
   });
 
-  const filteredMemberships = memberships.filter((item) => {
-    const latestStatus = item.venue.targetSubmissions[0]?.status;
-    if (parsedFilter === "missingCover") return item.venue.featuredAssetId === null;
-    if (parsedFilter === "needsEdits") return latestStatus === "REJECTED";
-    if (parsedFilter === "submitted") return latestStatus === "SUBMITTED";
+  const rows = memberships.filter((m) => {
+    const s = m.venue.targetSubmissions[0]?.status;
+    if (status === "Draft") return !m.venue.isPublished && s !== "SUBMITTED" && s !== "REJECTED";
+    if (status === "Submitted") return s === "SUBMITTED";
+    if (status === "Rejected") return s === "REJECTED";
+    if (status === "Published") return m.venue.isPublished;
     return true;
-  });
-
-  const pendingInvites = await db.venueInvite.findMany({
-    where: {
-      email: user.email.toLowerCase(),
-      status: "PENDING",
-      expiresAt: { gt: new Date() },
-    },
-    include: {
-      venue: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const hasNoMemberships = filteredMemberships.length === 0;
-  const hasNoInvites = pendingInvites.length === 0;
+  }).filter((m) => m.venue.name.toLowerCase().includes(q.toLowerCase()));
 
   return (
-    <main className="p-6 space-y-3">
-      <PageHeader title="My Venues" subtitle="Manage your venues, members, and submission status." />
-      <OnboardingPanel />
-
-      {pendingInvites.length > 0 ? (
-        <section className="space-y-2 rounded border bg-amber-50 p-4">
-          <h2 className="text-lg font-semibold">Pending invites</h2>
-          <ul className="space-y-2">
-            {pendingInvites.map((invite) => (
-              <li key={invite.id} className="rounded border bg-card p-3 text-sm">
-                <p className="font-medium">{invite.venue.name}</p>
-                <p className="text-neutral-600">Role: {invite.role}</p>
-                <p className="mt-2"><Link className="underline" href={`/invite/${invite.token}`}>Review and accept invite</Link></p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {hasNoMemberships ? (
-        hasNoInvites ? (
-          <section className="space-y-3">
-            <EmptyState
-              title="Create a venue or join one"
-              description="Create a venue to start posting events, or accept an invite."
-              actions={[
-                { label: "Browse venues", href: "/venues", variant: "secondary" },
-                { label: "Check notifications", href: "/notifications", variant: "secondary" },
-              ]}
-            />
-            <CreateVenueForm />
-          </section>
-        ) : (
-          <section className="space-y-3">
-            <p className="text-sm text-muted-foreground">No managed venues yet. You can still create your own venue draft now.</p>
-            <CreateVenueForm />
-          </section>
-        )
-      ) : (
-        <>
-          <div>
-            <Button asChild variant="outline"><Link href="/my/venues/new">+ Create venue</Link></Button>
-          </div>
-          <ul className="space-y-2">
-            {filteredMemberships.map((item) => (
-              <li key={item.id} className="border rounded p-3">
-                <div className="font-medium">{item.venue.name}</div>
-                <div className="text-sm text-neutral-600">Role: {item.role}</div>
-                {item.venue.targetSubmissions[0] ? (
-                  <div className="text-sm text-neutral-700">
-                    Submission: {item.venue.targetSubmissions[0].status}
-                    {item.venue.targetSubmissions[0].submittedAt ? ` • Submitted ${new Date(item.venue.targetSubmissions[0].submittedAt).toLocaleString()}` : ""}
-                    {item.venue.targetSubmissions[0].decidedAt ? ` • Decided ${new Date(item.venue.targetSubmissions[0].decidedAt).toLocaleString()}` : ""}
-                  </div>
-                ) : null}
-                {item.venue.targetSubmissions[0]?.status === "REJECTED" && item.venue.targetSubmissions[0].decisionReason ? <div className="text-sm text-red-700">Reason: {item.venue.targetSubmissions[0].decisionReason}</div> : null}
-                <div className="text-sm mt-2 space-x-3">
-                  <Link className="underline" href={`/my/venues/${item.venue.id}`}>Edit profile</Link>
-                  <Link className="underline" href={`/my/venues/${item.venue.id}/submit-event`}>Submit event</Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+    <main className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="Search venues" className="h-9 rounded border px-2 text-sm" /><Button size="sm" type="submit">Search</Button></form>
+        {(["Draft", "Submitted", "Published", "Rejected"] as const).map((chip) => <Link key={chip} className="rounded border px-2 py-1 text-xs" href={`/my/venues?status=${chip}`}>{chip}</Link>)}
+        <Link className="rounded border px-2 py-1 text-xs" href="/my/venues?sort=name">Sort: Name</Link>
+        <Button asChild size="sm"><Link href="/my/venues/new">+ Create venue</Link></Button>
+      </div>
+      <table className="w-full text-sm">
+        <thead><tr className="border-b"><th className="p-2 text-left">Venue</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr></thead>
+        <tbody>
+          {rows.map((item) => {
+            const latest = item.venue.targetSubmissions[0]?.status;
+            const statusLabel = item.venue.isPublished ? "Published" : latest === "SUBMITTED" ? "Submitted" : latest === "REJECTED" ? "Rejected" : "Draft";
+            return (
+              <tr key={item.id} className="border-b">
+                <td className="p-2">{item.venue.name}</td>
+                <td className="p-2">{statusLabel}</td>
+                <td className="p-2 text-right space-x-2">
+                  <Link className="underline" href={`/my/venues/${item.venue.id}`}>Edit Venue</Link>
+                  <Link className="underline" href={`/my/venues/${item.venue.id}/submit-event`}>Submit Event</Link>
+                  <Link className="underline" href={`/venues/${item.venue.slug}`}>View Public</Link>
+                  <Link className="underline" href={`/my/team?venueId=${item.venue.id}`}>Manage Team</Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </main>
   );
 }

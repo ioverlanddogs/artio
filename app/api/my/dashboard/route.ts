@@ -1,238 +1,191 @@
-import { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureDbUserForSession } from "@/lib/ensure-db-user-for-session";
-import { handleGetMyDashboard } from "@/lib/my-dashboard-route";
-
-async function findPublisherApprovalNotice(userId: string) {
-  try {
-    return await db.notification.findFirst({
-      where: {
-        userId,
-        dedupeKey: { startsWith: "publisher-access-approved:" },
-      },
-      select: { id: true },
-      orderBy: { createdAt: "desc" },
-    });
-  } catch (error) {
-    const missingDedupeKey = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022";
-    if (!missingDedupeKey) throw error;
-    return db.notification.findFirst({
-      where: {
-        userId,
-        title: "Publisher access approved",
-        href: "/my",
-      },
-      select: { id: true },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-}
-
-
-
-async function listEventsPipelineByUserId(userId: string) {
-  const eventSelect = Prisma.validator<Prisma.EventSelect>()({
-    id: true,
-    title: true,
-    startAt: true,
-    isPublished: true,
-    featuredAssetId: true,
-    featuredAsset: { select: { url: true } },
-    updatedAt: true,
-    venue: { select: { name: true } },
-    submissions: {
-      where: { type: "EVENT" },
-      select: {
-        status: true,
-        submittedAt: true,
-        decidedAt: true,
-        decisionReason: true,
-        rejectionReason: true,
-        note: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 1,
-    },
-  });
-
-  const where = {
-    venue: {
-      is: {
-        memberships: {
-          some: {
-            userId,
-            role: { in: ["OWNER", "EDITOR"] },
-          },
-        },
-      },
-    },
-  } satisfies Prisma.EventWhereInput;
-
-  const events = await db.event.findMany({
-    where,
-    select: eventSelect,
-    orderBy: { updatedAt: "desc" },
-    take: 25,
-  });
-
-  return events.map((event) => {
-    const latestSubmission = event.submissions[0] ?? null;
-    const latestSubmissionStatus = latestSubmission?.status ?? null;
-    const feedback = latestSubmission?.decisionReason ?? latestSubmission?.rejectionReason ?? latestSubmission?.note ?? null;
-    return {
-      id: event.id,
-      title: event.title,
-      startAtISO: event.startAt ? event.startAt.toISOString() : null,
-      updatedAtISO: event.updatedAt.toISOString(),
-      venueName: event.venue?.name ?? null,
-      statusLabel: event.isPublished
-        ? "Published"
-        : latestSubmissionStatus === "APPROVED"
-          ? "Approved"
-          : latestSubmissionStatus === "SUBMITTED"
-            ? "Submitted"
-            : latestSubmissionStatus === "REJECTED"
-              ? "Changes requested"
-              : "Draft",
-      submissionStatus: latestSubmissionStatus,
-      submittedAtISO: latestSubmission?.submittedAt?.toISOString() ?? null,
-      decidedAtISO: latestSubmission?.decidedAt?.toISOString() ?? null,
-      feedback,
-      isPublished: event.isPublished,
-      featuredAssetId: event.featuredAssetId ?? null,
-      featuredImageUrl: event.featuredAsset?.url ?? null,
-    };
-  });
-}
-
-async function listVenuesQuickPickByUserId(userId: string) {
-  return db.venue.findMany({
-    where: {
-      memberships: {
-        some: {
-          userId,
-          role: { in: ["OWNER", "EDITOR"] },
-        },
-      },
-    },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-    take: 3,
-  });
-}
+import { MyDashboardResponseSchema, type MyDashboardResponse, type PublisherStatus } from "@/lib/my/dashboard-schema";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  let authUser: { id: string; role: "USER" | "EDITOR" | "ADMIN" } | null = null;
-  const requireAuth = async () => {
-    if (authUser) return authUser;
+const ZERO_COUNTS = { Draft: 0, Submitted: 0, Published: 0, Rejected: 0 } satisfies Record<PublisherStatus, number>;
+
+function mapSubmissionStatus(status: string | null | undefined, isPublished: boolean): PublisherStatus {
+  if (isPublished) return "Published";
+  if (status === "SUBMITTED") return "Submitted";
+  if (status === "REJECTED") return "Rejected";
+  return "Draft";
+}
+
+export async function GET(req: NextRequest) {
+  try {
     const session = await getSessionUser();
-    if (!session) throw new Error("unauthorized");
+    if (!session) return apiError(401, "unauthorized", "Authentication required");
+
     const dbUser = await ensureDbUserForSession(session);
-    authUser = { id: dbUser?.id ?? session.id, role: session.role };
-    return authUser;
-  };
+    const userId = dbUser?.id ?? session.id;
+    const venueId = req.nextUrl.searchParams.get("venueId");
 
-  const user = await requireAuth();
-  const publisherApprovalNotice = await findPublisherApprovalNotice(user.id);
-
-  return handleGetMyDashboard({
-    requireAuth,
-    findOwnedArtistByUserId: async (userId) => db.artist.findUnique({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        bio: true,
-        websiteUrl: true,
-        featuredAssetId: true,
-        avatarImageUrl: true,
-        featuredAsset: { select: { url: true } },
-      },
-    }),
-    listManagedVenuesByUserId: async (userId) => db.venueMembership.findMany({
+    const memberships = await db.venueMembership.findMany({
       where: { userId, role: { in: ["OWNER", "EDITOR"] } },
-      select: { venueId: true },
-    }).then((rows) => rows.map((row) => ({ id: row.venueId }))),
-    listManagedVenueDetailsByUserId: async (userId) => db.venue.findMany({
-      where: {
-        memberships: {
-          some: {
-            userId,
-            role: { in: ["OWNER", "EDITOR"] },
+      select: { venueId: true, role: true, venue: { select: { name: true, updatedAt: true, isPublished: true, submissions: { where: { type: "VENUE" }, take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } } } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const allowedVenueIds = memberships.map((m) => m.venueId);
+    const selectedVenueId = venueId && allowedVenueIds.includes(venueId) ? venueId : null;
+    const scopedVenueIds = selectedVenueId ? [selectedVenueId] : allowedVenueIds;
+
+    const artist = await db.artist.findUnique({ where: { userId }, select: { id: true } });
+
+    const [events, artworks, pendingInvites] = await Promise.all([
+      db.event.findMany({
+        where: {
+          OR: [
+            scopedVenueIds.length ? { venueId: { in: scopedVenueIds } } : undefined,
+            artist?.id ? { eventArtists: { some: { artistId: artist.id } } } : undefined,
+          ].filter(Boolean) as never,
+        },
+        select: {
+          id: true,
+          title: true,
+          venueId: true,
+          updatedAt: true,
+          startAt: true,
+          isPublished: true,
+          venue: { select: { name: true } },
+          submissions: { where: { type: "EVENT" }, take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } },
+        },
+        orderBy: [{ startAt: "asc" }, { updatedAt: "desc" }],
+        take: 100,
+      }),
+      artist?.id
+        ? db.artwork.findMany({
+          where: { artistId: artist.id },
+          select: {
+            id: true,
+            title: true,
+            updatedAt: true,
+            isPublished: true,
+            featuredAsset: { select: { url: true } },
+            _count: { select: { images: true } },
+            venues: { select: { venueId: true } },
           },
-        },
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        city: true,
-        country: true,
-        isPublished: true,
-        featuredAssetId: true,
-        featuredAsset: { select: { url: true } },
-        submissions: {
-          where: { type: "VENUE" },
-          select: { status: true },
           orderBy: { updatedAt: "desc" },
-          take: 1,
-        },
+          take: 100,
+        })
+        : Promise.resolve([]),
+      scopedVenueIds.length
+        ? db.venueInvite.findMany({ where: { venueId: { in: scopedVenueIds }, status: "PENDING", expiresAt: { gt: new Date() } }, select: { id: true, venueId: true, createdAt: true } })
+        : Promise.resolve([]),
+    ]);
+
+    const venuesForContext = memberships.map((m) => ({ id: m.venueId, name: m.venue.name, role: m.role }));
+
+    const counts = {
+      venues: { ...ZERO_COUNTS },
+      events: { ...ZERO_COUNTS },
+      artwork: { Draft: 0, Published: 0 },
+    };
+
+    for (const m of memberships) {
+      if (selectedVenueId && m.venueId !== selectedVenueId) continue;
+      const status = mapSubmissionStatus(m.venue.submissions[0]?.status, m.venue.isPublished);
+      counts.venues[status] += 1;
+    }
+    for (const event of events) {
+      const status = mapSubmissionStatus(event.submissions[0]?.status, event.isPublished);
+      counts.events[status] += 1;
+    }
+    for (const artwork of artworks) {
+      if (artwork.isPublished) counts.artwork.Published += 1;
+      else counts.artwork.Draft += 1;
+    }
+
+    const attention: MyDashboardResponse["attention"] = [];
+
+    for (const event of events) {
+      const submissionStatus = event.submissions[0]?.status;
+      if (submissionStatus === "REJECTED") {
+        attention.push({ id: `event-rejected-${event.id}`, kind: "rejected", entityType: "event", entityId: event.id, title: event.title, reason: "Submission was rejected and needs updates.", ctaLabel: "Fix & Resubmit", ctaHref: `/my/events/${event.id}`, venueId: event.venueId ?? undefined, updatedAtISO: event.updatedAt.toISOString() });
+      } else if (submissionStatus === "SUBMITTED") {
+        attention.push({ id: `event-submitted-${event.id}`, kind: "pending_review", entityType: "event", entityId: event.id, title: event.title, reason: "Submission is pending review.", ctaLabel: "View submission", ctaHref: `/my/events/${event.id}`, venueId: event.venueId ?? undefined, updatedAtISO: event.updatedAt.toISOString() });
+      } else if (!event.isPublished && !event.venueId) {
+        attention.push({ id: `event-draft-${event.id}`, kind: "incomplete_draft", entityType: "event", entityId: event.id, title: event.title, reason: "Missing required fields: venue.", ctaLabel: "Complete draft", ctaHref: `/my/events/${event.id}`, venueId: undefined, updatedAtISO: event.updatedAt.toISOString() });
+      }
+    }
+
+    for (const venue of memberships) {
+      if (selectedVenueId && venue.venueId !== selectedVenueId) continue;
+      if (venue.venue.submissions[0]?.status === "REJECTED") {
+        attention.push({ id: `venue-rejected-${venue.venueId}`, kind: "rejected", entityType: "venue", entityId: venue.venueId, title: venue.venue.name, reason: "Venue submission was rejected and needs updates.", ctaLabel: "Fix & Resubmit", ctaHref: `/my/venues/${venue.venueId}`, venueId: venue.venueId, updatedAtISO: venue.venue.updatedAt.toISOString() });
+      }
+    }
+
+    for (const artwork of artworks) {
+      if (!artwork.isPublished && artwork._count.images === 0) {
+        attention.push({ id: `artwork-draft-${artwork.id}`, kind: "incomplete_draft", entityType: "artwork", entityId: artwork.id, title: artwork.title, reason: "Missing required fields: artwork image.", ctaLabel: "Complete draft", ctaHref: `/my/artwork/${artwork.id}`, venueId: undefined, updatedAtISO: artwork.updatedAt.toISOString() });
+      }
+    }
+
+    for (const invite of pendingInvites) {
+      attention.push({ id: `invite-${invite.id}`, kind: "pending_invite", entityType: "team", entityId: invite.id, title: "Pending team invite", reason: "An invite is waiting for a response.", ctaLabel: "Manage team", ctaHref: `/my/team?venueId=${invite.venueId}`, venueId: invite.venueId, updatedAtISO: invite.createdAt.toISOString() });
+    }
+
+    attention.sort((a, b) => Date.parse(b.updatedAtISO) - Date.parse(a.updatedAtISO));
+
+    const recentActivity = [
+      ...memberships.slice(0, 3).map((m) => ({ id: `venue-${m.venueId}`, label: `Updated venue: ${m.venue.name}`, href: `/my/venues/${m.venueId}`, occurredAtISO: m.venue.updatedAt.toISOString() })),
+      ...events.slice(0, 3).map((e) => ({ id: `event-${e.id}`, label: `Updated event: ${e.title}`, href: `/my/events/${e.id}`, occurredAtISO: e.updatedAt.toISOString() })),
+      ...artworks.slice(0, 3).map((a) => ({ id: `artwork-${a.id}`, label: `Updated artwork: ${a.title}`, href: `/my/artwork/${a.id}`, occurredAtISO: a.updatedAt.toISOString() })),
+    ]
+      .sort((a, b) => Date.parse(b.occurredAtISO) - Date.parse(a.occurredAtISO))
+      .slice(0, 8);
+
+    const payload: MyDashboardResponse = {
+      context: {
+        selectedVenueId,
+        venues: venuesForContext,
+        hasArtistProfile: Boolean(artist),
       },
-      orderBy: [{ isPublished: "asc" }, { updatedAt: "desc" }],
-    }),
-    listArtworksByArtistId: async (artistId) => db.artwork.findMany({
-      where: { artistId },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        isPublished: true,
-        featuredAssetId: true,
-        updatedAt: true,
-        featuredAsset: { select: { url: true } },
-        images: {
-          select: { asset: { select: { url: true } } },
-          orderBy: { sortOrder: "asc" },
-          take: 1,
-        },
-        _count: { select: { images: true } },
+      counts,
+      attention: attention.slice(0, 12),
+      recentActivity,
+      quickLists: {
+        venues: memberships
+          .filter((m) => !selectedVenueId || m.venueId === selectedVenueId)
+          .slice(0, 5)
+          .map((m) => ({
+            id: m.venueId,
+            name: m.venue.name,
+            role: m.role,
+            status: mapSubmissionStatus(m.venue.submissions[0]?.status, m.venue.isPublished),
+            updatedAtISO: m.venue.updatedAt.toISOString(),
+          })),
+        upcomingEvents: events
+          .filter((e) => e.startAt >= new Date())
+          .slice(0, 5)
+          .map((e) => ({
+            id: e.id,
+            title: e.title,
+            venueId: e.venueId,
+            venueName: e.venue?.name ?? null,
+            status: mapSubmissionStatus(e.submissions[0]?.status, e.isPublished),
+            startAtISO: e.startAt.toISOString(),
+            updatedAtISO: e.updatedAt.toISOString(),
+          })),
+        recentArtwork: artworks.slice(0, 6).map((a) => ({
+          id: a.id,
+          title: a.title,
+          status: a.isPublished ? "Published" : "Draft",
+          updatedAtISO: a.updatedAt.toISOString(),
+          imageUrl: a.featuredAsset?.url ?? null,
+        })),
       },
-      orderBy: { updatedAt: "desc" },
-    }),
-    listEventsByContext: async ({ artistId, managedVenueIds }) => db.event.findMany({
-      where: {
-        OR: [
-          managedVenueIds.length > 0 ? { venueId: { in: managedVenueIds } } : undefined,
-          { eventArtists: { some: { artistId } } },
-        ].filter(Boolean) as never,
-      },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        startAt: true,
-        updatedAt: true,
-        isPublished: true,
-        venueId: true,
-        venue: { select: { name: true } },
-      },
-      orderBy: [{ startAt: "asc" }, { updatedAt: "desc" }],
-      take: 200,
-    }),
-    listArtworkViewDailyRows: async (artworkIds, start) => db.pageViewDaily.findMany({
-      where: {
-        entityType: "ARTWORK",
-        entityId: { in: artworkIds },
-        day: { gte: start },
-      },
-      select: { entityId: true, day: true, views: true },
-    }),
-    getPublisherApprovalNotice: async () => publisherApprovalNotice,
-    listEventsPipelineByUserId,
-    listVenuesQuickPickByUserId,
-  });
+    };
+
+    const validated = MyDashboardResponseSchema.parse(payload);
+    return NextResponse.json(validated, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
 }

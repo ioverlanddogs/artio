@@ -1,32 +1,58 @@
 import Link from "next/link";
-import { redirectToLogin } from "@/lib/auth-redirect";
 import { getSessionUser } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { MyDashboardClient } from "@/components/my/my-dashboard-client";
-import { RequestPublisherAccessCard } from "@/components/my/request-publisher-access-card";
+import { redirectToLogin } from "@/lib/auth-redirect";
+import { MyDashboardResponseSchema } from "@/lib/my/dashboard-schema";
 
-export default async function MyDashboardPage() {
+async function getDashboard(venueId?: string) {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/my/dashboard${venueId ? `?venueId=${venueId}` : ""}`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return MyDashboardResponseSchema.parse(await res.json());
+}
+
+export default async function MyDashboardPage({ searchParams }: { searchParams: Promise<{ venueId?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my");
 
+  const { venueId } = await searchParams;
+  const data = await getDashboard(venueId);
+  if (!data) return <main><p>Unable to load dashboard.</p></main>;
+
   return (
-    <main className="space-y-6 p-4 sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Publisher Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Your creator hub for artworks, events, and performance.</p>
-        </div>
-        {user.role === "USER" ? null : (
-          <div className="flex flex-wrap gap-2">
-            <Button asChild><Link href="/my/artwork/new">+ Add artwork</Link></Button>
-            <Button asChild><Link href="/my/events/new">+ Create event</Link></Button>
-            <Button asChild variant="secondary"><Link href="/my/venues/new">+ Create venue</Link></Button>
-            <Button asChild variant="secondary"><Link href="/my/analytics">View analytics</Link></Button>
-          </div>
-        )}
-      </div>
-      {user.role === "USER" ? <RequestPublisherAccessCard email={user.email} /> : null}
-      <MyDashboardClient />
+    <main className="space-y-4">
+      <section className="rounded border p-3">
+        <h2 className="text-lg font-semibold">Needs attention</h2>
+        <ul className="mt-2 space-y-2">
+          {data.attention.map((item) => (
+            <li key={item.id} className="rounded border p-2 text-sm">
+              <p className="font-medium">{item.title}</p>
+              <p className="text-muted-foreground">{item.reason}</p>
+              <Link className="underline" href={item.ctaHref}>{item.ctaLabel}</Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <Link href={`/my/venues?status=Draft${venueId ? `&venueId=${venueId}` : ""}`} className="rounded border p-3">
+          <p className="text-xs text-muted-foreground">Venue drafts</p>
+          <p className="text-2xl font-semibold">{data.counts.venues.Draft}</p>
+        </Link>
+        <Link href={`/my/events?status=Submitted${venueId ? `&venueId=${venueId}` : ""}`} className="rounded border p-3">
+          <p className="text-xs text-muted-foreground">Events submitted</p>
+          <p className="text-2xl font-semibold">{data.counts.events.Submitted}</p>
+        </Link>
+        <Link href={`/my/artwork?status=Draft${venueId ? `&venueId=${venueId}` : ""}`} className="rounded border p-3">
+          <p className="text-xs text-muted-foreground">Artwork drafts</p>
+          <p className="text-2xl font-semibold">{data.counts.artwork.Draft}</p>
+        </Link>
+      </section>
+
+      <section className="rounded border p-3">
+        <h2 className="text-lg font-semibold">Recent activity</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {data.recentActivity.map((item) => <li key={item.id}><Link className="underline" href={item.href}>{item.label}</Link></li>)}
+        </ul>
+      </section>
     </main>
   );
 }
