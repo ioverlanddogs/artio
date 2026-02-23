@@ -67,7 +67,7 @@ export function AppShellNav({ user, isAdmin }: AppShellNavProps) {
   const [unread, setUnread] = useState(0);
 
   const roleLinks: NavLink[] = [];
-  if (user?.role === "EDITOR" || user?.role === "ADMIN") roleLinks.push({ label: "Publisher Dashboard", href: "/my" });
+  if (user) roleLinks.push({ label: "Publisher Dashboard", href: "/my" });
   if (isAdmin) roleLinks.push({ label: "Admin", href: "/admin" });
 
   useEffect(() => {

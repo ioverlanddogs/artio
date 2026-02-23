@@ -71,7 +71,7 @@ export function AdminBetaClient({ initialRequests, feedback }: { initialRequests
         </table>
       </section>
 
-      <p className="text-sm text-muted-foreground">When approving users, add their email to BETA_ALLOWLIST and redeploy.</p>
+      <p className="text-sm text-muted-foreground">Approving a request grants Publisher Dashboard role access (EDITOR) when a matching user account exists.</p>
     </main>
   );
 }
