@@ -11,6 +11,7 @@ import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { VenueGalleryManager } from "@/components/venues/venue-gallery-manager";
 import { resolveImageUrl } from "@/lib/assets";
 import VenuePublishPanel from "@/app/my/_components/VenuePublishPanel";
+import VenueSubmitButton from "@/app/my/_components/VenueSubmitButton";
 import VenueArtistRequestsPanel from "@/app/my/_components/VenueArtistRequestsPanel";
 import { evaluateVenueReadiness } from "@/lib/publish-readiness";
 import { PublishReadinessChecklist } from "@/components/publishing/publish-readiness-checklist";
@@ -111,11 +112,19 @@ export default async function MyVenueEditPage({ params }: { params: Promise<{ id
         title="Edit Venue"
         subtitle="Update venue details and team access settings."
         actions={(
-          <div className="flex flex-col items-start gap-1 md:items-end">
-            <Button asChild>
-              <Link href={`/my/venues/${venueId}/submit-event`}>Submit Event</Link>
-            </Button>
-            <p className="text-xs text-muted-foreground">Create and submit events for this venue</p>
+          <div className="flex flex-col items-start gap-3 md:items-end">
+            <VenueSubmitButton
+              venueId={venueId}
+              isReadyToSubmit={readiness.ready}
+              missingFields={readiness.blocking.map((item) => item.label)}
+              submissionStatus={submission?.status ?? null}
+            />
+            <div className="flex flex-col items-start gap-1 md:items-end">
+              <Button asChild>
+                <Link href={`/my/venues/${venueId}/submit-event`}>Submit Event</Link>
+              </Button>
+              <p className="text-xs text-muted-foreground">Create and submit events for this venue</p>
+            </div>
           </div>
         )}
       />
