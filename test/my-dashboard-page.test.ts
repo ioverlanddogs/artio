@@ -37,3 +37,10 @@ test("dashboard client includes events pipeline card content", () => {
   assert.match(source, /Resubmit/);
   assert.match(source, /\/my\/events\/\$\{event\.id\}/);
 });
+
+test("dashboard client includes fix-now guidance for actionable pipeline rows", () => {
+  const source = readFileSync("components/my/my-dashboard-client.tsx", "utf8");
+  assert.match(source, /Fix now: Address reviewer feedback, then Resubmit\./);
+  assert.match(source, /Fix now: Add a featured image, then Submit\./);
+  assert.match(source, /Fix now: Submit for review\./);
+});

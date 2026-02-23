@@ -133,6 +133,51 @@ function getEventSubmissionState(event: EventPipelineItem) {
   };
 }
 
+function getFixNowHint(
+  event: EventPipelineItem,
+  submissionState: ReturnType<typeof getEventSubmissionState>,
+): { text: string; tone: "info" | "warn" | "neutral" } | null {
+  const isMissingScheduleDetails = !event.startAtISO || !event.venueName;
+  const isDraft = submissionState.label === "Draft";
+  const needsImage = isDraft && !event.featuredAssetId;
+  const changesRequested = submissionState.showResubmitAction;
+  const inReview = submissionState.label === "Submitted";
+  const approvedNotPublished = submissionState.label === "Approved" && !event.isPublished;
+  const isPublished = submissionState.showPublished;
+
+  if (changesRequested) {
+    return { text: "Fix now: Address reviewer feedback, then Resubmit.", tone: "warn" };
+  }
+
+  if (isDraft && needsImage) {
+    if (isMissingScheduleDetails) {
+      return { text: "Fix now: Set venue and date/time, then Add image and Submit.", tone: "warn" };
+    }
+    return { text: "Fix now: Add a featured image, then Submit.", tone: "warn" };
+  }
+
+  if (isDraft && submissionState.showSubmitAction) {
+    if (isMissingScheduleDetails) {
+      return { text: "Fix now: Set venue and date/time, then Submit.", tone: "warn" };
+    }
+    return { text: "Fix now: Submit for review.", tone: "info" };
+  }
+
+  if (inReview) {
+    return { text: "In review: We’ll notify you once it’s approved or changes are requested.", tone: "neutral" };
+  }
+
+  if (approvedNotPublished) {
+    return { text: "Approved: awaiting publish.", tone: "neutral" };
+  }
+
+  if (isPublished) {
+    return null;
+  }
+
+  return null;
+}
+
 export function MyDashboardClient() {
   const router = useRouter();
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -364,6 +409,7 @@ export function MyDashboardClient() {
                 {data.eventsPipeline?.items.slice(0, 5).map((event) => {
                   const submissionState = getEventSubmissionState(event);
                   const isDraftWithoutImage = submissionState.label === "Draft" && !event.featuredAssetId;
+                  const fixNowHint = getFixNowHint(event, submissionState);
                   const isUploading = uploadingEventId === event.id;
                   const isSubmitting = submittingEventId === event.id;
 
@@ -372,6 +418,19 @@ export function MyDashboardClient() {
                       <div className="min-w-0 space-y-1">
                         <p className="truncate font-medium">{event.title}</p>
                         <p className="text-xs text-muted-foreground">{[formatEventDate(event.startAtISO), event.venueName].filter(Boolean).join(" · ") || "Date or venue not set"}</p>
+                        {fixNowHint ? (
+                          <p
+                            className={`text-xs ${
+                              fixNowHint.tone === "warn"
+                                ? "font-medium text-foreground"
+                                : fixNowHint.tone === "neutral"
+                                  ? "text-muted-foreground"
+                                  : "text-foreground/80"
+                            }`}
+                          >
+                            {fixNowHint.text}
+                          </p>
+                        ) : null}
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="secondary">{submissionState.label}</Badge>
                           {submissionState.showPublished ? <Badge variant="secondary">Published</Badge> : null}
