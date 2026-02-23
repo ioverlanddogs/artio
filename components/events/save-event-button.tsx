@@ -74,6 +74,9 @@ export function SaveEventButton({ eventId, initialSaved, nextUrl, isAuthenticate
         recordOutcome({ action: "save", itemType: "event", itemKey: `event:${analytics?.eventSlug ?? eventId}`.toLowerCase() });
       }
       enqueueToast({ title: nextSaved ? "Saved" : "Removed from saved" });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("artpulse:event_saved_toggled", { detail: { eventId, nextState: nextSaved ? "saved" : "unsaved" } }));
+      }
       if (nextSaved) setShowSavedHint(true);
     } catch {
       setSaved(!nextSaved);

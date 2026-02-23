@@ -33,8 +33,6 @@ type CalendarItem = {
 };
 
 type EventsResponse = { items: CalendarItem[] };
-type FollowResponse = { artists?: string[]; venues?: string[] };
-type FavoriteItem = { targetType: string; targetId: string };
 
 export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureItems }: { isAuthenticated: boolean; fixtureItems?: CalendarItem[]; fallbackFixtureItems?: CalendarItem[] }) {
   const calendarRef = useRef<FullCalendar | null>(null);
@@ -53,16 +51,31 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   const [isLoading, setIsLoading] = useState(!fixtureItems);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
-  const [followSet, setFollowSet] = useState<{ artistIds: Set<string>; venueIds: Set<string> }>({ artistIds: new Set(), venueIds: new Set() });
-  const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
   const [selectedEvent, setSelectedEvent] = useState<CalendarItem | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const refetchEvents = useCallback(() => {
+    setReloadToken((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     track("calendar_viewed");
     const onToday = () => calendarRef.current?.getApi().today();
+    const onFollowToggled = () => {
+      if (scope === "following") refetchEvents();
+    };
+    const onSaveToggled = () => {
+      if (scope === "saved") refetchEvents();
+    };
     window.addEventListener("calendar:today", onToday);
-    return () => window.removeEventListener("calendar:today", onToday);
-  }, []);
+    window.addEventListener("artpulse:follow_toggled", onFollowToggled);
+    window.addEventListener("artpulse:event_saved_toggled", onSaveToggled);
+    return () => {
+      window.removeEventListener("calendar:today", onToday);
+      window.removeEventListener("artpulse:follow_toggled", onFollowToggled);
+      window.removeEventListener("artpulse:event_saved_toggled", onSaveToggled);
+    };
+  }, [refetchEvents, scope]);
 
   useEffect(() => {
     if (fixtureItems) {
@@ -70,40 +83,6 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
       setIsLoading(false);
     }
   }, [fixtureItems]);
-
-  useEffect(() => {
-    if (!isAuthenticated || scope !== "following") {
-      setFollowSet({ artistIds: new Set(), venueIds: new Set() });
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await fetch("/api/follows", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = (await response.json()) as FollowResponse;
-        if (!cancelled) setFollowSet({ artistIds: new Set(data.artists ?? []), venueIds: new Set(data.venues ?? []) });
-      } catch { if (!cancelled) setFollowSet({ artistIds: new Set(), venueIds: new Set() }); }
-    })();
-    return () => { cancelled = true; };
-  }, [isAuthenticated, scope]);
-
-  useEffect(() => {
-    if (!isAuthenticated || scope !== "saved") {
-      setSavedSet(new Set());
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await fetch("/api/favorites", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = (await response.json()) as { items?: FavoriteItem[] };
-        if (!cancelled) setSavedSet(new Set((data.items ?? []).filter((item) => item.targetType === "EVENT").map((item) => item.targetId)));
-      } catch { if (!cancelled) setSavedSet(new Set()); }
-    })();
-    return () => { cancelled = true; };
-  }, [isAuthenticated, scope]);
 
   const replaceSearch = useCallback((updates: Record<string, string | null>) => {
     const next = buildEventQueryString(stableSearchParams, updates);
@@ -115,19 +94,14 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
     setIsLoading(true);
     setError(null);
     const params = new URLSearchParams();
-    if (filters.query) params.set("query", filters.query);
+    if (filters.query) params.set("q", filters.query);
     if (tagsKey) params.set("tags", tagsKey);
-    if (filters.venue) params.set("venue", filters.venue);
-    if (filters.artist) params.set("artist", filters.artist);
-    if (filters.lat) params.set("lat", filters.lat);
-    if (filters.lng) params.set("lng", filters.lng);
-    if (filters.radiusKm) params.set("radiusKm", filters.radiusKm);
+    params.set("scope", scope);
     params.set("from", filters.from || range.from);
     params.set("to", filters.to || range.to);
-    params.set("limit", "200");
 
     try {
-      const response = await fetch(`/api/events?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/calendar-events?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("failed");
       const data = (await response.json()) as EventsResponse;
       setEvents(data.items ?? []);
@@ -142,34 +116,22 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
     } finally {
       setIsLoading(false);
     }
-  }, [fallbackFixtureItems, filters.artist, filters.from, filters.lat, filters.lng, filters.query, filters.radiusKm, tagsKey, filters.to, filters.venue, fixtureItems, range]);
+  }, [fallbackFixtureItems, filters.from, filters.query, fixtureItems, range, scope, tagsKey, filters.to]);
 
-  useEffect(() => { void fetchEvents(); }, [fetchEvents]);
-
-  const filteredEvents = useMemo(() => {
-    if (scope === "saved") return events.filter((event) => savedSet.has(event.id));
-    if (scope === "following") {
-      return events.filter((event) => {
-        const venueId = event.venue?.id ?? null;
-        if (venueId && followSet.venueIds.has(venueId)) return true;
-        return (event.artistIds ?? []).some((artistId) => followSet.artistIds.has(artistId));
-      });
-    }
-    return events;
-  }, [events, followSet.artistIds, followSet.venueIds, savedSet, scope]);
+  useEffect(() => { void fetchEvents(); }, [fetchEvents, reloadToken]);
 
   const activeTags = useMemo(() => parsedTags.map((tag) => tag.trim()).filter(Boolean), [parsedTags]);
   const hasActiveFilters = Boolean(filters.query || activeTags.length || filters.from || filters.to);
   const filtersQueryString = useMemo(() => buildEventQueryString(stableSearchParams, { scope: null }), [stableSearchParams]);
   const eventsHref = filtersQueryString ? `/events?${filtersQueryString}` : "/events";
   const calendarEvents = useMemo(
-    () => filteredEvents.map((event) => ({ id: event.id, title: event.title, start: event.start, end: event.end ?? undefined, url: `/events/${event.slug}` })),
-    [filteredEvents],
+    () => events.map((event) => ({ id: event.id, title: event.title, start: event.start, end: event.end ?? undefined, url: `/events/${event.slug}` })),
+    [events],
   );
 
   function openEventPanel(clickInfo: EventClickArg) {
     clickInfo.jsEvent.preventDefault();
-    const event = filteredEvents.find((item) => item.id === clickInfo.event.id);
+    const event = events.find((item) => item.id === clickInfo.event.id);
     if (event) {
       track("calendar_event_opened", { eventSlug: event.slug, eventId: event.id, source: "calendar" });
       setSelectedEvent(event);
@@ -210,14 +172,14 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
             </div>
           ) : null}
         </div>
-        {!isLoading && !error && filteredEvents.length === 0 ? <EmptyState title="No events match these filters" description="Try broadening your filters or moving to a different date range." actions={[{ label: "Go to Events", href: eventsHref }]} /> : null}
+        {!isLoading && !error && events.length === 0 ? <EmptyState title="No events match these filters" description="Try broadening your filters or moving to a different date range." actions={[{ label: "Go to Events", href: eventsHref }]} /> : null}
       </Section>
 
       {viewMode === "agenda" ? (
         <Section title="Agenda" subtitle="List view for the current filtered set.">
-          {filteredEvents.length === 0 ? <EmptyState title="No agenda items" description="Switch back to calendar view or update filters." /> : (
+          {events.length === 0 ? <EmptyState title="No agenda items" description="Switch back to calendar view or update filters." /> : (
             <ul className="space-y-2">
-              {filteredEvents.map((event) => (
+              {events.map((event) => (
                 <li key={`agenda-${event.id}`}><EventCard href={`/events/${event.slug}`} title={event.title} startAt={event.start} endAt={event.end} venueName={event.venue?.name ?? undefined} /></li>
               ))}
             </ul>
@@ -234,12 +196,12 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
                 <DialogDescription id="calendar-event-panel-description">Quick actions for this selected event.</DialogDescription>
               </DialogHeader>
               <div className="mt-2 flex flex-col gap-3">
-            <EventRow href={`/events/${selectedEvent.slug}`} title={selectedEvent.title} startAt={selectedEvent.start} endAt={selectedEvent.end} venueName={selectedEvent.venue?.name ?? undefined} />
-            <div className="flex flex-wrap gap-2">
-              <SaveEventButton eventId={selectedEvent.id} initialSaved={savedSet.has(selectedEvent.id)} nextUrl="/calendar" isAuthenticated={isAuthenticated} analytics={{ eventSlug: selectedEvent.slug, ui: "calendar_panel" }} />
-              <Link href={`/events/${selectedEvent.slug}`} className="rounded border px-3 py-2 text-sm">View details</Link>
-              <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => navigator.share?.({ title: selectedEvent.title, url: `${window.location.origin}/events/${selectedEvent.slug}` })}>Share</button>
-            </div>
+                <EventRow href={`/events/${selectedEvent.slug}`} title={selectedEvent.title} startAt={selectedEvent.start} endAt={selectedEvent.end} venueName={selectedEvent.venue?.name ?? undefined} />
+                <div className="flex flex-wrap gap-2">
+                  <SaveEventButton eventId={selectedEvent.id} initialSaved={scope === "saved"} nextUrl="/calendar" isAuthenticated={isAuthenticated} analytics={{ eventSlug: selectedEvent.slug, ui: "calendar_panel" }} />
+                  <Link href={`/events/${selectedEvent.slug}`} className="rounded border px-3 py-2 text-sm">View details</Link>
+                  <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => navigator.share?.({ title: selectedEvent.title, url: `${window.location.origin}/events/${selectedEvent.slug}` })}>Share</button>
+                </div>
               </div>
             </>
           ) : null}
