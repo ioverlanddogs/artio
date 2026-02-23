@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { enqueueToast } from "@/lib/toast";
 
 type DashboardPayload = {
   needsOnboarding?: boolean;
@@ -23,7 +25,15 @@ type DashboardPayload = {
     venues: Array<{ id: string; slug?: string | null; name: string; city?: string | null; country?: string | null; isPublished: boolean; coverUrl?: string | null; submissionStatus?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | null }>;
   };
   eventsPipeline?: {
-    items: Array<{ id: string; title: string; startAtISO: string | null; venueName: string | null; statusLabel: string | null }>;
+    items: Array<{
+      id: string;
+      title: string;
+      startAtISO: string | null;
+      venueName: string | null;
+      statusLabel: string | null;
+      featuredAssetId?: string | null;
+      featuredImageUrl?: string | null;
+    }>;
   };
   venuesQuickPick?: Array<{ id: string; name: string }>;
   actionInbox: Array<{ id: string; label: string; count: number; href: string; severity: "info" | "warn" }>;
@@ -61,9 +71,13 @@ function formatEventDate(startAtISO: string | null) {
 }
 
 export function MyDashboardClient() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [publisherApprovalDismissed, setPublisherApprovalDismissed] = useState(true);
+  const [uploadingEventId, setUploadingEventId] = useState<string | null>(null);
+  const [activeUploadEventId, setActiveUploadEventId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,6 +101,61 @@ export function MyDashboardClient() {
     window.localStorage.setItem("publisherApprovalDismissed", "1");
     setPublisherApprovalDismissed(true);
   }, []);
+
+  const openUploadPicker = useCallback((eventId: string) => {
+    setActiveUploadEventId(eventId);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const uploadFeaturedImage = useCallback(async (eventId: string, file: File) => {
+    setUploadingEventId(eventId);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const uploadResponse = await fetch("/api/uploads/image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const body = await uploadResponse.json().catch(() => ({}));
+        throw new Error(body?.error?.message || "Image upload failed");
+      }
+
+      const uploaded = await uploadResponse.json() as { assetId?: string };
+      if (!uploaded.assetId) {
+        throw new Error("Image upload failed");
+      }
+
+      const patchResponse = await fetch(`/api/my/events/${eventId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ featuredAssetId: uploaded.assetId }),
+      });
+
+      if (!patchResponse.ok) {
+        const body = await patchResponse.json().catch(() => ({}));
+        throw new Error(body?.error?.message || "Failed to update event image");
+      }
+
+      enqueueToast({ title: "Event featured image added", variant: "success" });
+      await load();
+      router.refresh();
+    } catch (error) {
+      enqueueToast({ title: error instanceof Error ? error.message : "Failed to add image", variant: "error" });
+    } finally {
+      setUploadingEventId(null);
+      setActiveUploadEventId(null);
+    }
+  }, [load, router]);
+
+  const onInlineUploadSelected = useCallback(async (file: File | null) => {
+    if (!file || !activeUploadEventId) return;
+    await uploadFeaturedImage(activeUploadEventId, file);
+  }, [activeUploadEventId, uploadFeaturedImage]);
 
   if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, idx) => <Skeleton key={idx} className="h-32 w-full" />)}</div>;
   if (!data) return null;
@@ -195,16 +264,42 @@ export function MyDashboardClient() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {data.eventsPipeline?.items.slice(0, 5).map((event) => (
-                  <li key={event.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
-                    <div className="min-w-0 space-y-1">
-                      <p className="truncate font-medium">{event.title}</p>
-                      <p className="text-xs text-muted-foreground">{[formatEventDate(event.startAtISO), event.venueName].filter(Boolean).join(" · ") || "Date or venue not set"}</p>
-                      {event.statusLabel ? <Badge variant="secondary">{event.statusLabel}</Badge> : null}
-                    </div>
-                    <Link className="shrink-0 text-sm underline" href={`/my/events/${event.id}`}>Edit</Link>
-                  </li>
-                ))}
+                {data.eventsPipeline?.items.slice(0, 5).map((event) => {
+                  const isDraftWithoutImage = event.statusLabel === "Draft" && !event.featuredAssetId;
+                  const isUploading = uploadingEventId === event.id;
+
+                  return (
+                    <li key={event.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate font-medium">{event.title}</p>
+                        <p className="text-xs text-muted-foreground">{[formatEventDate(event.startAtISO), event.venueName].filter(Boolean).join(" · ") || "Date or venue not set"}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {event.statusLabel ? <Badge variant="secondary">{event.statusLabel}</Badge> : null}
+                          {event.featuredImageUrl ? (
+                            <img
+                              src={event.featuredImageUrl}
+                              alt=""
+                              className="h-6 w-6 rounded object-cover"
+                            />
+                          ) : null}
+                          {isDraftWithoutImage ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isUploading}
+                              onClick={() => openUploadPicker(event.id)}
+                              aria-label={`Add image for ${event.title}`}
+                            >
+                              {isUploading ? "Uploading..." : "Add image"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <Link className="shrink-0 text-sm underline" href={`/my/events/${event.id}`}>Edit</Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <div className="flex flex-wrap items-center gap-2">
@@ -218,6 +313,16 @@ export function MyDashboardClient() {
           </CardContent>
         </Card>
       ) : null}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(event) => {
+          void onInlineUploadSelected(event.target.files?.[0] ?? null);
+        }}
+      />
 
       <Card>
         <CardHeader><CardTitle>To do</CardTitle></CardHeader>

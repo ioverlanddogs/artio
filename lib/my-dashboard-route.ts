@@ -84,6 +84,8 @@ type Deps = {
     startAtISO: string | null;
     venueName: string | null;
     statusLabel: string | null;
+    featuredAssetId?: string | null;
+    featuredImageUrl?: string | null;
   }>>;
   listVenuesQuickPickByUserId?: (userId: string) => Promise<Array<{
     id: string;
