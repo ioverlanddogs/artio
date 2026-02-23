@@ -76,6 +76,7 @@ export function MyDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [publisherApprovalDismissed, setPublisherApprovalDismissed] = useState(true);
   const [uploadingEventId, setUploadingEventId] = useState<string | null>(null);
+  const [submittingEventId, setSubmittingEventId] = useState<string | null>(null);
   const [activeUploadEventId, setActiveUploadEventId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -156,6 +157,26 @@ export function MyDashboardClient() {
     if (!file || !activeUploadEventId) return;
     await uploadFeaturedImage(activeUploadEventId, file);
   }, [activeUploadEventId, uploadFeaturedImage]);
+
+  const submitEventForReview = useCallback(async (eventId: string) => {
+    setSubmittingEventId(eventId);
+    try {
+      const response = await fetch(`/api/my/events/${eventId}/submit`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body?.message || body?.error || "Failed to submit event");
+      }
+
+      enqueueToast({ title: "Submitted for review", variant: "success" });
+      await load();
+      router.refresh();
+    } catch (error) {
+      enqueueToast({ title: error instanceof Error ? error.message : "Failed to submit event", variant: "error" });
+    } finally {
+      setSubmittingEventId(null);
+    }
+  }, [load, router]);
 
   if (loading) return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, idx) => <Skeleton key={idx} className="h-32 w-full" />)}</div>;
   if (!data) return null;
@@ -267,6 +288,8 @@ export function MyDashboardClient() {
                 {data.eventsPipeline?.items.slice(0, 5).map((event) => {
                   const isDraftWithoutImage = event.statusLabel === "Draft" && !event.featuredAssetId;
                   const isUploading = uploadingEventId === event.id;
+                  const isSubmitting = submittingEventId === event.id;
+                  const isDraft = event.statusLabel === "Draft";
 
                   return (
                     <li key={event.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -287,11 +310,24 @@ export function MyDashboardClient() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={isUploading}
+                              disabled={isUploading || isSubmitting}
                               onClick={() => openUploadPicker(event.id)}
                               aria-label={`Add image for ${event.title}`}
                             >
                               {isUploading ? "Uploading..." : "Add image"}
+                            </Button>
+                          ) : null}
+                          {isDraft ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isUploading || isSubmitting}
+                              onClick={() => {
+                                void submitEventForReview(event.id);
+                              }}
+                            >
+                              {isSubmitting ? "Submitting..." : "Submit"}
                             </Button>
                           ) : null}
                         </div>
