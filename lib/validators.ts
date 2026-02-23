@@ -713,7 +713,13 @@ function formValueToPrimitive(value: FormDataEntryValue) {
 
 export async function parseBody(req: Request) {
   const ct = req.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return await req.json();
+  if (ct.includes("application/json")) {
+    try {
+      return await req.json();
+    } catch {
+      return {};
+    }
+  }
   if (ct.includes("application/x-www-form-urlencoded") || ct.includes("multipart/form-data")) {
     return Object.fromEntries(Array.from((await req.formData()).entries()).map(([k, v]) => [k, formValueToPrimitive(v)]));
   }

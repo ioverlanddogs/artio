@@ -32,6 +32,24 @@ test("submitVenueForReviewRequest posts to venue submit endpoint", async () => {
   assert.equal(calledUrl, "/api/my/venues/venue_123/submit");
   assert.equal(calledInit?.method, "POST");
   assert.equal((calledInit?.headers as Record<string, string>)?.["Content-Type"], "application/json");
+  assert.equal(calledInit?.body, "{}");
+});
+
+test("submitVenueForReviewRequest never sends application/json with an empty body", async () => {
+  let calledInit: RequestInit | undefined;
+
+  await submitVenueForReviewRequest({
+    venueId: "venue_123",
+    fetchImpl: async (_input: URL | RequestInfo, init?: RequestInit) => {
+      calledInit = init;
+      return new Response(null, { status: 204 });
+    },
+  });
+
+  const headers = (calledInit?.headers as Record<string, string>) ?? {};
+  const hasJsonContentType = headers["Content-Type"] === "application/json";
+  const hasEmptyBody = calledInit?.body == null || calledInit?.body === "";
+  assert.equal(hasJsonContentType && hasEmptyBody, false);
 });
 
 test("deriveVenueSubmitButtonUiState shows submitted state after success", () => {

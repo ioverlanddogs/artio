@@ -21,6 +21,7 @@ export async function submitVenueForReviewRequest({ venueId, fetchImpl = fetch }
   const response = await fetchImpl(`/api/my/venues/${venueId}/submit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
   });
   if (response.ok) return { ok: true };
   const body = await response.json().catch(() => ({}));
