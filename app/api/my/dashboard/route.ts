@@ -38,6 +38,8 @@ async function listEventsPipelineByUserId(userId: string) {
     title: true,
     startAt: true,
     isPublished: true,
+    featuredAssetId: true,
+    featuredAsset: { select: { url: true } },
     updatedAt: true,
     venue: { select: { name: true } },
     submissions: {
@@ -89,6 +91,8 @@ async function listEventsPipelineByUserId(userId: string) {
       startAtISO: event.startAt ? event.startAt.toISOString() : null,
       venueName: event.venue?.name ?? null,
       statusLabel: event.isPublished ? "Published" : latestSubmission === "SUBMITTED" ? "Submitted" : "Draft",
+      featuredAssetId: event.featuredAssetId ?? null,
+      featuredImageUrl: event.featuredAsset?.url ?? null,
     };
   });
 }
