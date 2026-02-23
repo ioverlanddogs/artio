@@ -57,7 +57,12 @@ test("/api/my/dashboard includes events pipeline when provided", async () => {
     title: "Pipeline Event",
     startAtISO: day(-2).toISOString(),
     venueName: "Main Hall",
-    statusLabel: "Submitted",
+    statusLabel: "Changes requested",
+    submissionStatus: "REJECTED",
+    submittedAtISO: day(-3).toISOString(),
+    decidedAtISO: day(-1).toISOString(),
+    feedback: "Please update the event details before publishing.",
+    isPublished: false,
   }];
 
   const res = await handleGetMyDashboard(deps);
@@ -66,7 +71,9 @@ test("/api/my/dashboard includes events pipeline when provided", async () => {
   assert.equal(body.viewer.role, "EDITOR");
   assert.equal(body.eventsPipeline.items.length, 1);
   assert.equal(body.eventsPipeline.items[0].id, "event-1");
-  assert.equal(body.eventsPipeline.items[0].statusLabel, "Submitted");
+  assert.equal(body.eventsPipeline.items[0].statusLabel, "Changes requested");
+  assert.equal(body.eventsPipeline.items[0].submissionStatus, "REJECTED");
+  assert.equal(body.eventsPipeline.items[0].feedback, "Please update the event details before publishing.");
 });
 
 test("/api/my/dashboard includes venues quick-pick when provided", async () => {

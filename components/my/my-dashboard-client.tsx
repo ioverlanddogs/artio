@@ -9,6 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { enqueueToast } from "@/lib/toast";
 
+type EventPipelineItem = {
+  id: string;
+  title: string;
+  startAtISO: string | null;
+  venueName: string | null;
+  statusLabel: string | null;
+  submissionStatus?: string | null;
+  submittedAtISO?: string | null;
+  decidedAtISO?: string | null;
+  feedback?: string | null;
+  isPublished?: boolean | null;
+  featuredAssetId?: string | null;
+  featuredImageUrl?: string | null;
+};
+
 type DashboardPayload = {
   needsOnboarding?: boolean;
   message?: string;
@@ -25,15 +40,7 @@ type DashboardPayload = {
     venues: Array<{ id: string; slug?: string | null; name: string; city?: string | null; country?: string | null; isPublished: boolean; coverUrl?: string | null; submissionStatus?: "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | null }>;
   };
   eventsPipeline?: {
-    items: Array<{
-      id: string;
-      title: string;
-      startAtISO: string | null;
-      venueName: string | null;
-      statusLabel: string | null;
-      featuredAssetId?: string | null;
-      featuredImageUrl?: string | null;
-    }>;
+    items: EventPipelineItem[];
   };
   venuesQuickPick?: Array<{ id: string; name: string }>;
   actionInbox: Array<{ id: string; label: string; count: number; href: string; severity: "info" | "warn" }>;
@@ -68,6 +75,52 @@ function formatEventDate(startAtISO: string | null) {
   const date = new Date(startAtISO);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function formatFeedback(feedback: string | null | undefined) {
+  if (!feedback) return null;
+  const compact = feedback.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  return compact.length > 140 ? `${compact.slice(0, 140).trimEnd()}…` : compact;
+}
+
+function getEventSubmissionState(event: EventPipelineItem) {
+  const submissionStatus = event.submissionStatus ?? null;
+  if (submissionStatus === "SUBMITTED") {
+    return {
+      label: "Submitted",
+      meta: event.submittedAtISO ? `Submitted ${formatEventDate(event.submittedAtISO)}` : null,
+      feedback: null,
+      showPublished: false,
+      showSubmitAction: false,
+    };
+  }
+  if (submissionStatus === "APPROVED") {
+    return {
+      label: "Approved",
+      meta: event.decidedAtISO ? `Approved ${formatEventDate(event.decidedAtISO)}` : null,
+      feedback: null,
+      showPublished: Boolean(event.isPublished),
+      showSubmitAction: false,
+    };
+  }
+  if (submissionStatus === "REJECTED") {
+    return {
+      label: "Changes requested",
+      meta: event.decidedAtISO ? `Reviewed ${formatEventDate(event.decidedAtISO)}` : null,
+      feedback: formatFeedback(event.feedback),
+      showPublished: false,
+      showSubmitAction: false,
+    };
+  }
+
+  return {
+    label: "Draft",
+    meta: null,
+    feedback: null,
+    showPublished: Boolean(event.isPublished),
+    showSubmitAction: !event.isPublished,
+  };
 }
 
 export function MyDashboardClient() {
@@ -286,10 +339,10 @@ export function MyDashboardClient() {
             ) : (
               <ul className="space-y-2">
                 {data.eventsPipeline?.items.slice(0, 5).map((event) => {
-                  const isDraftWithoutImage = event.statusLabel === "Draft" && !event.featuredAssetId;
+                  const submissionState = getEventSubmissionState(event);
+                  const isDraftWithoutImage = submissionState.label === "Draft" && !event.featuredAssetId;
                   const isUploading = uploadingEventId === event.id;
                   const isSubmitting = submittingEventId === event.id;
-                  const isDraft = event.statusLabel === "Draft";
 
                   return (
                     <li key={event.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -297,7 +350,9 @@ export function MyDashboardClient() {
                         <p className="truncate font-medium">{event.title}</p>
                         <p className="text-xs text-muted-foreground">{[formatEventDate(event.startAtISO), event.venueName].filter(Boolean).join(" · ") || "Date or venue not set"}</p>
                         <div className="flex flex-wrap items-center gap-2">
-                          {event.statusLabel ? <Badge variant="secondary">{event.statusLabel}</Badge> : null}
+                          <Badge variant="secondary">{submissionState.label}</Badge>
+                          {submissionState.showPublished ? <Badge variant="secondary">Published</Badge> : null}
+                          {submissionState.meta ? <span className="text-xs text-muted-foreground">{submissionState.meta}</span> : null}
                           {event.featuredImageUrl ? (
                             <img
                               src={event.featuredImageUrl}
@@ -317,7 +372,7 @@ export function MyDashboardClient() {
                               {isUploading ? "Uploading..." : "Add image"}
                             </Button>
                           ) : null}
-                          {isDraft ? (
+                          {submissionState.showSubmitAction ? (
                             <Button
                               type="button"
                               variant="outline"
@@ -331,6 +386,12 @@ export function MyDashboardClient() {
                             </Button>
                           ) : null}
                         </div>
+                        {submissionState.feedback ? (
+                          <p className="line-clamp-2 text-xs text-muted-foreground">Feedback: {submissionState.feedback}</p>
+                        ) : null}
+                        {event.submissionStatus === "REJECTED" ? (
+                          <p className="text-xs"><Link className="underline" href={`/my/events/${event.id}`}>View feedback</Link></p>
+                        ) : null}
                       </div>
                       <Link className="shrink-0 text-sm underline" href={`/my/events/${event.id}`}>Edit</Link>
                     </li>

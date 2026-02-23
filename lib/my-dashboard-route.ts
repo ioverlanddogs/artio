@@ -84,6 +84,11 @@ type Deps = {
     startAtISO: string | null;
     venueName: string | null;
     statusLabel: string | null;
+    submissionStatus?: string | null;
+    submittedAtISO?: string | null;
+    decidedAtISO?: string | null;
+    feedback?: string | null;
+    isPublished?: boolean | null;
     featuredAssetId?: string | null;
     featuredImageUrl?: string | null;
   }>>;

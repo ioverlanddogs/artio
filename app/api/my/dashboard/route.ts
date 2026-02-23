@@ -44,7 +44,14 @@ async function listEventsPipelineByUserId(userId: string) {
     venue: { select: { name: true } },
     submissions: {
       where: { type: "EVENT" },
-      select: { status: true },
+      select: {
+        status: true,
+        submittedAt: true,
+        decidedAt: true,
+        decisionReason: true,
+        rejectionReason: true,
+        note: true,
+      },
       orderBy: { updatedAt: "desc" },
       take: 1,
     },
@@ -84,13 +91,28 @@ async function listEventsPipelineByUserId(userId: string) {
     : [];
 
   return [...upcoming, ...fallback].map((event) => {
-    const latestSubmission = event.submissions[0]?.status;
+    const latestSubmission = event.submissions[0] ?? null;
+    const latestSubmissionStatus = latestSubmission?.status ?? null;
+    const feedback = latestSubmission?.decisionReason ?? latestSubmission?.rejectionReason ?? latestSubmission?.note ?? null;
     return {
       id: event.id,
       title: event.title,
       startAtISO: event.startAt ? event.startAt.toISOString() : null,
       venueName: event.venue?.name ?? null,
-      statusLabel: event.isPublished ? "Published" : latestSubmission === "SUBMITTED" ? "Submitted" : "Draft",
+      statusLabel: event.isPublished
+        ? "Published"
+        : latestSubmissionStatus === "APPROVED"
+          ? "Approved"
+          : latestSubmissionStatus === "SUBMITTED"
+            ? "Submitted"
+            : latestSubmissionStatus === "REJECTED"
+              ? "Changes requested"
+              : "Draft",
+      submissionStatus: latestSubmissionStatus,
+      submittedAtISO: latestSubmission?.submittedAt?.toISOString() ?? null,
+      decidedAtISO: latestSubmission?.decidedAt?.toISOString() ?? null,
+      feedback,
+      isPublished: event.isPublished,
       featuredAssetId: event.featuredAssetId ?? null,
       featuredImageUrl: event.featuredAsset?.url ?? null,
     };
