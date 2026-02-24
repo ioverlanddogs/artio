@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/events/event-card";
 import { ItemActionsMenu } from "@/components/personalization/item-actions-menu";
 import { WhyThis } from "@/components/personalization/why-this";
@@ -43,31 +44,67 @@ const emptySignals: OnboardingSignals = {
 
 const debugEnabled = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_PERSONALIZATION_DEBUG === "true";
 
+type ForYouSessionStatus = "authenticated" | "unauthenticated" | "loading";
+
+export async function fetchForYouRecommendations({
+  status,
+  fetchImpl = fetch,
+}: {
+  status: ForYouSessionStatus;
+  fetchImpl?: typeof fetch;
+}): Promise<{ kind: "skipped" | "unauthorized" | "error" } | { kind: "success"; data: ForYouResponse }> {
+  if (status !== "authenticated") return { kind: "skipped" };
+
+  const response = await fetchImpl("/api/recommendations/for-you?days=7&limit=20", { cache: "no-store" });
+  if (response.status === 401) return { kind: "unauthorized" };
+  if (!response.ok) return { kind: "error" };
+  const data = (await response.json()) as ForYouResponse;
+  return { kind: "success", data };
+}
+
 export function ForYouClient() {
+  const { status } = useSession();
   const [data, setData] = useState<ForYouResponse>({ windowDays: 7, items: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthFallback, setShowAuthFallback] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const [signals, setSignals] = useState<OnboardingSignals>(emptySignals);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setIsLoading(true);
-    const response = await fetch("/api/recommendations/for-you?days=7&limit=20", { cache: "no-store" });
-    if (!response.ok) {
+    const result = await fetchForYouRecommendations({ status });
+    if (result.kind === "skipped") {
+      setShowAuthFallback(true);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (result.kind === "unauthorized") {
+      setShowAuthFallback(true);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (result.kind === "error") {
+      setShowAuthFallback(false);
       setError("Unable to load recommendations right now.");
       setIsLoading(false);
       return;
     }
-    const nextData = (await response.json()) as ForYouResponse;
-    setData(nextData);
-    setError(null);
-    setIsLoading(false);
-  };
+    if (result.kind === "success") {
+      setData(result.data);
+      setShowAuthFallback(false);
+      setError(null);
+      setIsLoading(false);
+    }
+  }, [status]);
 
   useEffect(() => {
+    if (status === "loading") return;
     void load();
     void getOnboardingSignals().then((next) => setSignals(next));
-  }, []);
+  }, [load, status]);
 
   const rankedItems = useMemo(() => {
     const visible = data.items.filter((item) => !hiddenIds.includes(item.event.id));
@@ -123,8 +160,17 @@ return ranked;
 
   return (
     <section className="space-y-3" aria-busy={isLoading}>
-      <p className="text-sm text-gray-700">Personalized events in the next {data.windowDays} days based on your follows, saved searches, location, and recent clicks.</p>
+      <p className="text-sm text-gray-700">
+        Personalized events in the next {data.windowDays} days based on your follows, saved searches, location, and recent clicks.
+      </p>
       {error ? <ErrorCard message={error} onRetry={() => void load()} /> : null}
+      {!isLoading && showAuthFallback ? (
+        <EmptyState
+          title="Log in to see personalized recommendations"
+          description="Sign in to get event picks based on your follows, saved searches, and activity."
+          actions={[{ label: "Log in", href: `/login?next=${encodeURIComponent("/for-you")}` }]}
+        />
+      ) : null}
       {isLoading ? (
         <div className="space-y-3">
           <LoadingCard lines={4} />
@@ -132,7 +178,7 @@ return ranked;
           <LoadingCard lines={4} />
         </div>
       ) : null}
-      {!isLoading && !error && rankedItems.length === 0 ? (
+      {!isLoading && !error && !showAuthFallback && rankedItems.length === 0 ? (
         <EmptyState
           title="Nothing to show—try clearing preferences"
           description="Follow a venue or artist, save a search, or set your location."
@@ -143,7 +189,7 @@ return ranked;
           ]}
         />
       ) : null}
-      {!isLoading && !error ? (
+      {!isLoading && !error && !showAuthFallback ? (
         <div className="space-y-3">
           {rankedItems.map((ranked) => {
             const item = ranked.item;
