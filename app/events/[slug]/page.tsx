@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!hasDatabaseUrl()) return buildDetailMetadata({ kind: "event", slug });
 
   try {
-    const event = await db.event.findFirst({ where: { slug, isPublished: true }, include: { images: { include: { asset: { select: { url: true } } }, orderBy: { sortOrder: "asc" } } } });
+    const event = await db.event.findFirst({ where: { slug, isPublished: true, deletedAt: null, OR: [{ venueId: null }, { venue: { deletedAt: null } }] }, include: { images: { include: { asset: { select: { url: true } } }, orderBy: { sortOrder: "asc" } } } });
     if (!event) return buildDetailMetadata({ kind: "event", slug });
     const imageUrl = resolveEntityPrimaryImage(event)?.url ?? null;
     return buildDetailMetadata({ kind: "event", slug, title: event.title, description: event.description, imageUrl });
@@ -44,7 +44,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const [event, user] = await Promise.all([
     db.event.findFirst({
-      where: { slug, isPublished: true },
+      where: { slug, isPublished: true, deletedAt: null },
       include: {
         venue: true,
         eventTags: { include: { tag: true } },
@@ -60,7 +60,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
     listPublishedArtworksByEvent(event.id, 6),
     countPublishedArtworksByEvent(event.id),
     db.event.findMany({
-    where: { isPublished: true, id: { not: event.id }, OR: [{ venueId: event.venueId ?? undefined }, { eventArtists: { some: { artistId: { in: event.eventArtists.map((ea) => ea.artistId) } } } }] },
+    where: { isPublished: true, deletedAt: null, id: { not: event.id }, OR: [{ venueId: event.venueId ?? undefined }, { eventArtists: { some: { artistId: { in: event.eventArtists.map((ea) => ea.artistId) } } } }] },
     include: { venue: { select: { name: true } }, images: { take: 1, orderBy: { sortOrder: "asc" }, include: { asset: { select: { url: true } } } } },
     orderBy: { startAt: "asc" },
     take: 4,

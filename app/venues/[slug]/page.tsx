@@ -26,7 +26,7 @@ export const revalidate = 300;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   if (!hasDatabaseUrl()) return { title: "Venue | Artpulse", description: "Discover venue details and upcoming events on Artpulse." };
-  const venue = await db.venue.findFirst({ where: { slug, isPublished: true }, select: { name: true, description: true, featuredImageUrl: true, featuredAsset: { select: { url: true } } } });
+  const venue = await db.venue.findFirst({ where: { slug, isPublished: true, deletedAt: null }, select: { name: true, description: true, featuredImageUrl: true, featuredAsset: { select: { url: true } } } });
   if (!venue) return { title: "Venue | Artpulse", description: "Discover venue details and upcoming events on Artpulse." };
   const imageUrl = resolveEntityPrimaryImage(venue)?.url ?? null;
   return { title: `${venue.name} | Artpulse`, description: getVenueDescriptionExcerpt(venue.description, `Explore ${venue.name} on Artpulse.`), openGraph: { title: `${venue.name} | Artpulse`, description: getVenueDescriptionExcerpt(venue.description, `Explore ${venue.name} on Artpulse.`), images: imageUrl ? [{ url: imageUrl, alt: venue.name }] : undefined } };
@@ -40,7 +40,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
   const user = await getSessionUser();
 
   const venue = await db.venue.findFirst({
-    where: { slug, isPublished: true },
+    where: { slug, isPublished: true, deletedAt: null },
     select: {
       id: true,
       name: true,
@@ -54,7 +54,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
       featuredImageUrl: true,
       images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
       events: {
-        where: { isPublished: true, startAt: { gte: now } },
+        where: { isPublished: true, deletedAt: null, startAt: { gte: now } },
         orderBy: [{ startAt: "asc" }, { id: "asc" }],
         take: 24,
         select: {

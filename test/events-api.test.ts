@@ -8,10 +8,12 @@ test("GET /api/events accepts date-only range and limit=200", async () => {
   const originalFindMany = db.event.findMany;
   let capturedTake: number | undefined;
   let capturedWhereStartAt: unknown;
+  let capturedDeletedAt: unknown;
 
   db.event.findMany = (async (args) => {
     capturedTake = args.take;
     capturedWhereStartAt = (args.where as { AND?: Array<{ startAt?: unknown }> })?.AND?.find((entry) => entry.startAt)?.startAt;
+    capturedDeletedAt = (args.where as { deletedAt?: unknown }).deletedAt;
     return [];
   }) as typeof db.event.findMany;
 

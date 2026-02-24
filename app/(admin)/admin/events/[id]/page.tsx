@@ -3,6 +3,7 @@ import EventAdminForm from "@/app/(admin)/admin/_components/EventAdminForm";
 import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
+import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 
 export default async function AdminEditEvent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,7 +15,7 @@ export default async function AdminEditEvent({ params }: { params: Promise<{ id:
 
   return (
     <main className="space-y-6">
-      <AdminPageHeader title="Edit event" backHref="/admin/events" backLabel="Back to events" />
+      <AdminPageHeader title="Edit event" backHref="/admin/events" backLabel="Back to events" right={<AdminArchiveActions entity="events" id={event.id} archived={!!event.deletedAt} />} />
       <EventAdminForm
         title="Edit Event"
         endpoint={`/api/admin/events/${id}`}

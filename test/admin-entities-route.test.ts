@@ -5,13 +5,15 @@ import {
   handleAdminEntityExport,
   handleAdminEntityImportApply,
   handleAdminEntityImportPreview,
+  handleAdminEntityArchive,
   handleAdminEntityList,
   handleAdminEntityPatch,
+  handleAdminEntityRestore,
 } from "../lib/admin-entities-route.ts";
 
 function buildVenueDeps() {
   const venues = [
-    { id: "11111111-1111-4111-8111-111111111111", name: "Venue A", slug: "venue-a", city: "NY", postcode: "10001", country: "US", isPublished: false, websiteUrl: null, addressLine1: null, addressLine2: null, description: null, featuredAssetId: null },
+    { id: "11111111-1111-4111-8111-111111111111", name: "Venue A", slug: "venue-a", city: "NY", postcode: "10001", country: "US", isPublished: false, websiteUrl: null, addressLine1: null, addressLine2: null, description: null, featuredAssetId: null, deletedAt: null, deletedByAdminId: null, deletedReason: null },
   ];
   const auditEntries: Array<Record<string, unknown>> = [];
 
@@ -29,8 +31,8 @@ function buildVenueDeps() {
         venues.push(created as never);
         return created;
       },
-      findMany: async () => venues,
-      count: async () => venues.length,
+      findMany: async ({ where }: { where?: { deletedAt?: null | { not: null } } } = {}) => venues.filter((v) => (where?.deletedAt === null ? v.deletedAt == null : (where?.deletedAt && "not" in where.deletedAt ? v.deletedAt != null : true))),
+      count: async ({ where }: { where?: { deletedAt?: null | { not: null } } } = {}) => venues.filter((v) => (where?.deletedAt === null ? v.deletedAt == null : (where?.deletedAt && "not" in where.deletedAt ? v.deletedAt != null : true))).length,
     },
     adminAuditLog: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -104,6 +106,35 @@ test("import apply updates record and creates audit log", async () => {
   assert.equal(auditEntries[0].action, "ADMIN_IMPORT_APPLIED");
 });
 
+
+
+test("archive and restore venue are idempotent", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  const archiveReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/archive", { method: "POST", body: JSON.stringify({ reason: "spam" }), headers: { "content-type": "application/json" } });
+  const archiveRes = await handleAdminEntityArchive(archiveReq, "venues", { id: "11111111-1111-4111-8111-111111111111" }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(archiveRes.status, 200);
+  assert.ok(venues[0]?.deletedAt);
+
+  const archiveAgain = await handleAdminEntityArchive(archiveReq, "venues", { id: "11111111-1111-4111-8111-111111111111" }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(archiveAgain.status, 200);
+
+  const restoreReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/restore", { method: "POST" });
+  const restoreRes = await handleAdminEntityRestore(restoreReq, "venues", { id: "11111111-1111-4111-8111-111111111111" }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(restoreRes.status, 200);
+  assert.equal(venues[0]?.deletedAt ?? null, null);
+});
+
+test("admin list supports showArchived", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], deletedAt: new Date() };
+  const hiddenRes = await handleAdminEntityList(new NextRequest("http://localhost/api/admin/venues"), "venues", { requireAdminUser: adminUser, appDb: appDb as never });
+  const hiddenBody = await hiddenRes.json();
+  assert.equal(hiddenBody.items.length, 0);
+
+  const shownRes = await handleAdminEntityList(new NextRequest("http://localhost/api/admin/venues?showArchived=1"), "venues", { requireAdminUser: adminUser, appDb: appDb as never });
+  const shownBody = await shownRes.json();
+  assert.equal(shownBody.items.length, 1);
+});
 test("export returns csv headers", async () => {
   const { appDb } = buildVenueDeps();
   const req = new NextRequest("http://localhost/api/admin/venues/export");

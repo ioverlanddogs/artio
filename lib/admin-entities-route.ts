@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 
-type EntityName = "venues" | "events" | "artists";
+type EntityName = "venues" | "events" | "artists" | "artwork";
 
 type AdminEntitiesDeps = {
   requireAdminUser: () => Promise<AdminActor>;
@@ -18,6 +18,8 @@ const PAGE_SIZE = 20;
 const listQuerySchema = z.object({
   query: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
+  showArchived: z.enum(["0", "1"]).optional(),
+  onlyArchived: z.enum(["0", "1"]).optional(),
 });
 
 const entityIdSchema = z.object({ id: z.string().uuid() });
@@ -69,9 +71,10 @@ const importPreviewBodySchema = z.object({
 });
 
 const defaultFields = {
-  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "websiteUrl", "isPublished", "description", "featuredAssetId"] as const,
-  events: ["id", "title", "startAt", "endAt", "venueId", "ticketUrl", "isPublished"] as const,
-  artists: ["id", "name", "websiteUrl", "bio", "featuredAssetId", "isPublished"] as const,
+  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "websiteUrl", "isPublished", "description", "featuredAssetId", "deletedAt"] as const,
+  events: ["id", "title", "startAt", "endAt", "venueId", "ticketUrl", "isPublished", "deletedAt"] as const,
+  artists: ["id", "name", "websiteUrl", "bio", "featuredAssetId", "isPublished", "deletedAt"] as const,
+  artwork: ["id", "title", "slug", "artistId", "isPublished", "deletedAt"] as const,
 };
 
 function parseCsv(text: string): { headers: string[]; rows: string[][] } {
@@ -222,13 +225,16 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
     const parsed = listQuerySchema.safeParse({
       query: req.nextUrl.searchParams.get("query") ?? undefined,
       page: req.nextUrl.searchParams.get("page") ?? "1",
+      showArchived: req.nextUrl.searchParams.get("showArchived") ?? undefined,
+      onlyArchived: req.nextUrl.searchParams.get("onlyArchived") ?? undefined,
     });
     if (!parsed.success) return apiError(400, "invalid_query", "Invalid query parameters");
-    const { page, query = "" } = parsed.data;
+    const { page, query = "", showArchived, onlyArchived } = parsed.data;
+    const deletedFilter = onlyArchived === "1" ? { deletedAt: { not: null as Date | null } } : (showArchived === "1" ? {} : { deletedAt: null });
     const skip = (page - 1) * PAGE_SIZE;
 
     if (entity === "venues") {
-      const where = query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { city: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : undefined;
+      const where = { ...deletedFilter, ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { city: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
       const [total, items] = await Promise.all([
         deps.appDb.venue.count({ where }),
         deps.appDb.venue.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.venues.map((k) => [k, true])) as never }),
@@ -237,7 +243,7 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
     }
 
     if (entity === "events") {
-      const where = query ? { OR: [{ title: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : undefined;
+      const where = { ...deletedFilter, ...(query ? { OR: [{ title: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
       const [total, items] = await Promise.all([
         deps.appDb.event.count({ where }),
         deps.appDb.event.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.events.map((k) => [k, true])) as never }),
@@ -245,7 +251,7 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
       return NextResponse.json({ items, total, page, pageSize: PAGE_SIZE });
     }
 
-    const where = query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : undefined;
+    const where = { ...deletedFilter, ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
     const [total, items] = await Promise.all([
       deps.appDb.artist.count({ where }),
       deps.appDb.artist.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.artists.map((k) => [k, true])) as never }),
@@ -478,3 +484,82 @@ export async function handleAdminEntityImportApply(req: NextRequest, entity: Ent
 }
 
 export const ADMIN_ENTITY_FIELDS = defaultFields;
+
+const archiveBodySchema = z.object({ reason: z.string().trim().max(500).optional() }).strict();
+
+export async function handleAdminEntityArchive(req: NextRequest, entity: EntityName, params: { id: string }, deps: AdminEntitiesDeps) {
+  try {
+    const actor = await deps.requireAdminUser();
+    const parsedId = entityIdSchema.safeParse(params);
+    if (!parsedId.success) return apiError(400, "invalid_id", "Invalid entity id");
+    const parsedBody = archiveBodySchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsedBody.success) return apiError(400, "invalid_body", "Invalid payload", parsedBody.error.flatten());
+
+    const data = { deletedAt: new Date(), deletedByAdminId: actor.id, deletedReason: parsedBody.data.reason ?? null };
+    const where = { id: parsedId.data.id };
+
+    if (entity === "events") {
+      const current = await deps.appDb.event.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.event.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+    if (entity === "venues") {
+      const current = await deps.appDb.venue.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.venue.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+    if (entity === "artists") {
+      const current = await deps.appDb.artist.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.artist.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+
+    const current = await deps.appDb.artwork.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+    if (!current) return apiError(404, "not_found", "Entity not found");
+    if (current.deletedAt) return NextResponse.json({ item: current });
+    return NextResponse.json({ item: await deps.appDb.artwork.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
+    return apiError(401, "unauthorized", "Authentication required");
+  }
+}
+
+export async function handleAdminEntityRestore(_req: NextRequest, entity: EntityName, params: { id: string }, deps: AdminEntitiesDeps) {
+  try {
+    await deps.requireAdminUser();
+    const parsedId = entityIdSchema.safeParse(params);
+    if (!parsedId.success) return apiError(400, "invalid_id", "Invalid entity id");
+    const where = { id: parsedId.data.id };
+    const data = { deletedAt: null, deletedByAdminId: null, deletedReason: null };
+
+    if (entity === "events") {
+      const current = await deps.appDb.event.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (!current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.event.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+    if (entity === "venues") {
+      const current = await deps.appDb.venue.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (!current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.venue.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+    if (entity === "artists") {
+      const current = await deps.appDb.artist.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+      if (!current) return apiError(404, "not_found", "Entity not found");
+      if (!current.deletedAt) return NextResponse.json({ item: current });
+      return NextResponse.json({ item: await deps.appDb.artist.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+    }
+
+    const current = await deps.appDb.artwork.findUnique({ where, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } });
+    if (!current) return apiError(404, "not_found", "Entity not found");
+    if (!current.deletedAt) return NextResponse.json({ item: current });
+    return NextResponse.json({ item: await deps.appDb.artwork.update({ where, data, select: { id: true, deletedAt: true, deletedByAdminId: true, deletedReason: true } }) });
+  } catch (error) {
+    if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
+    return apiError(401, "unauthorized", "Authentication required");
+  }
+}

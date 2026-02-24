@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     const venueId = req.nextUrl.searchParams.get("venueId");
 
     const memberships = await db.venueMembership.findMany({
-      where: { userId, role: { in: ["OWNER", "EDITOR"] } },
+      where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null } },
       select: { venueId: true, role: true, venue: { select: { name: true, city: true, country: true, featuredAssetId: true, updatedAt: true, isPublished: true, submissions: { where: { type: "VENUE" }, take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } } } } },
       orderBy: { createdAt: "asc" },
     });
@@ -67,10 +67,10 @@ export async function GET(req: NextRequest) {
     const [events, artworks, pendingInvites] = await Promise.all([
       db.event.findMany({
         where: {
-          OR: [
+          AND: [{ deletedAt: null }, { OR: [
             scopedVenueIds.length ? { venueId: { in: scopedVenueIds } } : undefined,
             artist?.id ? { eventArtists: { some: { artistId: artist.id } } } : undefined,
-          ].filter(Boolean) as never,
+          ].filter(Boolean) as never }] ,
         },
         select: {
           id: true,
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       }),
       artist?.id
         ? db.artwork.findMany({
-          where: { artistId: artist.id },
+          where: { artistId: artist.id, deletedAt: null },
           select: {
             id: true,
             title: true,

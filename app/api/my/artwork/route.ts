@@ -16,7 +16,7 @@ export async function GET() {
   if (!artist && user.role !== "ADMIN") return apiError(403, "forbidden", "Artist profile required");
 
   const items = await db.artwork.findMany({
-    where: user.role === "ADMIN" ? {} : { artistId: artist!.id },
+    where: user.role === "ADMIN" ? {} : { artistId: artist!.id, deletedAt: null },
     orderBy: { updatedAt: "desc" },
     select: { id: true, title: true, slug: true, isPublished: true, updatedAt: true, description: true, year: true, medium: true, featuredAssetId: true, _count: { select: { images: true } } },
   });

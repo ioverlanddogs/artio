@@ -27,7 +27,7 @@ export const revalidate = 300;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   if (!hasDatabaseUrl()) return FALLBACK_METADATA;
-  const artist = await db.artist.findFirst({ where: { slug, isPublished: true }, select: { name: true, bio: true, avatarImageUrl: true, featuredImageUrl: true, images: { take: 4, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } } } });
+  const artist = await db.artist.findFirst({ where: { slug, isPublished: true, deletedAt: null }, select: { name: true, bio: true, avatarImageUrl: true, featuredImageUrl: true, images: { take: 4, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } } } });
   if (!artist) return FALLBACK_METADATA;
   const description = (artist.bio ?? "").trim().slice(0, 160) || FALLBACK_METADATA.description;
   const imageUrl = resolveEntityPrimaryImage(artist)?.url ?? null;
@@ -41,7 +41,7 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
   const user = await getSessionUser();
 
   const artist = await db.artist.findFirst({
-    where: { slug, isPublished: true },
+    where: { slug, isPublished: true, deletedAt: null },
     select: {
       id: true,
       slug: true,
@@ -53,7 +53,7 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
       featuredImageUrl: true,
       images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
       eventArtists: {
-        where: { event: { isPublished: true, startAt: { gte: now } } },
+        where: { event: { isPublished: true, deletedAt: null, startAt: { gte: now } } },
         orderBy: { event: { startAt: "asc" } },
         take: 24,
         select: {

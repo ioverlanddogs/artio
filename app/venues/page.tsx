@@ -27,7 +27,7 @@ export default async function VenuesPage() {
 
   if (hasDatabaseUrl()) {
     const dbVenues = await db.venue.findMany({
-      where: { isPublished: true },
+      where: { isPublished: true, deletedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, slug: true, name: true, city: true, region: true, country: true, description: true, featuredImageUrl: true, images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } } },
     });
@@ -35,7 +35,7 @@ export default async function VenuesPage() {
     const [followerCounts, userFollows, artworkCounts] = await Promise.all([
       ids.length ? db.follow.groupBy({ by: ["targetId"], where: { targetType: "VENUE", targetId: { in: ids } }, _count: { _all: true } }) : Promise.resolve([]),
       user && ids.length ? db.follow.findMany({ where: { userId: user.id, targetType: "VENUE", targetId: { in: ids } }, select: { targetId: true } }) : Promise.resolve([]),
-      ids.length ? db.artworkVenue.groupBy({ by: ["venueId"], where: { venueId: { in: ids }, artwork: { isPublished: true } }, _count: { _all: true } }) : Promise.resolve([]),
+      ids.length ? db.artworkVenue.groupBy({ by: ["venueId"], where: { venueId: { in: ids }, artwork: { isPublished: true, deletedAt: null } }, _count: { _all: true } }) : Promise.resolve([]),
     ]);
     const countById = new Map(followerCounts.map((entry) => [entry.targetId, entry._count._all]));
     const followedSet = new Set(userFollows.map((row) => row.targetId));

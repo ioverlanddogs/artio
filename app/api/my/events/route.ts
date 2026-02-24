@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       const events = await db.event.findMany({
         where: {
           isPublished: false,
+          deletedAt: null,
           startAt,
           venueId,
           submissions: {
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
         ticketUrl: input.ticketUrl,
         timezone: input.timezone,
         isPublished: false,
+          deletedAt: null,
         publishedAt: null,
       },
       select: { id: true, slug: true, title: true, startAt: true, endAt: true, venueId: true, isPublished: true },
