@@ -10,6 +10,14 @@ export const dynamic = "force-dynamic";
 
 type EventsSearchParams = Promise<{ q?: string; query?: string; status?: string; venueId?: string; sort?: string; dateFrom?: string; dateTo?: string }>;
 
+export function resolveVenueFilterLabel(
+  venueId: string,
+  venues: Array<{ id: string; name: string }>,
+): string {
+  const venueName = venues.find((venue) => venue.id === venueId)?.name;
+  return `Venue: ${venueName ?? "Selected venue"}`;
+}
+
 export default async function MyEventsPage({ searchParams }: { searchParams: EventsSearchParams }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my/events");
@@ -37,10 +45,12 @@ export default async function MyEventsPage({ searchParams }: { searchParams: Eve
 
   const pills: FilterPill[] = [];
   if (venueId) {
-    const venueName = memberships.find((m) => m.venueId === venueId)?.venue.name;
     pills.push({
       key: "venueId",
-      label: `Venue: ${venueName ?? "Selected"}`,
+      label: resolveVenueFilterLabel(
+        venueId,
+        memberships.map((membership) => ({ id: membership.venueId, name: membership.venue.name })),
+      ),
       value: venueId,
       removeHref: buildRemoveFilterHref("/my/events", params, ["venueId"]),
     });

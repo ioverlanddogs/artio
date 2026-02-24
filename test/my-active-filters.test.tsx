@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ActiveFiltersBar } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref } from "@/app/my/_components/filter-href";
+import { resolveVenueFilterLabel } from "@/app/my/events/page";
 
 test("status=draft renders Status pill label", () => {
   const html = renderToStaticMarkup(
@@ -41,4 +42,18 @@ test("clear filters href removes filter params but preserves venue scope", () =>
 test("bar does not render when no active filters", () => {
   const html = renderToStaticMarkup(<ActiveFiltersBar pills={[]} clearAllHref="/my/venues" />);
   assert.equal(html, "");
+});
+
+test("venue filter label resolves venue name and avoids raw venue id", () => {
+  const venueId = "de8407ee-b2be-4e1a-a4cb-0c33ab560d78";
+  const label = resolveVenueFilterLabel(venueId, [{ id: venueId, name: "Gallery X" }]);
+
+  assert.equal(label, "Venue: Gallery X");
+  assert.doesNotMatch(label, /de8407ee-b2be-4e1a-a4cb-0c33ab560d78/);
+});
+
+test("venue filter label falls back when venue id is not found", () => {
+  const label = resolveVenueFilterLabel("missing-venue", [{ id: "venue_1", name: "Gallery X" }]);
+
+  assert.equal(label, "Venue: Selected venue");
 });
