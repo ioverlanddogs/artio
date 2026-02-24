@@ -3,13 +3,20 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
+import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
+import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyVenuesPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; sort?: string }> }) {
+type VenuesSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string }>;
+
+export default async function MyVenuesPage({ searchParams }: { searchParams: VenuesSearchParams }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my/venues");
-  const { q = "", status, sort = "updated" } = await searchParams;
+  const params = await searchParams;
+  const query = getFirstSearchValue(params, ["q", "query"]) ?? "";
+  const status = params.status;
+  const sort = params.sort ?? "updated";
 
   const memberships = await db.venueMembership.findMany({
     where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] } },
@@ -19,21 +26,40 @@ export default async function MyVenuesPage({ searchParams }: { searchParams: Pro
 
   const rows = memberships.filter((m) => {
     const s = m.venue.targetSubmissions[0]?.status;
-    if (status === "Draft") return !m.venue.isPublished && s !== "SUBMITTED" && s !== "REJECTED";
-    if (status === "Submitted") return s === "SUBMITTED";
-    if (status === "Rejected") return s === "REJECTED";
-    if (status === "Published") return m.venue.isPublished;
+    if (status === "Draft" || status === "draft") return !m.venue.isPublished && s !== "SUBMITTED" && s !== "REJECTED";
+    if (status === "Submitted" || status === "submitted") return s === "SUBMITTED";
+    if (status === "Rejected" || status === "rejected") return s === "REJECTED";
+    if (status === "Published" || status === "published") return m.venue.isPublished;
     return true;
-  }).filter((m) => m.venue.name.toLowerCase().includes(q.toLowerCase()));
+  }).filter((m) => m.venue.name.toLowerCase().includes(query.toLowerCase()));
+
+  const pills: FilterPill[] = [];
+  if (status) {
+    pills.push({
+      key: "status",
+      label: `Status: ${toTitleCase(status)}`,
+      value: status,
+      removeHref: buildRemoveFilterHref("/my/venues", params, ["status"]),
+    });
+  }
+  if (query) {
+    pills.push({
+      key: "query",
+      label: `Search: \"${truncateFilterValue(query)}\"`,
+      value: query,
+      removeHref: buildRemoveFilterHref("/my/venues", params, ["q", "query"]),
+    });
+  }
 
   return (
     <main className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="Search venues" className="h-9 rounded border px-2 text-sm" /><Button size="sm" type="submit">Search</Button></form>
+        <form className="flex gap-2"><input name="q" defaultValue={query} placeholder="Search venues" className="h-9 rounded border px-2 text-sm" /><Button size="sm" type="submit">Search</Button></form>
         {(["Draft", "Submitted", "Published", "Rejected"] as const).map((chip) => <Link key={chip} className="rounded border px-2 py-1 text-xs" href={`/my/venues?status=${chip}`}>{chip}</Link>)}
         <Link className="rounded border px-2 py-1 text-xs" href="/my/venues?sort=name">Sort: Name</Link>
         <Button asChild size="sm"><Link href="/my/venues/new">+ Create venue</Link></Button>
       </div>
+      <ActiveFiltersBar pills={pills} clearAllHref={buildClearFiltersHref("/my/venues", params, ["status", "q", "query", "sort"], ["venueId"])} />
       <table className="w-full text-sm">
         <thead><tr className="border-b"><th className="p-2 text-left">Venue</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr></thead>
         <tbody>
