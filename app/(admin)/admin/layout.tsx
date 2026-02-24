@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin";
 
 const ADMIN_LINKS = [
@@ -28,12 +29,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Artpulse</p>
             <h1 className="text-lg font-semibold">Admin Panel</h1>
           </div>
-          <div className="text-sm text-muted-foreground">{admin.email}</div>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="secondary" size="sm">
+              <Link href="/my">← Back to Publisher Dashboard</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/">View Public Site</Link>
+            </Button>
+            <div className="text-sm text-muted-foreground">{admin.email}</div>
+          </div>
         </div>
       </header>
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 p-6 md:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="rounded-lg border bg-background p-3">
           <nav className="space-y-1" aria-label="Admin navigation">
+            <p className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">User side</p>
+            <Link href="/my" className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+              Publisher Dashboard
+            </Link>
+            <Link href="/" className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+              Public Home
+            </Link>
+            <div className="my-2 border-t" />
             {ADMIN_LINKS.map((item) => (
               <Link key={item.href} href={item.href} className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
                 {item.label}
