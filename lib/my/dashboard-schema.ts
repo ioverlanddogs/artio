@@ -37,6 +37,10 @@ export const VenueSummarySchema = z.object({
   role: z.enum(["OWNER", "EDITOR"]),
   status: PublisherStatusSchema,
   updatedAtISO: z.string().datetime(),
+  completeness: z.object({
+    percent: z.number().int().min(0).max(100),
+    missing: z.array(z.string()),
+  }).optional(),
 });
 export type VenueSummary = z.infer<typeof VenueSummarySchema>;
 

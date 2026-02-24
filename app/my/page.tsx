@@ -4,14 +4,8 @@ import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { MyDashboardResponseSchema } from "@/lib/my/dashboard-schema";
 import { getServerBaseUrl } from "@/lib/server/get-base-url";
-
-function makeTabHref(path: "/my/venues" | "/my/events" | "/my/artwork", status: string, venueId?: string) {
-  const params = new URLSearchParams({ status });
-  if (venueId) {
-    params.set("venueId", venueId);
-  }
-  return `${path}?${params.toString()}`;
-}
+import CompletenessBar from "./_components/CompletenessBar";
+import StatusTileGroups from "./_components/StatusTileGroups";
 
 async function getDashboard(venueId?: string) {
   const qs = venueId ? `?venueId=${encodeURIComponent(venueId)}` : "";
@@ -48,33 +42,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Status at a glance</h2>
-        <div className="grid gap-3 md:grid-cols-4">
-          {(["Draft", "Submitted", "Published", "Rejected"] as const).map((status) => (
-            <Link key={`venue-${status}`} href={makeTabHref("/my/venues", status, venueId)} className="rounded border p-3">
-              <p className="text-xs text-muted-foreground">Venue {status.toLowerCase()}</p>
-              <p className="text-2xl font-semibold">{data.counts.venues[status]}</p>
-            </Link>
-          ))}
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          {(["Draft", "Submitted", "Published", "Rejected"] as const).map((status) => (
-            <Link key={`event-${status}`} href={makeTabHref("/my/events", status, venueId)} className="rounded border p-3">
-              <p className="text-xs text-muted-foreground">Event {status.toLowerCase()}</p>
-              <p className="text-2xl font-semibold">{data.counts.events[status]}</p>
-            </Link>
-          ))}
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {(["Draft", "Published"] as const).map((status) => (
-            <Link key={`artwork-${status}`} href={makeTabHref("/my/artwork", status, venueId)} className="rounded border p-3">
-              <p className="text-xs text-muted-foreground">Artwork {status.toLowerCase()}</p>
-              <p className="text-2xl font-semibold">{data.counts.artwork[status]}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <StatusTileGroups counts={data.counts} venueId={venueId} />
 
       <section className="rounded border p-3">
         <div className="mb-2 flex items-center justify-between">
@@ -82,10 +50,11 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
           <Link className="text-sm underline" href={venueId ? `/my/venues?venueId=${venueId}` : "/my/venues"}>View all</Link>
         </div>
         <div className="space-y-2 text-sm">
-          {data.quickLists.venues.map((venue) => (
+          {data.quickLists.venues.length === 0 ? <p className="rounded border p-2 text-muted-foreground">You haven&apos;t created any venues yet. <Link className="underline" href="/my/venues/new">Create Venue</Link></p> : data.quickLists.venues.map((venue) => (
             <article className="rounded border p-2" key={venue.id}>
               <p className="font-medium">{venue.name}</p>
               <p className="text-muted-foreground">{venue.status} · {new Date(venue.updatedAtISO).toLocaleDateString()}</p>
+              {venue.completeness ? <CompletenessBar percent={venue.completeness.percent} missing={venue.completeness.missing} /> : null}
               <div className="mt-1 space-x-2">
                 <Link className="underline" href={`/my/venues/${venue.id}`}>Edit</Link>
                 <Link className="underline" href={`/my/venues/${venue.id}/submit-event`}>Submit Event</Link>
@@ -102,7 +71,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
           <Link className="text-sm underline" href={venueId ? `/my/events?venueId=${venueId}` : "/my/events"}>View all</Link>
         </div>
         <div className="space-y-2 text-sm">
-          {data.quickLists.upcomingEvents.map((event) => (
+          {data.quickLists.upcomingEvents.length === 0 ? <p className="rounded border p-2 text-muted-foreground">You don&apos;t have any upcoming events yet. <Link className="underline" href="/my/events/new">Create Event</Link></p> : data.quickLists.upcomingEvents.map((event) => (
             <article className="rounded border p-2" key={event.id}>
               <p className="font-medium">{event.title}</p>
               <p className="text-muted-foreground">{new Date(event.startAtISO).toLocaleDateString()} · {event.venueName ?? "No venue"}</p>
@@ -121,7 +90,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
           <Link className="text-sm underline" href={venueId ? `/my/artwork?venueId=${venueId}` : "/my/artwork"}>View all</Link>
         </div>
         <div className="space-y-2 text-sm">
-          {data.quickLists.recentArtwork.map((artwork) => (
+          {data.quickLists.recentArtwork.length === 0 ? <p className="rounded border p-2 text-muted-foreground">You haven&apos;t added artwork yet. <Link className="underline" href="/my/artwork/new">Add Artwork</Link></p> : data.quickLists.recentArtwork.map((artwork) => (
             <article className="flex items-center gap-3 rounded border p-2" key={artwork.id}>
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded border bg-muted">
                 {artwork.imageUrl ? <Image src={artwork.imageUrl} alt={artwork.title} fill sizes="40px" className="object-cover" /> : null}

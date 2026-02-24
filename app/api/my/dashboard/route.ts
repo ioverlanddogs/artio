@@ -4,10 +4,29 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureDbUserForSession } from "@/lib/ensure-db-user-for-session";
 import { MyDashboardResponseSchema, type MyDashboardResponse, type PublisherStatus } from "@/lib/my/dashboard-schema";
+import { evaluateVenueReadiness } from "@/lib/publish-readiness";
 
 export const runtime = "nodejs";
 
 const ZERO_COUNTS = { Draft: 0, Submitted: 0, Published: 0, Rejected: 0 } satisfies Record<PublisherStatus, number>;
+
+const VENUE_READINESS_LABELS: Record<string, string> = {
+  "venue-name": "Name",
+  "venue-city": "City",
+  "venue-country": "Country",
+  "venue-cover": "Cover image",
+};
+
+function toVenueCompleteness(venue: { name: string | null; city: string | null; country: string | null; featuredAssetId: string | null }) {
+  const readiness = evaluateVenueReadiness(venue);
+  const requiredCount = 4;
+  const completedCount = Math.max(0, requiredCount - readiness.blocking.length);
+  const missing = readiness.blocking.map((item) => VENUE_READINESS_LABELS[item.id] ?? item.label.replace(/^Add\s+/i, "").replace(/\.$/, ""));
+  return {
+    percent: Math.round((completedCount / requiredCount) * 100),
+    missing,
+  };
+}
 
 function mapSubmissionStatus(status: string | null | undefined, isPublished: boolean): PublisherStatus {
   if (isPublished) return "Published";
@@ -27,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     const memberships = await db.venueMembership.findMany({
       where: { userId, role: { in: ["OWNER", "EDITOR"] } },
-      select: { venueId: true, role: true, venue: { select: { name: true, updatedAt: true, isPublished: true, submissions: { where: { type: "VENUE" }, take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } } } } },
+      select: { venueId: true, role: true, venue: { select: { name: true, city: true, country: true, featuredAssetId: true, updatedAt: true, isPublished: true, submissions: { where: { type: "VENUE" }, take: 1, orderBy: { updatedAt: "desc" }, select: { status: true } } } } },
       orderBy: { createdAt: "asc" },
     });
 
@@ -160,6 +179,12 @@ export async function GET(req: NextRequest) {
             role: m.role,
             status: mapSubmissionStatus(m.venue.submissions[0]?.status, m.venue.isPublished),
             updatedAtISO: m.venue.updatedAt.toISOString(),
+            completeness: toVenueCompleteness({
+              name: m.venue.name,
+              city: m.venue.city,
+              country: m.venue.country,
+              featuredAssetId: m.venue.featuredAssetId,
+            }),
           })),
         upcomingEvents: events
           .filter((e) => e.startAt >= new Date())
