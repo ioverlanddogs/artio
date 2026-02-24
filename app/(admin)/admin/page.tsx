@@ -1,3 +1,4 @@
+import AdminPageHeader from "./_components/AdminPageHeader";
 import { db } from "@/lib/db";
 
 async function getDbHealth() {
@@ -37,10 +38,7 @@ export default async function AdminHomePage() {
 
   return (
     <main className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Dashboard</h2>
-        <p className="text-sm text-muted-foreground">Operational overview for administrators.</p>
-      </div>
+      <AdminPageHeader title="Dashboard" description="Operational overview for administrators." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="DB health" value={dbHealth} />
         <StatCard label="Users" value={counts.users} />
