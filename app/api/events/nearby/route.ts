@@ -74,7 +74,8 @@ export async function GET(req: NextRequest) {
     const batch = (await db.event.findMany({
       where: {
         isPublished: true,
-        AND: andFilters,
+        deletedAt: null,
+        AND: [...andFilters, { OR: [{ venueId: null }, { venue: { deletedAt: null } }] }],
       },
       take: batchSize,
       orderBy: START_AT_ID_ORDER_BY,

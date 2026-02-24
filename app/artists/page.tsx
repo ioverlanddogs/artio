@@ -27,7 +27,7 @@ export default async function ArtistsPage() {
 
   if (hasDatabaseUrl()) {
     const dbArtists = await db.artist.findMany({
-      where: { isPublished: true },
+      where: { isPublished: true, deletedAt: null },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -37,14 +37,14 @@ export default async function ArtistsPage() {
         avatarImageUrl: true,
         featuredImageUrl: true,
         images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
-        eventArtists: { where: { event: { isPublished: true } }, take: 8, select: { event: { select: { eventTags: { select: { tag: { select: { slug: true } } } } } } } },
+        eventArtists: { where: { event: { isPublished: true, deletedAt: null } }, take: 8, select: { event: { select: { eventTags: { select: { tag: { select: { slug: true } } } } } } } },
       },
     });
     const ids = dbArtists.map((artist) => artist.id);
     const [followerCounts, userFollows, artworkCounts] = await Promise.all([
       ids.length ? db.follow.groupBy({ by: ["targetId"], where: { targetType: "ARTIST", targetId: { in: ids } }, _count: { _all: true } }) : Promise.resolve([]),
       user && ids.length ? db.follow.findMany({ where: { userId: user.id, targetType: "ARTIST", targetId: { in: ids } }, select: { targetId: true } }) : Promise.resolve([]),
-      ids.length ? db.artwork.groupBy({ by: ["artistId"], where: { isPublished: true, artistId: { in: ids } }, _count: { _all: true } }) : Promise.resolve([]),
+      ids.length ? db.artwork.groupBy({ by: ["artistId"], where: { isPublished: true, deletedAt: null, artistId: { in: ids } }, _count: { _all: true } }) : Promise.resolve([]),
     ]);
     const countById = new Map(followerCounts.map((entry) => [entry.targetId, entry._count._all]));
     const followedSet = new Set(userFollows.map((row) => row.targetId));

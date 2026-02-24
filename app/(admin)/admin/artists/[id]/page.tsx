@@ -3,6 +3,7 @@ import AdminEntityForm from "@/app/(admin)/admin/_components/AdminEntityForm";
 import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
+import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 
 export default async function AdminArtist({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,7 +12,7 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
 
   return (
     <main className="space-y-6">
-      <AdminPageHeader title="Edit artist" backHref="/admin/artists" backLabel="Back to artists" />
+      <AdminPageHeader title="Edit artist" backHref="/admin/artists" backLabel="Back to artists" right={<AdminArchiveActions entity="artists" id={artist.id} archived={!!artist.deletedAt} />} />
       <AdminEntityForm
         title="Edit Artist"
         endpoint={`/api/admin/artists/${id}`}

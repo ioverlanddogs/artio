@@ -67,8 +67,8 @@ export async function GET(req: NextRequest) {
     const filters: Prisma.EventWhereInput[] = [];
     if (query) filters.push({ OR: [{ title: { contains: query, mode: "insensitive" } }, { description: { contains: query, mode: "insensitive" } }] });
     if (from || to) filters.push({ startAt: { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } });
-    if (venue) filters.push({ venue: { slug: venue } });
-    if (artist) filters.push({ eventArtists: { some: { artist: { slug: artist, isPublished: true } } } });
+    if (venue) filters.push({ venue: { slug: venue, deletedAt: null } });
+    if (artist) filters.push({ eventArtists: { some: { artist: { slug: artist, isPublished: true, deletedAt: null } } } });
     if (tagList.length) filters.push({ eventTags: { some: { tag: { slug: { in: tagList } } } } });
     if (box) {
       filters.push({
@@ -88,7 +88,8 @@ export async function GET(req: NextRequest) {
       const rows = (await db.event.findMany({
         where: {
           isPublished: true,
-          ...(batchFilters.length ? { AND: batchFilters } : {}),
+          deletedAt: null,
+          AND: [...batchFilters, { OR: [{ venueId: null }, { venue: { deletedAt: null } }] }],
         },
         take,
         orderBy: START_AT_ID_ORDER_BY,

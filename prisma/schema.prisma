@@ -282,6 +282,9 @@ model Venue {
   isPublished        Boolean                  @default(false)
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
+  deletedAt          DateTime?
+  deletedByAdminId   String?                  @db.Uuid
+  deletedReason      String?
   events             Event[]
   images             VenueImage[]
   memberships        VenueMembership[]
@@ -294,6 +297,7 @@ model Venue {
 
   @@index([isPublished])
   @@index([featuredAssetId])
+  @@index([deletedAt])
 }
 
 model Artist {
@@ -310,6 +314,9 @@ model Artist {
   isPublished       Boolean                  @default(false)
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
+  deletedAt         DateTime?
+  deletedByAdminId  String?                  @db.Uuid
+  deletedReason     String?
   user              User?                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   images            ArtistImage[]
   eventArtists      EventArtist[]
@@ -321,6 +328,7 @@ model Artist {
 
   @@index([isPublished])
   @@index([featuredAssetId])
+  @@index([deletedAt])
 }
 
 model ArtistVenueAssociation {
@@ -364,6 +372,9 @@ model Event {
   publishedAt   DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  deletedByAdminId String?     @db.Uuid
+  deletedReason String?
   venue         Venue?         @relation(fields: [venueId], references: [id])
   featuredAsset Asset?         @relation("EventFeaturedAsset", fields: [featuredAssetId], references: [id], onDelete: SetNull)
   images        EventImage[]
@@ -380,6 +391,7 @@ model Event {
   @@index([isPublished, startAt, id])
   @@index([venueId, startAt])
   @@index([publishedAt])
+  @@index([deletedAt])
 }
 
 model VenueMembership {
@@ -682,6 +694,9 @@ model Artwork {
   featuredAssetId String?        @db.Uuid
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+  deletedByAdminId String?       @db.Uuid
+  deletedReason   String?
   artist          Artist         @relation(fields: [artistId], references: [id], onDelete: Cascade)
   featuredAsset   Asset?         @relation("ArtworkFeaturedAsset", fields: [featuredAssetId], references: [id], onDelete: SetNull)
   images          ArtworkImage[]
@@ -694,6 +709,7 @@ model Artwork {
   @@index([isPublished])
   @@index([artistId, isPublished, updatedAt])
   @@index([featuredAssetId])
+  @@index([deletedAt])
 }
 
 model ArtistFeaturedArtwork {

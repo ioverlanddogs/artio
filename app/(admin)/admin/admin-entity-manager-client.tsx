@@ -13,6 +13,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
@@ -36,6 +37,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
     setError(null);
     try {
       const params = new URLSearchParams({ page: String(nextPage) });
+      if (showArchived) params.set("showArchived", "1");
       if (nextQuery.trim()) params.set("query", nextQuery.trim());
       const res = await fetch(`/api/admin/${entity}?${params.toString()}`);
       const body = await res.json();
@@ -47,7 +49,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
     } finally {
       setBusy(false);
     }
-  }, [entity, page, query]);
+  }, [entity, page, query, showArchived]);
 
   const loadPresets = useCallback(async () => {
     try {
@@ -251,6 +253,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
         <input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} className="rounded border px-2 py-1 text-sm" placeholder={`Search ${entity}`} />
         <button type="button" onClick={() => void exportCsv()} className="rounded border px-3 py-1 text-sm">Export CSV</button>
         <button type="button" onClick={() => setImportOpen((v) => !v)} className="rounded border px-3 py-1 text-sm">Import CSV</button>
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={showArchived} onChange={(e) => { setPage(1); setShowArchived(e.target.checked); }} /> Show archived</label>
       </div>
 
       {importOpen ? (
@@ -308,9 +311,9 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
 
       <div className="overflow-x-auto rounded border bg-background">
         <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-muted/50"><tr>{["id", ...fields, "actions"].map((field) => <th key={field} className="px-3 py-2 text-left">{field}</th>)}</tr></thead>
+          <thead className="bg-muted/50"><tr>{["id", ...fields, "status", "actions"].map((field) => <th key={field} className="px-3 py-2 text-left">{field}</th>)}</tr></thead>
           <tbody>
-            {items.length === 0 ? <tr><td className="px-3 py-3 text-muted-foreground" colSpan={fields.length + 2}>{busy ? "Loading..." : "No records"}</td></tr> : items.map((item) => {
+            {items.length === 0 ? <tr><td className="px-3 py-3 text-muted-foreground" colSpan={fields.length + 3}>{busy ? "Loading..." : "No records"}</td></tr> : items.map((item) => {
               const id = String(item.id ?? "");
               const isEditing = editingId === id;
               return (
@@ -325,6 +328,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                       ) : String(item[field] ?? "")}
                     </td>
                   ))}
+                  <td className="px-3 py-2">{item.deletedAt ? <span className="rounded border px-2 py-0.5 text-xs">Archived</span> : null}</td>
                   <td className="px-3 py-2">
                     {isEditing ? <button type="button" onClick={() => void saveEdit(id)} className="rounded border px-2 py-1 text-xs">Save</button> : <button type="button" onClick={() => startEdit(item)} className="rounded border px-2 py-1 text-xs">Edit</button>}
                   </td>
