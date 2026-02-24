@@ -2,14 +2,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("/my overview renders quick list headings and status tiles", () => {
+test("/my overview renders grouped status sections and totals", () => {
+  const page = readFileSync("app/my/page.tsx", "utf8");
+  const groups = readFileSync("app/my/_components/StatusTileGroups.tsx", "utf8");
+
+  assert.match(page, /StatusTileGroups/);
+  assert.match(groups, /title="Venues"/);
+  assert.match(groups, /title="Events"/);
+  assert.match(groups, /title="Artwork"/);
+  assert.match(groups, /Total:/);
+  assert.match(groups, /makeDashboardTabHref\("\/my\/venues", status, venueId\)/);
+  assert.match(groups, /makeDashboardTabHref\("\/my\/events", status, venueId\)/);
+  assert.match(groups, /makeDashboardTabHref\("\/my\/artwork", status, venueId\)/);
+});
+
+test("/my venues quick list renders completeness bar and truncates missing list", () => {
+  const page = readFileSync("app/my/page.tsx", "utf8");
+  const bar = readFileSync("app/my/_components/CompletenessBar.tsx", "utf8");
+
+  assert.match(page, /venue\.completeness \? <CompletenessBar/);
+  assert.match(bar, /% complete/);
+  assert.match(bar, /missing\.slice\(0, 3\)/);
+  assert.match(bar, /Missing:/);
+});
+
+test("/my includes section empty states", () => {
   const source = readFileSync("app/my/page.tsx", "utf8");
-  assert.match(source, /Venues/);
-  assert.match(source, /Upcoming events/);
-  assert.match(source, /Recent artwork/);
-  assert.match(source, /Venue \{status.toLowerCase\(\)\}/);
-  assert.match(source, /Event \{status.toLowerCase\(\)\}/);
-  assert.match(source, /Artwork \{status.toLowerCase\(\)\}/);
+  assert.match(source, /You haven&apos;t created any venues yet/);
+  assert.match(source, /You don&apos;t have any upcoming events yet/);
+  assert.match(source, /You haven&apos;t added artwork yet/);
 });
 
 test("/my needs attention empty state renders", () => {
