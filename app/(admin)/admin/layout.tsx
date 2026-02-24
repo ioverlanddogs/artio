@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin";
+import AdminSidebarNav from "./_components/AdminSidebarNav";
 
 const ADMIN_LINKS = [
   { href: "/admin", label: "Dashboard" },
@@ -42,21 +43,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </header>
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 p-6 md:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="rounded-lg border bg-background p-3">
-          <nav className="space-y-1" aria-label="Admin navigation">
-            <p className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">User side</p>
-            <Link href="/my" className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-              Publisher Dashboard
-            </Link>
-            <Link href="/" className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-              Public Home
-            </Link>
-            <div className="my-2 border-t" />
-            {ADMIN_LINKS.map((item) => (
-              <Link key={item.href} href={item.href} className="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <AdminSidebarNav
+            userLinks={[
+              { href: "/my", label: "Publisher Dashboard" },
+              { href: "/", label: "Public Home" },
+            ]}
+            adminLinks={ADMIN_LINKS}
+          />
         </aside>
         <section>{children}</section>
       </div>

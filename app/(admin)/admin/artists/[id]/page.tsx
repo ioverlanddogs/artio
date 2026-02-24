@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import AdminEntityForm from "@/app/(admin)/admin/_components/AdminEntityForm";
+import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 
@@ -9,25 +10,28 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
   if (!artist) notFound();
 
   return (
-    <AdminEntityForm
-      title="Edit Artist"
-      endpoint={`/api/admin/artists/${id}`}
-      method="PATCH"
-      redirectPath="/admin/artists"
-      uploadTargetType="artist"
-      uploadTargetId={id}
-      initial={artist}
-      fields={[
-        { name: "name", label: "Name" },
-        { name: "slug", label: "Slug" },
-        { name: "bio", label: "Bio" },
-        { name: "websiteUrl", label: "Website URL" },
-        { name: "instagramUrl", label: "Instagram URL" },
-        { name: "avatarImageUrl", label: "Avatar Image URL" },
-        { name: "featuredImageUrl", label: "Featured Image URL" },
-        { name: "featuredAssetId", label: "Featured Asset ID" },
-      ]}
-      altRequired={ADMIN_IMAGE_ALT_REQUIRED}
-    />
+    <main className="space-y-6">
+      <AdminPageHeader title="Edit artist" backHref="/admin/artists" backLabel="Back to artists" />
+      <AdminEntityForm
+        title="Edit Artist"
+        endpoint={`/api/admin/artists/${id}`}
+        method="PATCH"
+        redirectPath="/admin/artists"
+        uploadTargetType="artist"
+        uploadTargetId={id}
+        initial={artist}
+        fields={[
+          { name: "name", label: "Name" },
+          { name: "slug", label: "Slug" },
+          { name: "bio", label: "Bio" },
+          { name: "websiteUrl", label: "Website URL" },
+          { name: "instagramUrl", label: "Instagram URL" },
+          { name: "avatarImageUrl", label: "Avatar Image URL" },
+          { name: "featuredImageUrl", label: "Featured Image URL" },
+          { name: "featuredAssetId", label: "Featured Asset ID" },
+        ]}
+        altRequired={ADMIN_IMAGE_ALT_REQUIRED}
+      />
+    </main>
   );
 }
