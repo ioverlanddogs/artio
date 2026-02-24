@@ -20,6 +20,7 @@ export function MyHeaderBar() {
   const searchParams = useSearchParams();
   const venueId = searchParams.get("venueId") ?? "";
   const [venues, setVenues] = useState<VenueOption[]>([]);
+  const [hasArtistProfile, setHasArtistProfile] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const onVenueChange = useCallback((value: string, mode: "push" | "replace" = "push") => {
@@ -51,6 +52,7 @@ export function MyHeaderBar() {
           return;
         }
         setVenues(parsed.data.context.venues);
+        setHasArtistProfile(parsed.data.context.hasArtistProfile);
       } catch {
         // no-op: keep header resilient even when dashboard context fetch fails
       } finally {
@@ -115,6 +117,10 @@ export function MyHeaderBar() {
           </DropdownMenu>
           <Button asChild size="sm"><Link href="/my/events/new">+ Event</Link></Button>
           <Button asChild size="sm" variant="secondary"><Link href="/my/venues/new">+ Venue</Link></Button>
+          <Button asChild size="sm" variant="secondary"><Link href="/my/artwork/new">+ Artwork</Link></Button>
+          {!hasArtistProfile ? (
+            <Button asChild size="sm" variant="outline"><Link href="/my/artist">Create Artist Profile</Link></Button>
+          ) : null}
         </div>
       </div>
     </header>

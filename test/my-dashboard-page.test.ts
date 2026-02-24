@@ -2,12 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("/my dashboard page includes command center sections", () => {
+test("/my overview renders quick list headings and status tiles", () => {
   const source = readFileSync("app/my/page.tsx", "utf8");
-  assert.match(source, /Needs attention/);
-  assert.match(source, /Recent activity/);
-  assert.match(source, /Venue drafts/);
-  assert.match(source, /Events submitted/);
+  assert.match(source, /Venues/);
+  assert.match(source, /Upcoming events/);
+  assert.match(source, /Recent artwork/);
+  assert.match(source, /Venue \{status.toLowerCase\(\)\}/);
+  assert.match(source, /Event \{status.toLowerCase\(\)\}/);
+  assert.match(source, /Artwork \{status.toLowerCase\(\)\}/);
+});
+
+test("/my needs attention empty state renders", () => {
+  const source = readFileSync("app/my/page.tsx", "utf8");
+  assert.match(source, /Nothing needs attention — you&apos;re all caught up\./);
+  assert.match(source, /data\.attention\.length === 0/);
+});
+
+test("header includes + Artwork and conditional artist profile CTA", () => {
+  const header = readFileSync("app/my/_components/my-header-bar.tsx", "utf8");
+  assert.match(header, /\+ Artwork/);
+  assert.match(header, /!hasArtistProfile/);
+  assert.match(header, /Create Artist Profile/);
 });
 
 test("/my layout includes shared shell components", () => {
