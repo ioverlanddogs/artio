@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ActiveFiltersBar } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref } from "@/app/my/_components/filter-href";
 import { makeDashboardTabHref } from "@/app/my/_components/dashboard-tab-href";
-import { resolveVenueFilterLabel } from "@/app/my/events/page";
+import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filter-label";
 
 test("status=draft renders Status pill label", () => {
   const html = renderToStaticMarkup(

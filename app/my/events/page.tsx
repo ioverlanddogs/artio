@@ -5,18 +5,11 @@ import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
+import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filter-label";
 
 export const dynamic = "force-dynamic";
 
 type EventsSearchParams = Promise<{ q?: string; query?: string; status?: string; venueId?: string; sort?: string; dateFrom?: string; dateTo?: string }>;
-
-export function resolveVenueFilterLabel(
-  venueId: string,
-  venues: Array<{ id: string; name: string }>,
-): string {
-  const venueName = venues.find((venue) => venue.id === venueId)?.name;
-  return `Venue: ${venueName ?? "Selected venue"}`;
-}
 
 export default async function MyEventsPage({ searchParams }: { searchParams: EventsSearchParams }) {
   const user = await getSessionUser();
