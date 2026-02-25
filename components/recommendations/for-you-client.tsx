@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventCard } from "@/components/events/event-card";
 import { ItemActionsMenu } from "@/components/personalization/item-actions-menu";
@@ -44,21 +43,13 @@ const emptySignals: OnboardingSignals = {
 
 const debugEnabled = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_PERSONALIZATION_DEBUG === "true";
 
-type ForYouSessionStatus = "authenticated" | "unauthenticated" | "loading";
-
 export async function fetchForYouRecommendations({
-  status,
-  hasUser,
   signal,
   fetchImpl = fetch,
 }: {
-  status: ForYouSessionStatus;
-  hasUser: boolean;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
-}): Promise<{ kind: "skipped" | "unauthorized" | "error" } | { kind: "success"; data: ForYouResponse }> {
-  if (status !== "authenticated" || !hasUser) return { kind: "skipped" };
-
+}): Promise<{ kind: "unauthorized" | "error" } | { kind: "success"; data: ForYouResponse }> {
   const response = await fetchImpl("/api/recommendations/for-you?days=7&limit=20", { cache: "no-store", signal });
   if (response.status === 401) return { kind: "unauthorized" };
   if (!response.ok) return { kind: "error" };
@@ -69,21 +60,14 @@ export async function fetchForYouRecommendations({
 export function shouldAttemptForYouFetch({
   attempted,
   lockedOut,
-  status,
-  hasUser,
 }: {
   attempted: boolean;
   lockedOut: boolean;
-  status: ForYouSessionStatus;
-  hasUser: boolean;
 }): boolean {
-  return !lockedOut && !attempted && status === "authenticated" && hasUser;
+  return !lockedOut && !attempted;
 }
 
 export function ForYouClient() {
-  const session = useSession();
-  const status = session?.status ?? "unauthenticated";
-  const hasUser = Boolean(session?.data?.user);
   const [data, setData] = useState<ForYouResponse>({ windowDays: 7, items: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,14 +79,8 @@ export function ForYouClient() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
-    const result = await fetchForYouRecommendations({ status, hasUser, signal });
+    const result = await fetchForYouRecommendations({ signal });
     if (signal?.aborted) return;
-    if (result.kind === "skipped") {
-      setShowAuthFallback(true);
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
     if (result.kind === "unauthorized") {
       setShowAuthFallback(true);
       setLockedOut(true);
@@ -122,22 +100,17 @@ export function ForYouClient() {
       setError(null);
       setIsLoading(false);
     }
-  }, [hasUser, status]);
+  }, []);
 
   useEffect(() => {
-    if (status === "loading") {
-      setIsLoading(true);
-      return;
-    }
-
-    if (status === "unauthenticated" || !hasUser || lockedOut) {
+    if (lockedOut) {
       setShowAuthFallback(true);
       setError(null);
       setIsLoading(false);
       return;
     }
 
-    if (!shouldAttemptForYouFetch({ attempted: attemptedRef.current, lockedOut, status, hasUser })) return;
+    if (!shouldAttemptForYouFetch({ attempted: attemptedRef.current, lockedOut })) return;
 
     attemptedRef.current = true;
     const controller = new AbortController();
@@ -146,7 +119,7 @@ export function ForYouClient() {
     return () => {
       controller.abort();
     };
-  }, [hasUser, load, lockedOut, status]);
+  }, [load, lockedOut]);
 
   useEffect(() => {
     let cancelled = false;
