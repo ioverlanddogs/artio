@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import SubmissionsModeration from "@/app/(admin)/admin/_components/SubmissionsModeration";
+import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,10 @@ export default async function AdminSubmissionsPage({ searchParams }: { searchPar
 
   return (
     <main className="p-6 space-y-3">
-      <h1 className="text-2xl font-semibold">Submission Moderation</h1>
+      <AdminPageHeader
+        title="Submissions"
+        description="Approve, reject, or request changes for submitted content."
+      />
       <div className="flex gap-2 text-sm">
         {allowedStatuses.map((s) => (
           <Link key={s} href={`/admin/submissions?status=${s}&type=${type}`} className={`rounded border px-3 py-1 ${s === status ? "bg-neutral-100" : ""}`}>

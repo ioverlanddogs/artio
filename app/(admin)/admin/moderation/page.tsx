@@ -1,6 +1,7 @@
 import { createAdminModerationDeps } from "@/lib/admin-moderation-db";
 import { db } from "@/lib/db";
 import ModerationClient from "@/app/(admin)/admin/moderation/moderation-client";
+import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 
 export default async function AdminModerationPage() {
   const items = await createAdminModerationDeps().getQueueItems();
@@ -19,7 +20,10 @@ export default async function AdminModerationPage() {
 
   return (
     <main className="space-y-4">
-      <h2 className="text-2xl font-semibold">Moderation Queue</h2>
+      <AdminPageHeader
+        title="Moderation"
+        description="Review submissions and moderation queue items."
+      />
       <ModerationClient initialItems={details} />
     </main>
   );
