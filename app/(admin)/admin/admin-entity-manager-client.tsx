@@ -1,11 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import AdminInlineRowActions, { buildEditableDraft, getNextEditingId } from "./_components/AdminInlineRowActions";
 
 type EntityName = "venues" | "events" | "artists";
 
 type RowResult = { rowIndex: number; status: string; errors?: string[]; targetId?: string; patch?: Record<string, unknown> };
 type PresetListItem = { id: string; name: string; entityType: EntityName; updatedAt: string };
+
+type EditableField = {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "checkbox" | "datetime";
+};
 
 export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy }: { entity: EntityName; fields: string[]; title: string; defaultMatchBy: "id" | "slug" | "name" }) {
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
@@ -16,7 +24,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
 
   const [importOpen, setImportOpen] = useState(false);
   const [csvText, setCsvText] = useState("");
@@ -31,6 +39,8 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const [presetNotice, setPresetNotice] = useState<string | null>(null);
 
   const maxPage = useMemo(() => Math.max(1, Math.ceil(total / 20)), [total]);
+  const editableConfig = useMemo(() => editableFieldsForEntity(entity), [entity]);
+  const editableKeys = useMemo(() => new Set(editableConfig.map((field) => String(field.key))), [editableConfig]);
 
   const loadData = useCallback(async (nextQuery = query, nextPage = page) => {
     setBusy(true);
@@ -76,37 +86,8 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
 
   function startEdit(item: Record<string, unknown>) {
     const id = String(item.id ?? "");
-    setEditingId(id);
-    setDrafts((current) => ({ ...current, [id]: Object.fromEntries(fields.map((field) => [field, item[field] == null ? "" : String(item[field])])) }));
-  }
-
-  async function saveEdit(id: string) {
-    const draft = drafts[id];
-    if (!draft) return;
-    const payload: Record<string, unknown> = {};
-    for (const key of fields) {
-      if (!(key in draft)) continue;
-      if (key === "isPublished") payload[key] = draft[key] === "true";
-      else payload[key] = draft[key] === "" ? null : draft[key];
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/${entity}/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? "Save failed");
-      setEditingId(null);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setBusy(false);
-    }
+    setEditingId((current) => getNextEditingId(current, id));
+    setDrafts((current) => ({ ...current, [id]: buildEditableDraft(item, editableConfig) }));
   }
 
   async function exportCsv() {
@@ -251,8 +232,8 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
 
       <div className="flex flex-wrap gap-2">
         <input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} className="rounded border px-2 py-1 text-sm" placeholder={`Search ${entity}`} />
-        <button type="button" onClick={() => void exportCsv()} className="rounded border px-3 py-1 text-sm">Export CSV</button>
-        <button type="button" onClick={() => setImportOpen((v) => !v)} className="rounded border px-3 py-1 text-sm">Import CSV</button>
+        <Button type="button" variant="outline" size="sm" onClick={() => void exportCsv()}>Export CSV</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen((v) => !v)}>Import CSV</Button>
         <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={showArchived} onChange={(e) => { setPage(1); setShowArchived(e.target.checked); }} /> Show archived</label>
       </div>
 
@@ -266,8 +247,8 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                   <option value="">Load preset</option>
                   {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
                 </select>
-                <button type="button" className="rounded border px-3 py-1" onClick={() => void savePreset()}>Save preset</button>
-                <button type="button" className="rounded border px-3 py-1" onClick={() => void deleteSelectedPreset()} disabled={!selectedPresetId}>Delete preset</button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void savePreset()}>Save preset</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void deleteSelectedPreset()} disabled={!selectedPresetId}>Delete preset</Button>
               </div>
               {presetNotice ? <p className="rounded border border-green-200 bg-green-50 p-2 text-sm text-green-700">{presetNotice}</p> : null}
               <div className="grid gap-2 md:grid-cols-2">
@@ -288,7 +269,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                   <option value="slug">matchBy=slug</option>
                   <option value="name">matchBy=name</option>
                 </select>
-                <button type="button" className="rounded border px-3 py-1" onClick={() => void runPreview()}>Preview import</button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void runPreview()}>Preview import</Button>
               </div>
             </div>
           ) : null}
@@ -301,7 +282,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                   <tbody>{preview.rowResults.slice(0, 20).map((row) => <tr key={row.rowIndex} className="border-t"><td className="px-2 py-1">{row.rowIndex}</td><td className="px-2 py-1">{row.status}</td><td className="px-2 py-1">{row.errors?.join(", ") ?? ""}</td></tr>)}</tbody>
                 </table>
               </div>
-              <button type="button" onClick={() => void applyImport()} className="rounded border px-3 py-1 text-sm">Apply import</button>
+              <Button type="button" variant="outline" size="sm" onClick={() => void applyImport()}>Apply import</Button>
             </div>
           ) : null}
         </div>
@@ -321,16 +302,33 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                   <td className="px-3 py-2 font-mono text-xs">{id}</td>
                   {fields.map((field) => (
                     <td key={field} className="px-3 py-2">
-                      {isEditing ? (
-                        field === "isPublished"
-                          ? <select className="rounded border px-2 py-1 text-xs" value={drafts[id]?.[field] ?? "false"} onChange={(e) => setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? {}), [field]: e.target.value } }))}><option value="true">true</option><option value="false">false</option></select>
-                          : <input className="w-full rounded border px-2 py-1 text-xs" value={drafts[id]?.[field] ?? ""} onChange={(e) => setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? {}), [field]: e.target.value } }))} />
-                      ) : String(item[field] ?? "")}
+                      {isEditing && editableKeys.has(field)
+                        ? renderEditableField({
+                          field,
+                          value: drafts[id]?.[field],
+                          onChange: (next) => setDrafts((d) => ({ ...d, [id]: { ...(d[id] ?? {}), [field]: next } })),
+                        })
+                        : String(item[field] ?? "")}
                     </td>
                   ))}
                   <td className="px-3 py-2">{item.deletedAt ? <span className="rounded border px-2 py-0.5 text-xs">Archived</span> : null}</td>
                   <td className="px-3 py-2">
-                    {isEditing ? <button type="button" onClick={() => void saveEdit(id)} className="rounded border px-2 py-1 text-xs">Save</button> : <button type="button" onClick={() => startEdit(item)} className="rounded border px-2 py-1 text-xs">Edit</button>}
+                    <AdminInlineRowActions
+                      entityLabel={entityLabelForEntity(entity)}
+                      entityType={entity}
+                      id={id}
+                      initial={item}
+                      editable={editableConfig}
+                      patchUrl={`/api/admin/${entity}/${id}`}
+                      archiveUrl={`/api/admin/${entity}/${id}/archive`}
+                      restoreUrl={`/api/admin/${entity}/${id}/restore`}
+                      deleteUrl={`/api/admin/${entity}/${id}`}
+                      isArchived={Boolean(item.deletedAt)}
+                      isEditing={isEditing}
+                      onStartEdit={() => startEdit(item)}
+                      onCancelEdit={() => setEditingId(null)}
+                      onSaveSuccess={() => setEditingId(null)}
+                    />
                   </td>
                 </tr>
               );
@@ -340,10 +338,64 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
       </div>
 
       <div className="flex items-center gap-2">
-        <button type="button" className="rounded border px-3 py-1 text-sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
+        <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
         <span className="text-sm">Page {page} / {maxPage}</span>
-        <button type="button" className="rounded border px-3 py-1 text-sm" disabled={page >= maxPage} onClick={() => setPage((p) => Math.min(maxPage, p + 1))}>Next</button>
+        <Button type="button" variant="outline" size="sm" disabled={page >= maxPage} onClick={() => setPage((p) => Math.min(maxPage, p + 1))}>Next</Button>
       </div>
     </div>
   );
+}
+
+function entityLabelForEntity(entity: EntityName) {
+  if (entity === "events") return "Event";
+  if (entity === "venues") return "Venue";
+  return "Artist";
+}
+
+function editableFieldsForEntity(entity: EntityName): EditableField[] {
+  if (entity === "events") {
+    return [
+      { key: "title", label: "Title", type: "text" },
+      { key: "startAt", label: "Start at", type: "datetime" },
+      { key: "endAt", label: "End at", type: "datetime" },
+      { key: "isPublished", label: "Published", type: "checkbox" },
+    ] as const;
+  }
+  if (entity === "venues") {
+    return [
+      { key: "name", label: "Name", type: "text" },
+      { key: "city", label: "City", type: "text" },
+      { key: "country", label: "Country", type: "text" },
+      { key: "isPublished", label: "Published", type: "checkbox" },
+    ] as const;
+  }
+  return [
+    { key: "name", label: "Name", type: "text" },
+    { key: "isPublished", label: "Published", type: "checkbox" },
+  ] as const;
+}
+
+function renderEditableField({ field, value, onChange }: { field: string; value: unknown; onChange: (value: unknown) => void }) {
+  if (field === "isPublished") {
+    return (
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+        Published
+      </label>
+    );
+  }
+
+  if (field === "startAt" || field === "endAt") {
+    const iso = typeof value === "string" ? value : "";
+    return (
+      <input
+        type="datetime-local"
+        className="w-full rounded border px-2 py-1 text-xs"
+        value={iso ? iso.slice(0, 16) : ""}
+        onChange={(event) => onChange(event.target.value ? new Date(event.target.value).toISOString() : null)}
+      />
+    );
+  }
+
+  return <input className="w-full rounded border px-2 py-1 text-xs" value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} />;
 }
