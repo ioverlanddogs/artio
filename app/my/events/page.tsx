@@ -7,6 +7,8 @@ import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFi
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filter-label";
 import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
+import MyEventSubmitButton from "@/app/my/_components/MyEventSubmitButton";
+import MyEventCreateRevisionButton from "@/app/my/_components/MyEventCreateRevisionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +91,7 @@ export default async function MyEventsPage({ searchParams }: { searchParams: Eve
       <table className="w-full text-sm"><thead><tr className="border-b"><th className="p-2 text-left">Event</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr></thead><tbody>
         {filtered.map((event) => {
           const submitted = event.submissions[0]?.status;
-          return <tr className="border-b" key={event.id}><td className="p-2">{event.title}<div className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"}</div></td><td className="p-2">{event.deletedAt ? "Archived" : event.isPublished ? "Published" : submitted ?? "Draft"}</td><td className="p-2 text-right space-x-2"><Link className="underline" href={`/my/events/${event.id}`}>Edit</Link><Link className="underline" href={`/api/my/events/${event.id}/submit`}>Submit/Resubmit</Link><Link className="underline" href={`/events/${event.slug}`}>View Public</Link>{event.isPublished ? <Link className="underline" href={`/api/my/venues/${event.venueId}/events/${event.id}/revisions`}>Create revision</Link> : null}<MyArchiveActionButton entityLabel="event" endpointBase={`/api/my/events/${event.id}`} archived={!!event.deletedAt} /></td></tr>;
+          return <tr className="border-b" key={event.id}><td className="p-2">{event.title}<div className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"}</div></td><td className="p-2">{event.deletedAt ? "Archived" : event.isPublished ? "Published" : submitted ?? "Draft"}</td><td className="p-2 text-right space-x-2"><Link className="underline" href={`/my/events/${event.id}`}>Edit</Link><MyEventSubmitButton eventId={event.id} initialLabel="Submit/Resubmit" /><Link className="underline" href={`/events/${event.slug}`}>View Public</Link>{event.isPublished ? <MyEventCreateRevisionButton eventId={event.id} /> : null}<MyArchiveActionButton entityLabel="event" endpointBase={`/api/my/events/${event.id}`} archived={!!event.deletedAt} /></td></tr>;
         })}
       </tbody></table>
     </main>
