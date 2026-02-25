@@ -1,7 +1,11 @@
 import { headers } from "next/headers";
 
-function isAuthDebugEnabled() {
-  return process.env.DEBUG_AUTH === "1" || process.env.DEBUG_AUTH === "true";
+const AUTH_DEBUG_TRUTHY = new Set(["1", "true", "yes"]);
+
+export function isAuthDebugEnabled() {
+  const raw = process.env.DEBUG_AUTH;
+  if (!raw) return false;
+  return AUTH_DEBUG_TRUTHY.has(raw.trim().toLowerCase());
 }
 
 export function hasSessionCookieFromHeader(cookieHeader: string | null) {
@@ -13,10 +17,13 @@ export async function getAuthDebugRequestMeta() {
   try {
     const requestHeaders = await headers();
     const pathname = requestHeaders.get("x-pathname") ?? "unknown";
-    const hasSessionCookie = hasSessionCookieFromHeader(requestHeaders.get("cookie"));
-    return { pathname, hasSessionCookie };
+    const host = requestHeaders.get("host") ?? "unknown";
+    const cookieHeader = requestHeaders.get("cookie");
+    const hasCookieHeader = Boolean(cookieHeader);
+    const hasSessionCookieName = hasSessionCookieFromHeader(cookieHeader);
+    return { pathname, host, hasCookieHeader, hasSessionCookieName };
   } catch {
-    return { pathname: "unknown", hasSessionCookie: false };
+    return { pathname: "unknown", host: "unknown", hasCookieHeader: false, hasSessionCookieName: false };
   }
 }
 

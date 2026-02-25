@@ -3,15 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getBetaConfig, isEmailAllowed } from "@/lib/beta/access";
 import { REQUEST_ID_HEADER } from "@/lib/request-id";
 import { isAdminEmail } from "@/lib/admin-email";
-import { hasSessionCookieFromHeader, logAuthDebug } from "@/lib/auth-debug";
+import { hasSessionCookieFromHeader, isAuthDebugEnabled, logAuthDebug } from "@/lib/auth-debug";
 
 const PUBLIC_BETA_PATHS = new Set(["/beta", "/login"]);
 
 export async function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   const requestId = requestHeaders.get(REQUEST_ID_HEADER) || crypto.randomUUID();
+  const authDebugEnabled = isAuthDebugEnabled();
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
-  requestHeaders.set("x-pathname", req.nextUrl.pathname);
+  if (authDebugEnabled) {
+    requestHeaders.set("x-pathname", req.nextUrl.pathname);
+  }
 
   const pathname = req.nextUrl.pathname;
   const betaConfig = getBetaConfig();
@@ -19,8 +22,10 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/for-you" || pathname.startsWith("/for-you/")) {
     logAuthDebug("middleware.for-you", {
       pathname,
-      hasSessionCookie: hasSessionCookieFromHeader(req.headers.get("cookie")),
-      userExists: null,
+      host: req.nextUrl.host,
+      hasCookieHeader: Boolean(req.headers.get("cookie")),
+      hasSessionCookieName: hasSessionCookieFromHeader(req.headers.get("cookie")),
+      userExists: false,
       redirectTarget: null,
     });
   }

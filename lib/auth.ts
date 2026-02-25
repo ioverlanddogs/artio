@@ -24,6 +24,7 @@ const hasAuthConfig = Boolean(authSecret && googleClientId && googleClientSecret
 
 const authFailureWindowMs = 60_000;
 const authFailureState = { windowStart: 0, count: 0 };
+let hasWarnedAboutEdgeRuntime = false;
 
 function isAllowlistedAdminEmail(email: string) {
   const betaConfig = getBetaConfig();
@@ -124,6 +125,14 @@ export const authOptions: NextAuthOptions = {
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
+  if (process.env.NODE_ENV !== "production" && !hasWarnedAboutEdgeRuntime) {
+    const isEdgeRuntime = process.env.NEXT_RUNTIME === "edge" || typeof (globalThis as { EdgeRuntime?: string }).EdgeRuntime !== "undefined";
+    if (isEdgeRuntime) {
+      hasWarnedAboutEdgeRuntime = true;
+      console.warn("[auth] getSessionUser() is running in Edge runtime; use `export const runtime = \"nodejs\"` on auth-gated routes.");
+    }
+  }
+
   const session = await getServerSession(authOptions);
   const user = !session?.user?.id || !session.user.email
     ? null

@@ -1,10 +1,11 @@
 import { LoginButton } from "@/app/login/login-button";
+import { sanitizeNextPath } from "@/lib/login-next";
 
 type LoginSearchParams = Promise<{ next?: string }>;
 
 export default async function LoginPage({ searchParams }: { searchParams: LoginSearchParams }) {
   const params = await searchParams;
-  const next = params.next?.startsWith("/") ? params.next : "/account";
+  const next = sanitizeNextPath(params.next, "/account");
 
   return (
     <main className="mx-auto max-w-md space-y-4 p-6">

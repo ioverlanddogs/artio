@@ -25,7 +25,9 @@ export async function handleForYouGet(req: { nextUrl: URL }, deps: {
   } catch {
     logAuthDebug("api.recommendations.for-you.unauthorized", {
       pathname: req.nextUrl.pathname,
-      hasSessionCookie: hasSessionCookieFromHeader((req as { headers?: Headers }).headers?.get("cookie") ?? null),
+      host: req.nextUrl.host,
+      hasCookieHeader: Boolean((req as { headers?: Headers }).headers?.get("cookie") ?? null),
+      hasSessionCookieName: hasSessionCookieFromHeader((req as { headers?: Headers }).headers?.get("cookie") ?? null),
       userExists: false,
       redirectTarget: null,
     });
