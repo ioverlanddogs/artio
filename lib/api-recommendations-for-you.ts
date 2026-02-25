@@ -33,17 +33,31 @@ export async function handleForYouGet(req: { nextUrl: URL }, deps: {
 
     return NextResponse.json({ windowDays: result.windowDays, items: result.items }, { headers: { "cache-control": "private, no-store" } });
   } catch (err) {
-    logAuthDebug("api.recommendations.for-you.unauthorized", {
-      pathname: req.nextUrl.pathname,
-      host: req.nextUrl.host,
-      hasCookieHeader: Boolean(cookieHeader),
-      hasSessionCookieName: getSessionCookiePresence(cookieHeader),
-      userExists: false,
-      redirectTarget: null,
-    });
     if (isAuthError(err)) {
+      logAuthDebug("api.recommendations.for-you.unauthorized", {
+        pathname: req.nextUrl.pathname,
+        host: req.nextUrl.host,
+        hasCookieHeader: Boolean(cookieHeader),
+        hasSessionCookieName: getSessionCookiePresence(cookieHeader),
+        userExists: false,
+        redirectTarget: null,
+      });
       return apiError(401, "unauthorized", "Login required");
     }
+
+    const headers = (req as { headers?: Headers }).headers;
+    const requestId = headers?.get("x-request-id") ?? headers?.get("x-vercel-id") ?? null;
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("api.recommendations.for_you.internal_error", {
+      requestId,
+      pathname: req.nextUrl.pathname,
+      host: req.nextUrl.host,
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      },
+    });
 
     return apiError(500, "internal_error", "Unexpected server error");
   }

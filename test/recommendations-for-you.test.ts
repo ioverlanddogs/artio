@@ -46,6 +46,22 @@ test("API returns 500 for non-auth errors from auth guard", async () => {
   assert.equal(res.status, 500);
 });
 
+
+
+test("API returns 500 for non-auth errors from recommendations service", async () => {
+  const req = {
+    nextUrl: new URL("http://localhost/api/recommendations/for-you"),
+    headers: new Headers({ cookie: "next-auth.session-token=fake", "x-request-id": "req-123" }),
+  } as never;
+
+  const res = await handleForYouGet(req, {
+    requireAuthFn: async () => ({ id: "u1" }) as never,
+    getForYouRecommendationsFn: async () => { throw new Error("service failure"); },
+  });
+
+  assert.equal(res.status, 500);
+});
+
 test("scoring produces capped reasons and diversity dampening", () => {
   const now = new Date("2026-02-01T10:00:00.000Z");
   const venueId = "venue-1";
@@ -244,4 +260,30 @@ test("liked similarity adds score boost and reason", () => {
 
   assert.equal(withLike.score, withoutLike.score + 2);
   assert.equal(withLike.reasons.includes("Because you liked similar events"), true);
+});
+
+
+test("nearby candidate query uses to-one venue relation filter with `is` and does not throw", async () => {
+  let nearbyQueryChecked = false;
+  const db = {
+    user: { findUnique: async () => ({ locationLat: 51.5, locationLng: -2.6, locationRadiusKm: 25, locationLabel: "Bristol" }) },
+    follow: { findMany: async () => [] },
+    savedSearch: { findMany: async () => [] },
+    engagementEvent: { findMany: async () => [] },
+    event: {
+      findMany: async (args: any) => {
+        if (args.where?.OR && args.select?.id && args.select?.venue) {
+          nearbyQueryChecked = true;
+          assert.ok(args.where.OR[1]?.venue?.is);
+          return [];
+        }
+        if (args.where?.id?.in) return [];
+        return [];
+      },
+    },
+  } as never;
+
+  const result = await getForYouRecommendations(db, { userId: "u-nearby", days: 30, limit: 10 });
+  assert.equal(nearbyQueryChecked, true);
+  assert.deepEqual(result.items, []);
 });

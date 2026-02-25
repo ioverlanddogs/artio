@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { canAccessSavedSearch } from "../lib/ownership.ts";
 import { digestDedupeKey, isoWeekStamp } from "../lib/digest.ts";
-import { normalizeSavedSearchParams, previewSavedSearch, savedSearchParamsSchema } from "../lib/saved-searches.ts";
+import { normalizeSavedSearchParams, previewSavedSearch, runSavedSearchEvents, savedSearchParamsSchema } from "../lib/saved-searches.ts";
 import { runWeeklyDigests } from "../lib/cron-digests.ts";
 import { canSaveFromPreview } from "../components/saved-searches/save-search-button.tsx";
 
@@ -99,4 +99,25 @@ test("preview returns max 10 published items", async () => {
     body: { type: "EVENTS_FILTER", params: { q: "abc", tags: [] } },
   });
   assert.equal(result.items.length, 10);
+});
+
+
+test("nearby saved search query uses to-one venue relation `is` filter", async () => {
+  let capturedWhere: any = null;
+  await runSavedSearchEvents({
+    eventDb: {
+      event: {
+        findMany: async (args: any) => {
+          capturedWhere = args.where;
+          return [];
+        },
+      },
+    },
+    type: "NEARBY",
+    paramsJson: { lat: 51.5, lng: -2.6, radiusKm: 25, days: 30, tags: [] },
+    limit: 5,
+  });
+
+  const nearbyOr = capturedWhere.AND[0].OR;
+  assert.ok(nearbyOr[1].venue.is);
 });

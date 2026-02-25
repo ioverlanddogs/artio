@@ -136,7 +136,7 @@ export async function runSavedSearchEvents(args: {
         startAt: nearbyFilters.startAt,
         AND: [{ OR: [
           { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } },
-          { venue: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } },
+          { venue: { is: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } } },
         ] }, ...(params.q ? [{ OR: [{ title: { contains: params.q, mode: "insensitive" as const } }, { venue: { name: { contains: params.q, mode: "insensitive" as const } } }] }] : []), ...nearbyFilters.cursorFilters],
       },
       take: limit + 1,
@@ -165,7 +165,7 @@ export async function runSavedSearchEvents(args: {
     const box = getBoundingBox(params.lat, params.lng, params.radiusKm);
     filters.push({ OR: [
       { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } },
-      { venue: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } },
+      { venue: { is: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } } },
     ] });
   }
   filters.push(...buildStartAtIdCursorPredicate(cursor));

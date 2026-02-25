@@ -211,7 +211,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
         startAt: { gte: now, lte: to },
         OR: [
           { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } },
-          { venue: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } },
+          { venue: { is: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } } },
         ],
       },
       select: { id: true, lat: true, lng: true, venue: { select: { lat: true, lng: true } } },
