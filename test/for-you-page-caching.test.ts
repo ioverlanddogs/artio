@@ -7,6 +7,7 @@ test("for-you page disables caching for auth gate", () => {
   const pagePath = join(process.cwd(), "app/for-you/page.tsx");
   const contents = readFileSync(pagePath, "utf8");
 
+  assert.match(contents, /export const runtime = ["']nodejs["'];/);
   assert.match(contents, /export const dynamic = ["']force-dynamic["'];/);
   assert.match(contents, /export const revalidate = 0;/);
   assert.match(contents, /noStore\(\);/);

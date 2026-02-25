@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { forYouRecommendationsQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
 import { getForYouRecommendations } from "@/lib/recommendations-for-you";
+import { hasSessionCookieFromHeader, logAuthDebug } from "@/lib/auth-debug";
 
 export async function handleForYouGet(req: { nextUrl: URL }, deps: {
   requireAuthFn?: typeof requireUser;
@@ -22,6 +23,12 @@ export async function handleForYouGet(req: { nextUrl: URL }, deps: {
 
     return NextResponse.json({ windowDays: result.windowDays, items: result.items }, { headers: { "cache-control": "private, no-store" } });
   } catch {
+    logAuthDebug("api.recommendations.for-you.unauthorized", {
+      pathname: req.nextUrl.pathname,
+      hasSessionCookie: hasSessionCookieFromHeader((req as { headers?: Headers }).headers?.get("cookie") ?? null),
+      userExists: false,
+      redirectTarget: null,
+    });
     return apiError(401, "unauthorized", "Login required");
   }
 }

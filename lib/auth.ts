@@ -6,6 +6,7 @@ import { hasMinimumVenueRole } from "@/lib/ownership";
 import { logWarn } from "@/lib/logging";
 import { trackMetric } from "@/lib/telemetry";
 import { getBetaConfig, isEmailAllowed, normalizeEmail } from "@/lib/beta/access";
+import { getAuthDebugRequestMeta, logAuthDebug } from "@/lib/auth-debug";
 
 export type SessionUser = { id: string; email: string; name: string | null; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -124,13 +125,23 @@ export const authOptions: NextAuthOptions = {
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) return null;
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name ?? null,
-    role: session.user.role || "USER",
-  };
+  const user = !session?.user?.id || !session.user.email
+    ? null
+    : {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name ?? null,
+        role: session.user.role || "USER",
+      };
+
+  const requestMeta = await getAuthDebugRequestMeta();
+  logAuthDebug("getSessionUser", {
+    ...requestMeta,
+    userExists: Boolean(user),
+    redirectTarget: null,
+  });
+
+  return user;
 }
 
 export async function requireAuth() {

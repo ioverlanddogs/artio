@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getBetaConfig, isEmailAllowed } from "@/lib/beta/access";
 import { REQUEST_ID_HEADER } from "@/lib/request-id";
 import { isAdminEmail } from "@/lib/admin-email";
+import { hasSessionCookieFromHeader, logAuthDebug } from "@/lib/auth-debug";
 
 const PUBLIC_BETA_PATHS = new Set(["/beta", "/login"]);
 
@@ -10,9 +11,20 @@ export async function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   const requestId = requestHeaders.get(REQUEST_ID_HEADER) || crypto.randomUUID();
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
+  requestHeaders.set("x-pathname", req.nextUrl.pathname);
 
   const pathname = req.nextUrl.pathname;
   const betaConfig = getBetaConfig();
+
+  if (pathname === "/for-you" || pathname.startsWith("/for-you/")) {
+    logAuthDebug("middleware.for-you", {
+      pathname,
+      hasSessionCookie: hasSessionCookieFromHeader(req.headers.get("cookie")),
+      userExists: null,
+      redirectTarget: null,
+    });
+  }
+
 
   if (betaConfig.betaMode && !pathname.startsWith("/api") && !PUBLIC_BETA_PATHS.has(pathname)) {
     const token = await getToken({ req, secret: process.env.AUTH_SECRET });

@@ -5,14 +5,24 @@ import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { ForYouClient } from "@/components/recommendations/for-you-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { GetStartedBanner } from "@/components/onboarding/get-started-banner";
+import { getAuthDebugRequestMeta, logAuthDebug } from "@/lib/auth-debug";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function ForYouPage() {
   noStore();
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/for-you");
+  if (!user) {
+    const requestMeta = await getAuthDebugRequestMeta();
+    logAuthDebug("for-you.page.redirect_to_login", {
+      ...requestMeta,
+      userExists: false,
+      redirectTarget: "/login?next=%2Ffor-you",
+    });
+    redirectToLogin("/for-you");
+  }
 
   if (!hasDatabaseUrl()) {
     return (
