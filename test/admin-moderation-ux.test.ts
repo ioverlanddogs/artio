@@ -7,7 +7,7 @@ const moderationSource = readFileSync("app/(admin)/admin/moderation/moderation-c
 
 test("submissions moderation uses row-level loading and refreshes via router", () => {
   assert.match(submissionsSource, /const \[loadingId, setLoadingId\]/);
-  assert.match(submissionsSource, /disabled=\{isLoading\}/);
+  assert.match(submissionsSource, /const disableRowActions = isBulkRunning \|\| isLoading/);
   assert.match(submissionsSource, /router\.refresh\(\)/);
   assert.match(submissionsSource, /enqueueToast\(/);
 });
