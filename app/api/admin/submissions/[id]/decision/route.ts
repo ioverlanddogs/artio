@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
-import { requireEditor } from "@/lib/auth";
+import { requireEditor, isAuthError } from "@/lib/auth";
 import { idParamSchema, parseBody, zodDetails } from "@/lib/validators";
 import { submissionDecisionDedupeKey } from "@/lib/notification-keys";
 import { buildInAppFromTemplate, enqueueNotification } from "@/lib/notifications";
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (error instanceof ModerationDecisionError) {
       return apiError(error.status, error.code, error.message);
     }
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

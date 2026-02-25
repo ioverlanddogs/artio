@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { uploadImageAsset } from "@/lib/assets";
 import { db } from "@/lib/db";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(uploaded, { status: 201 });
   } catch (error) {
     if (isRateLimitError(error)) return rateLimitErrorResponse(error);
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "invalid_mime") {

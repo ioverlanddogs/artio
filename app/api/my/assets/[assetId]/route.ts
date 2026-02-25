@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { deleteBlobByUrl } from "@/lib/blob-delete";
 import { db } from "@/lib/db";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
@@ -48,7 +48,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ a
     return NextResponse.json({ success: true });
   } catch (error) {
     if (isRateLimitError(error)) return rateLimitErrorResponse(error);
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     return apiError(500, "internal_error", "Unexpected server error");

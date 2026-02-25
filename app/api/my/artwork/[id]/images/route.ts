@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
+import { isAuthError } from "@/lib/auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { requireMyArtworkAccess } from "@/lib/my-artwork-access";
 import { artworkImageCreateSchema, idParamSchema, parseBody, zodDetails } from "@/lib/validators";
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await logAdminAction({ actorEmail: user.email, action: "ARTWORK_IMAGE_ADDED", targetType: "artwork", targetId: parsedId.data.id, metadata: { imageId: image.id, assetId: image.assetId }, req });
     return NextResponse.json({ image }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && (error.message === "forbidden" || error.message === "not_found")) return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");
   }

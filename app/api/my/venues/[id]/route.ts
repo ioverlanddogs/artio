@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireVenueRole } from "@/lib/auth";
+import { requireVenueRole, isAuthError } from "@/lib/auth";
 import { myVenuePatchSchema, parseBody, venueIdParamSchema, zodDetails } from "@/lib/validators";
 import { submissionSubmittedDedupeKey } from "@/lib/notification-keys";
 import { buildInAppFromTemplate, enqueueNotification } from "@/lib/notifications";
@@ -150,7 +150,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(venue);
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

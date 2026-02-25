@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
-import { requireVenueRole } from "@/lib/auth";
+import { requireVenueRole, isAuthError } from "@/lib/auth";
 import { myEventCreateSchema, parseBody, venueIdParamSchema, zodDetails } from "@/lib/validators";
 
 export const runtime = "nodejs";
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json(event, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

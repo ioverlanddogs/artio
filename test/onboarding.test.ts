@@ -71,9 +71,9 @@ test("dismissed onboarding panel state is client-only", () => {
   }
 });
 
-test("/api/onboarding requires authentication", async () => {
+test("/api/onboarding returns 500 when auth session lookup fails unexpectedly", async () => {
   const response = await getOnboarding();
-  assert.equal(response.status, 401);
+  assert.equal(response.status, 500);
 });
 
 
@@ -207,5 +207,21 @@ test("setOnboardingFlagForSession swallows P2003 onboarding upsert errors", asyn
     db.user.findUnique = originalFindUnique;
     db.onboardingState.upsert = originalUpsertOnboarding;
     console.warn = originalConsoleWarn;
+  }
+});
+
+
+test("/api/onboarding returns 500 for non-auth internal errors", async () => {
+  const originalFindFirst = db.venueMembership.findFirst;
+
+  db.venueMembership.findFirst = (async () => {
+    throw new Error("db exploded");
+  }) as typeof db.venueMembership.findFirst;
+
+  try {
+    const response = await getOnboarding();
+    assert.equal(response.status, 500);
+  } finally {
+    db.venueMembership.findFirst = originalFindFirst;
   }
 });

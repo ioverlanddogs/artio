@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
+import { isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireVenueMemberManager } from "@/lib/venue-access";
 import { inviteIdParamSchema, venueIdParamSchema, zodDetails } from "@/lib/validators";
@@ -29,7 +30,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

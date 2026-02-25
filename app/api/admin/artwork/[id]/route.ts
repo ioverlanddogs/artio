@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, isAuthError } from "@/lib/auth";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { handleAdminEntityPatch } from "@/lib/admin-entities-route";
 
@@ -20,7 +20,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     await db.artwork.delete({ where: { id: parsedId.data.id } });
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
       return apiError(409, "conflict", "Cannot delete artwork due to related records. Archive it instead or remove dependencies.");

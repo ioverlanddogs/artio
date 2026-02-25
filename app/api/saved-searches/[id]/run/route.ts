@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { idParamSchema, paramsToObject, zodDetails } from "@/lib/validators";
 import { runSavedSearchEvents } from "@/lib/saved-searches";
 import { z } from "zod";
@@ -42,7 +42,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const hasMore = items.length > parsedQuery.data.limit;
     const page = hasMore ? items.slice(0, parsedQuery.data.limit) : items;
     return NextResponse.json({ items: page, nextCursor: hasMore ? encodeCursor(page[page.length - 1]!) : null });
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

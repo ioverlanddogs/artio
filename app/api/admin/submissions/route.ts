@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
-import { requireEditor } from "@/lib/auth";
+import { requireEditor, isAuthError } from "@/lib/auth";
 import { decodeSubmissionsCursor, encodeSubmissionsCursor } from "@/lib/admin-submissions-cursor";
 
 export const runtime = "nodejs";
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ items, nextCursor });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

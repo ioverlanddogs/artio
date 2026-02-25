@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getFollowManageData, getFollowManageDataSafe } from "@/lib/follows-manage";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
@@ -16,7 +16,7 @@ export async function GET() {
     const data = await getFollowManageDataSafe(() => getFollowManageData(db, user.id));
     return NextResponse.json(data);
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     return NextResponse.json({ artists: [], venues: [] });

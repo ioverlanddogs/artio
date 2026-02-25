@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
 import { handlePostMyVenue, VenueLimitReachedError } from "@/lib/my-venue-create-route";
 import { logAdminAction } from "@/lib/admin-audit";
@@ -68,7 +68,7 @@ export async function GET() {
     });
     return NextResponse.json(items.map((item) => ({ membershipRole: item.role, venue: item.venue })));
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     return apiError(500, "internal_error", "Unexpected server error");
