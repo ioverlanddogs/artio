@@ -4,14 +4,24 @@ import { apiError } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { forYouRecommendationsQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
 import { getForYouRecommendations } from "@/lib/recommendations-for-you";
-import { hasSessionCookieFromHeader, logAuthDebug } from "@/lib/auth-debug";
+import { getSessionCookiePresence, logAuthDebug } from "@/lib/auth-debug";
 
 export async function handleForYouGet(req: { nextUrl: URL }, deps: {
   requireAuthFn?: typeof requireUser;
   getForYouRecommendationsFn?: typeof getForYouRecommendations;
 } = {}) {
+  const cookieHeader = (req as { headers?: Headers }).headers?.get("cookie") ?? null;
+
   try {
     const user = await (deps.requireAuthFn ?? requireUser)();
+    logAuthDebug("api.recommendations.for-you", {
+      pathname: req.nextUrl.pathname,
+      host: req.nextUrl.host,
+      hasCookieHeader: Boolean(cookieHeader),
+      hasSessionCookieName: getSessionCookiePresence(cookieHeader),
+      userExists: true,
+      redirectTarget: null,
+    });
     const parsed = forYouRecommendationsQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
     if (!parsed.success) return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
 
@@ -26,8 +36,8 @@ export async function handleForYouGet(req: { nextUrl: URL }, deps: {
     logAuthDebug("api.recommendations.for-you.unauthorized", {
       pathname: req.nextUrl.pathname,
       host: req.nextUrl.host,
-      hasCookieHeader: Boolean((req as { headers?: Headers }).headers?.get("cookie") ?? null),
-      hasSessionCookieName: hasSessionCookieFromHeader((req as { headers?: Headers }).headers?.get("cookie") ?? null),
+      hasCookieHeader: Boolean(cookieHeader),
+      hasSessionCookieName: getSessionCookiePresence(cookieHeader),
       userExists: false,
       redirectTarget: null,
     });

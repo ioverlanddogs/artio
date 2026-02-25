@@ -9,8 +9,19 @@ export function isAuthDebugEnabled() {
 }
 
 export function hasSessionCookieFromHeader(cookieHeader: string | null) {
+  return getSessionCookiePresence(cookieHeader) !== "none";
+}
+
+export type SessionCookiePresence = "none" | "secure" | "plain" | "both";
+
+export function getSessionCookiePresence(cookieHeader: string | null): SessionCookiePresence {
   const cookie = cookieHeader ?? "";
-  return cookie.includes("next-auth.session-token") || cookie.includes("__Secure-next-auth.session-token");
+  const hasSecure = /(?:^|;\s*)__Secure-next-auth\.session-token=/.test(cookie);
+  const hasPlain = /(?:^|;\s*)next-auth\.session-token=/.test(cookie);
+  if (hasSecure && hasPlain) return "both";
+  if (hasSecure) return "secure";
+  if (hasPlain) return "plain";
+  return "none";
 }
 
 export async function getAuthDebugRequestMeta() {
@@ -20,10 +31,10 @@ export async function getAuthDebugRequestMeta() {
     const host = requestHeaders.get("host") ?? "unknown";
     const cookieHeader = requestHeaders.get("cookie");
     const hasCookieHeader = Boolean(cookieHeader);
-    const hasSessionCookieName = hasSessionCookieFromHeader(cookieHeader);
+    const hasSessionCookieName = getSessionCookiePresence(cookieHeader);
     return { pathname, host, hasCookieHeader, hasSessionCookieName };
   } catch {
-    return { pathname: "unknown", host: "unknown", hasCookieHeader: false, hasSessionCookieName: false };
+    return { pathname: "unknown", host: "unknown", hasCookieHeader: false, hasSessionCookieName: "none" as const };
   }
 }
 

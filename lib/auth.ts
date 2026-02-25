@@ -26,6 +26,31 @@ const authFailureWindowMs = 60_000;
 const authFailureState = { windowStart: 0, count: 0 };
 let hasWarnedAboutEdgeRuntime = false;
 
+let hasWarnedAboutMissingNextAuthSecret = false;
+let hasWarnedAboutHostMismatch = false;
+
+function warnAuthEnvRisks(host: string) {
+  if (process.env.NODE_ENV === "production") return;
+
+  if (!process.env.NEXTAUTH_SECRET && !hasWarnedAboutMissingNextAuthSecret) {
+    hasWarnedAboutMissingNextAuthSecret = true;
+    console.warn("[auth] NEXTAUTH_SECRET is not set. This project uses AUTH_SECRET; set NEXTAUTH_SECRET as well to avoid env mismatch in some deployments.");
+  }
+
+  const configuredUrl = process.env.NEXTAUTH_URL;
+  if (!configuredUrl || hasWarnedAboutHostMismatch || !host || host === "unknown") return;
+
+  try {
+    const configuredHost = new URL(configuredUrl).host;
+    if (configuredHost !== host) {
+      hasWarnedAboutHostMismatch = true;
+      console.warn(`[auth] Request host (${host}) differs from NEXTAUTH_URL host (${configuredHost}). Session cookies may not be sent consistently across hosts.`);
+    }
+  } catch {
+    // ignore malformed NEXTAUTH_URL in warning path
+  }
+}
+
 function isAllowlistedAdminEmail(email: string) {
   const betaConfig = getBetaConfig();
   return betaConfig.adminEmails.has(normalizeEmail(email));
@@ -144,6 +169,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       };
 
   const requestMeta = await getAuthDebugRequestMeta();
+  warnAuthEnvRisks(requestMeta.host);
   logAuthDebug("getSessionUser", {
     ...requestMeta,
     userExists: Boolean(user),
