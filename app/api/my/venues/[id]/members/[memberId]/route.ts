@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
+import { isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { canRemoveOwnerMember } from "@/lib/ownership";
 import { requireVenueMemberManager } from "@/lib/venue-access";
@@ -53,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       user: member.user,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {
@@ -92,7 +93,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     await db.venueMembership.delete({ where: { id: existing.id } });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

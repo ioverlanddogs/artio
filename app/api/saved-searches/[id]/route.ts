@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { idParamSchema, parseBody, zodDetails } from "@/lib/validators";
 import { normalizeSavedSearchParams, savedSearchPatchSchema } from "@/lib/saved-searches";
 
@@ -29,8 +29,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
 
     return NextResponse.json(item);
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
 
@@ -42,7 +43,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
     await db.savedSearch.deleteMany({ where: { id: parsedId.data.id, userId: user.id } });
     return NextResponse.json({ ok: true });
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

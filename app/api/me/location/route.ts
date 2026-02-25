@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { locationPreferenceSchema, parseBody, zodDetails } from "@/lib/validators";
 
 export const runtime = "nodejs";
@@ -25,8 +25,8 @@ export async function GET() {
     });
     if (!location) return apiError(404, "not_found", "User not found");
     return NextResponse.json(toResponse(location));
-  } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+  } catch (error: unknown) {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     return apiError(500, "internal_error", "Unexpected server error");
@@ -37,8 +37,9 @@ export async function PUT(req: NextRequest) {
   let user;
   try {
     user = await requireAuth();
-  } catch {
-    return apiError(401, "unauthorized", "Authentication required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 
   try {
@@ -58,7 +59,8 @@ export async function PUT(req: NextRequest) {
     });
 
     return NextResponse.json(toResponse(updated));
-  } catch {
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

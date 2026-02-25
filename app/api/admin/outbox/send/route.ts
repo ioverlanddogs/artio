@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, isAuthError } from "@/lib/auth";
 import { sendPendingNotifications } from "@/lib/outbox";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { z } from "zod";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const result = await sendPendingNotifications({ limit: parsedBody.data.limit });
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     if (error instanceof Error && error.message === "forbidden") {

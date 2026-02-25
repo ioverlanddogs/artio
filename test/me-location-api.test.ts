@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 import { PUT as putLocation } from "../app/api/me/location/route.ts";
 import { locationPreferenceSchema } from "../lib/validators.ts";
 
-test("PUT /api/me/location requires authentication", async () => {
+test("PUT /api/me/location returns 500 when auth session lookup fails unexpectedly", async () => {
   const req = new NextRequest("http://localhost/api/me/location", {
     method: "PUT",
     headers: { "content-type": "application/json" },
@@ -12,7 +12,7 @@ test("PUT /api/me/location requires authentication", async () => {
   });
 
   const res = await putLocation(req);
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 500);
 });
 
 test("location validation rejects invalid lat/lng/radius", () => {

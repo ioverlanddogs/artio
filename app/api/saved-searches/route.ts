@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { normalizeSavedSearchParams, savedSearchCreateSchema } from "@/lib/saved-searches";
 
@@ -13,8 +13,9 @@ export async function GET() {
     const user = await requireAuth();
     const items = await db.savedSearch.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
     return NextResponse.json({ items });
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
 
@@ -35,7 +36,8 @@ export async function POST(req: NextRequest) {
       },
     });
     return NextResponse.json(item, { status: 201 });
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

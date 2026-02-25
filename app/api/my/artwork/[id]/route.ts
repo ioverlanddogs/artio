@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
+import { isAuthError } from "@/lib/auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { ensureUniqueArtworkSlugWithDeps, slugifyArtworkTitle } from "@/lib/artwork-slug";
 import { requireMyArtworkAccess } from "@/lib/my-artwork-access";
@@ -21,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const completeness = computeArtworkCompleteness(artwork, artwork.images.length);
     return NextResponse.json({ artwork, completeness });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && (error.message === "forbidden" || error.message === "not_found")) return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");
   }
@@ -63,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await logAdminAction({ actorEmail: user.email, action: "ARTWORK_UPDATED", targetType: "artwork", targetId: artwork.id, metadata: { before, after: data }, req });
     return NextResponse.json({ artwork });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && (error.message === "forbidden" || error.message === "not_found")) return apiError(403, "forbidden", "Forbidden");
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return apiError(409, "conflict", "Artwork slug already exists");
     return apiError(500, "internal_error", "Unexpected server error");

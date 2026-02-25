@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
 import { deleteBlobByUrl } from "@/lib/blob-delete";
 import { logAdminAction } from "@/lib/admin-audit";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { artworkImageUpdateSchema, imageIdParamSchema, parseBody, zodDetails } from "@/lib/validators";
 
 async function canAccess(userId: string, role: "USER" | "EDITOR" | "ADMIN", imageId: string) {
@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ im
     await logAdminAction({ actorEmail: user.email, action: "ARTWORK_IMAGE_UPDATED", targetType: "artwork", targetId: image.artworkId, metadata: { imageId: image.id }, req });
     return NextResponse.json({ image: updated });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }
@@ -61,7 +61,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await logAdminAction({ actorEmail: user.email, action: "ARTWORK_IMAGE_DELETED", targetType: "artwork", targetId: image.artworkId, metadata: { imageId: image.id, assetId: image.assetId }, req });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

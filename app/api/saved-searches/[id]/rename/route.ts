@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { assertOwnedSavedSearch } from "@/lib/saved-searches-management";
 import { idParamSchema, parseBody, savedSearchRenameSchema, zodDetails } from "@/lib/validators";
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await db.savedSearch.update({ where: { id: parsedId.data.id }, data: { name: parsedBody.data.name } });
     return NextResponse.json({ ok: true, name: parsedBody.data.name });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Login required");
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

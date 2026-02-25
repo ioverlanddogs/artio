@@ -10,6 +10,20 @@ import { getAuthDebugRequestMeta, logAuthDebug } from "@/lib/auth-debug";
 
 export type SessionUser = { id: string; email: string; name: string | null; role: "USER" | "EDITOR" | "ADMIN" };
 
+export class AuthError extends Error {
+  code = "UNAUTHORIZED" as const;
+  status = 401;
+
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+export function isAuthError(err: unknown): err is AuthError {
+  return err instanceof AuthError;
+}
+
 const googleClientId = process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
 const authSecret = process.env.AUTH_SECRET;
@@ -183,7 +197,7 @@ export async function requireAuth() {
   const user = await getSessionUser();
   if (!user) {
     logRateLimitedAuthFailure();
-    throw new Error("unauthorized");
+    throw new AuthError();
   }
   return user;
 }

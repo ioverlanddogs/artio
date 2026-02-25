@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { apiError } from "@/lib/api";
 import { paramsToObject, zodDetails } from "@/lib/validators";
 import { listDigestsForUser } from "@/lib/digests";
@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch {
-    return apiError(401, "unauthorized", "Authentication required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

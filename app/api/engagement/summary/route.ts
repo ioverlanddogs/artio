@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -51,7 +51,8 @@ export async function GET() {
       topTags7d: Array.from(tagCounts.values()).sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug)).slice(0, 5),
       topVenues7d: Array.from(venueCounts.values()).sort((a, b) => b.count - a.count || a.id.localeCompare(b.id)).slice(0, 5),
     });
-  } catch {
-    return apiError(401, "unauthorized", "Login required");
+  } catch (error: unknown) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Login required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

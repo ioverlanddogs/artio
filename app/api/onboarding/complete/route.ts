@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { markOnboardingCompletedForSession } from "@/lib/onboarding";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export async function POST() {
     await markOnboardingCompletedForSession(user, { path: "/api/onboarding/complete" });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") {
+    if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");
     }
     return apiError(500, "internal_error", "Unexpected server error");
