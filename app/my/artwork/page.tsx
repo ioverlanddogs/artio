@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
+import { MyArtworkPublishToggleButton } from "@/app/my/_components/MyArtworkPublishToggleButton";
 
 type ArtworkSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
 
@@ -58,7 +59,7 @@ export default async function MyArtworkPage({ searchParams }: { searchParams: Ar
       </div>
       <ActiveFiltersBar pills={pills} clearAllHref={buildClearFiltersHref("/my/artwork", params, ["status", "q", "query", "sort", "showArchived"], ["venueId"])} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => <article key={item.id} className="rounded border p-3"><h3 className="font-medium">{item.title}</h3><p className="text-xs text-muted-foreground">{item.deletedAt ? "Archived" : item.isPublished ? "Published" : "Draft"}</p><div className="mt-2 space-x-2 text-sm"><Link className="underline" href={`/my/artwork/${item.id}`}>Edit</Link><Link className="underline" href={`/api/my/artwork/${item.id}/publish`}>{item.isPublished ? "Unpublish" : "Publish"}</Link><Link className="underline" href={`/artwork/${item.slug ?? item.id}`}>View Public</Link><MyArchiveActionButton entityLabel="artwork" endpointBase={`/api/my/artwork/${item.id}`} archived={!!item.deletedAt} /></div></article>)}
+        {items.map((item) => <article key={item.id} className="rounded border p-3"><h3 className="font-medium">{item.title}</h3><p className="text-xs text-muted-foreground">{item.deletedAt ? "Archived" : item.isPublished ? "Published" : "Draft"}</p><div className="mt-2 space-x-2 text-sm"><Link className="underline" href={`/my/artwork/${item.id}`}>Edit</Link><MyArtworkPublishToggleButton artworkId={item.id} initialIsPublished={item.isPublished} /><Link className="underline" href={`/artwork/${item.slug ?? item.id}`}>View Public</Link><MyArchiveActionButton entityLabel="artwork" endpointBase={`/api/my/artwork/${item.id}`} archived={!!item.deletedAt} /></div></article>)}
       </div>
     </main>
   );
