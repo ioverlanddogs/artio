@@ -2,27 +2,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
-import { MyDashboardResponseSchema } from "@/lib/my/dashboard-schema";
-import { getServerBaseUrl } from "@/lib/server/get-base-url";
+import { ensureDbUserForSession } from "@/lib/ensure-db-user-for-session";
+import { getMyDashboard } from "@/lib/my/dashboard/get-my-dashboard";
 import CompletenessBar from "./_components/CompletenessBar";
 import StatusTileGroups from "./_components/StatusTileGroups";
 import NeedsAttentionPanel from "./_components/NeedsAttentionPanel";
 
-async function getDashboard(venueId?: string) {
-  const qs = venueId ? `?venueId=${encodeURIComponent(venueId)}` : "";
-  const baseUrl = await getServerBaseUrl();
-  const res = await fetch(`${baseUrl}/api/my/dashboard${qs}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  return MyDashboardResponseSchema.parse(await res.json());
-}
-
 export default async function MyDashboardPage({ searchParams }: { searchParams: Promise<{ venueId?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my");
+  const dbUser = await ensureDbUserForSession(user);
 
   const { venueId } = await searchParams;
-  const data = await getDashboard(venueId);
-  if (!data) return <main><p>Unable to load dashboard.</p></main>;
+  const data = await getMyDashboard({ userId: dbUser?.id ?? user.id, venueId });
 
   return (
     <main className="space-y-4">

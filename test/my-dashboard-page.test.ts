@@ -33,6 +33,14 @@ test("/my includes section empty states", () => {
   assert.match(source, /You haven&apos;t added artwork yet/);
 });
 
+test("/my overview uses in-process dashboard builder (no internal HTTP fetch)", () => {
+  const source = readFileSync("app/my/page.tsx", "utf8");
+  assert.match(source, /getMyDashboard\(\{ userId: dbUser\?\.id \?\? user\.id, venueId \}\)/);
+  assert.doesNotMatch(source, /\/api\/my\/dashboard/);
+  assert.doesNotMatch(source, /getServerBaseUrl/);
+  assert.doesNotMatch(source, /fetch\(/);
+});
+
 test("/my needs attention renders grouped headings and empty state", () => {
   const page = readFileSync("app/my/page.tsx", "utf8");
   const panel = readFileSync("app/my/_components/NeedsAttentionPanel.tsx", "utf8");
