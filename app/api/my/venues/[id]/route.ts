@@ -6,31 +6,12 @@ import { myVenuePatchSchema, parseBody, venueIdParamSchema, zodDetails } from "@
 import { submissionSubmittedDedupeKey } from "@/lib/notification-keys";
 import { buildInAppFromTemplate, enqueueNotification } from "@/lib/notifications";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
-import { geocodeBest } from "@/lib/geocode";
+import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { geocodeForVenueUpdate } from "@/lib/venues/venue-geocode-flow";
 
 export const runtime = "nodejs";
 
-const geocodePatchFields = ["name", "addressLine1", "addressLine2", "city", "postcode", "country"] as const;
-
-function buildVenueGeocodeQuery(fields: {
-  name?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  city?: string | null;
-  postcode?: string | null;
-  country?: string | null;
-}) {
-  const parts = [fields.name, fields.addressLine1, fields.addressLine2, fields.city, fields.postcode, fields.country]
-    .filter((part): part is string => typeof part === "string" && part.trim().length > 0);
-
-  return parts.length > 0 ? parts.join(", ") : null;
-}
-
-function isSwallowableGeocodeError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const withCode = error as { code?: unknown; message?: unknown };
-  return withCode.code === "not_configured" || withCode.code === "provider_error" || withCode.message === "not_configured";
-}
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,6 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         addressLine1: true,
         addressLine2: true,
         city: true,
+        region: true,
         postcode: true,
         country: true,
         lat: true,
@@ -66,36 +48,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!asset || asset.ownerUserId !== user.id) return apiError(403, "forbidden", "Can only use your own uploaded assets");
     }
 
-    const patch = parsedBody.data;
-    const hasLatInPatch = Object.prototype.hasOwnProperty.call(patch, "lat");
-    const hasLngInPatch = Object.prototype.hasOwnProperty.call(patch, "lng");
-    const shouldConsiderGeocode = !hasLatInPatch && !hasLngInPatch
-      && geocodePatchFields.some((field) => Object.prototype.hasOwnProperty.call(patch, field));
-
     const updateData: Record<string, unknown> = { ...safeFields, featuredAssetId: featuredAssetId ?? null };
 
-    if (shouldConsiderGeocode) {
-      const query = buildVenueGeocodeQuery({
-        name: safeFields.name ?? existing.name,
-        addressLine1: safeFields.addressLine1 ?? existing.addressLine1,
-        addressLine2: safeFields.addressLine2 ?? existing.addressLine2,
-        city: safeFields.city ?? existing.city,
-        postcode: safeFields.postcode ?? existing.postcode,
-        country: safeFields.country ?? existing.country,
-      });
-
-      if (query) {
-        try {
-          const result = await geocodeBest(query);
-          if (result && (existing.lat == null || existing.lng == null)) {
-            updateData.lat = result.lat;
-            updateData.lng = result.lng;
-          }
-        } catch (error) {
-          if (!isSwallowableGeocodeError(error)) {
-            console.warn(`my_venue_update_geocode_failed venueId=${existing.id} city=${safeFields.city ?? existing.city ?? ""} postcode=${safeFields.postcode ?? existing.postcode ?? ""}`);
-          }
-        }
+    try {
+      const result = await geocodeForVenueUpdate({ existing, patch: safeFields });
+      if (result) {
+        updateData.lat = result.lat;
+        updateData.lng = result.lng;
+      }
+    } catch (error) {
+      if (!(error instanceof MapboxForwardGeocodeError && ["not_configured", "provider_error", "provider_timeout"].includes(error.code))) {
+        console.warn(`my_venue_update_geocode_failed venueId=${existing.id} city=${safeFields.city ?? existing.city ?? ""} postcode=${safeFields.postcode ?? existing.postcode ?? ""}`);
       }
     }
 
@@ -148,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
       await setOnboardingFlagForSession(user, "hasCreatedVenue", true, { path: "/api/my/venues/[id]" });
 
-    return NextResponse.json(venue);
+    return NextResponse.json(venue, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (isAuthError(error)) {
       return apiError(401, "unauthorized", "Authentication required");

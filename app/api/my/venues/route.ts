@@ -5,32 +5,10 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
 import { handlePostMyVenue, VenueLimitReachedError } from "@/lib/my-venue-create-route";
 import { logAdminAction } from "@/lib/admin-audit";
-import { geocodeBest } from "@/lib/geocode";
+import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { geocodeForVenueCreate } from "@/lib/venues/venue-geocode-flow";
 
 export const runtime = "nodejs";
-
-function buildVenueGeocodeQuery(fields: {
-  name?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  city?: string | null;
-  postcode?: string | null;
-  country?: string | null;
-}) {
-  const parts = [fields.name, fields.addressLine1, fields.addressLine2, fields.city, fields.postcode, fields.country]
-    .filter((part): part is string => typeof part === "string" && part.trim().length > 0);
-
-  return parts.length > 0 ? parts.join(", ") : null;
-}
-
-function isNotConfiguredError(error: unknown) {
-  if (typeof error === "string") return error === "not_configured";
-  if (error && typeof error === "object") {
-    const withMessage = error as { message?: unknown; code?: unknown };
-    return withMessage.message === "not_configured" || withMessage.code === "not_configured";
-  }
-  return false;
-}
 
 export async function GET() {
   try {
@@ -110,33 +88,13 @@ export async function POST(req: NextRequest) {
       let effectiveLat = data.lat;
       let effectiveLng = data.lng;
 
-      const hasManualLat = data.lat != null;
-      const hasManualLng = data.lng != null;
-      const shouldGeocode = !hasManualLat && !hasManualLng
-        && Boolean(data.postcode || data.city || data.addressLine1);
-
-      if (shouldGeocode) {
-        const query = buildVenueGeocodeQuery({
-          name: data.name,
-          addressLine1: data.addressLine1,
-          addressLine2: data.addressLine2,
-          city: data.city,
-          postcode: data.postcode,
-          country: data.country,
-        });
-
-        if (query) {
-          try {
-            const result = await geocodeBest(query);
-            if (result) {
-              effectiveLat = result.lat;
-              effectiveLng = result.lng;
-            }
-          } catch (error) {
-            if (!isNotConfiguredError(error)) {
-              console.warn(`my_venue_geocode_failed venueId=pending city=${data.city ?? ""} postcode=${data.postcode ?? ""}`);
-            }
-          }
+      try {
+        const geocoded = await geocodeForVenueCreate(data);
+        effectiveLat = geocoded.lat;
+        effectiveLng = geocoded.lng;
+      } catch (error) {
+        if (!(error instanceof MapboxForwardGeocodeError && error.code === "not_configured")) {
+          console.warn(`my_venue_geocode_failed venueId=pending city=${data.city ?? ""} postcode=${data.postcode ?? ""}`);
         }
       }
 

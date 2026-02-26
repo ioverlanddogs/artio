@@ -17,6 +17,7 @@ import { evaluateVenueReadiness } from "@/lib/publish-readiness";
 import { PublishReadinessChecklist } from "@/components/publishing/publish-readiness-checklist";
 import { Button } from "@/components/ui/button";
 import { resolveVenueIdFromRouteParam } from "./route-param";
+import { VenueLocationMissingBanner } from "@/app/my/_components/VenueLocationMissingBanner";
 
 export default async function MyVenueEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -143,6 +144,9 @@ export default async function MyVenueEditPage({ params }: { params: Promise<{ id
         initialIssues={readiness.blocking.map((item) => ({ field: item.id, message: item.label }))}
         readiness={readiness}
       />
+
+
+      {venue.lat == null || venue.lng == null ? <VenueLocationMissingBanner venueId={venue.id} /> : null}
 
       <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} />
 
