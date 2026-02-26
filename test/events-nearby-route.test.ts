@@ -119,3 +119,23 @@ test("GET /api/events/nearby supports sort=soonest ordering", async () => {
     db.event.findMany = originalFindMany;
   }
 });
+
+
+test("GET /api/events/nearby sort=distance uses haversine ordering", async () => {
+  const originalFindMany = db.event.findMany;
+  db.event.findMany = (async () => [
+    { ...baseEvent, id: "evt_far", lat: 0, lng: 1, startAt: new Date("2026-03-01T10:00:00.000Z") },
+    { ...baseEvent, id: "evt_near", lat: 1, lng: 0, startAt: new Date("2026-03-01T10:00:00.000Z") },
+  ] as any) as typeof db.event.findMany;
+
+  try {
+    const req = new NextRequest("http://localhost/api/events/nearby?lat=1&lng=1&radiusKm=200&sort=distance");
+    const res = await getNearby(req);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.items[0].id, "evt_near");
+    assert.equal(typeof body.items[0].distanceKm, "number");
+  } finally {
+    db.event.findMany = originalFindMany;
+  }
+});

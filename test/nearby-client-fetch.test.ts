@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildNearbyEventsQuery, fetchNearbyEvents } from "../lib/nearby-client-fetch.ts";
+import { buildNearbyEventsQuery, buildNearbyVenuesQuery, fetchNearbyEvents } from "../lib/nearby-client-fetch.ts";
 
 test("fetchNearbyEvents skips fetch when lat/lng/radius are invalid", async () => {
   let called = false;
@@ -36,4 +36,18 @@ test("buildNearbyEventsQuery serializes finite numbers for nearby route", () => 
   assert.equal(query?.get("radiusKm"), "25");
   assert.equal(query?.get("tags"), "street-art");
   assert.equal(query?.get("days"), "30");
+});
+
+test("buildNearbyVenuesQuery serializes lat/lng/radius and q", () => {
+  const query = buildNearbyVenuesQuery({
+    lat: "51.454514",
+    lng: "-2.587910",
+    radiusKm: "25",
+    filters: { sort: "distance", tags: [], days: 30, q: "gallery" },
+  });
+
+  assert.equal(query?.get("lat"), "51.454514");
+  assert.equal(query?.get("lng"), "-2.587910");
+  assert.equal(query?.get("radiusKm"), "25");
+  assert.equal(query?.get("q"), "gallery");
 });
