@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { ForbiddenError } from "@/lib/http-errors";
 import { canManageVenueMembers } from "@/lib/ownership";
 
 export async function requireVenueMemberManager(venueId: string) {
@@ -12,7 +13,7 @@ export async function requireVenueMemberManager(venueId: string) {
   });
 
   if (!membership || !canManageVenueMembers(membership.role, false)) {
-    throw new Error("forbidden");
+    throw new ForbiddenError();
   }
 
   return user;

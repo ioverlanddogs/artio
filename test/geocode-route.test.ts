@@ -106,3 +106,22 @@ test("GET /api/geocode normalizes GeoNames response", async () => {
   restoreEnv(env);
   globalThis.fetch = originalFetch;
 });
+
+
+test("GET /api/geocode returns 504 when provider times out", async () => {
+  const env = snapshotEnv();
+  delete process.env.GEONAMES_USERNAME;
+  process.env.MAPBOX_ACCESS_TOKEN = "y";
+
+  globalThis.fetch = (async () => {
+    throw new DOMException("Aborted", "AbortError");
+  }) as typeof fetch;
+
+  const res = await geocodeGet(new NextRequest("http://localhost/api/geocode?q=London"));
+  assert.equal(res.status, 504);
+  const body = await res.json();
+  assert.equal(body.error.code, "provider_timeout");
+
+  restoreEnv(env);
+  globalThis.fetch = originalFetch;
+});

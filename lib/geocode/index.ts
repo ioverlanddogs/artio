@@ -1,4 +1,5 @@
 import { normalizeGeoNames } from "@/lib/geocode/geonames";
+import { FetchTimeoutError, fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { geocodeQuerySchema } from "@/lib/validators";
 
 export type GeocodeCandidate = { label: string; lat: number; lng: number };
@@ -9,7 +10,7 @@ type MapboxFeature = {
   center?: [number, number];
 };
 
-type GeocodeErrorCode = "bad_request" | "not_configured" | "provider_error";
+type GeocodeErrorCode = "bad_request" | "not_configured" | "provider_error" | "provider_timeout";
 
 export class GeocodeError extends Error {
   code: GeocodeErrorCode;
@@ -39,7 +40,7 @@ export async function geocodeCandidates(query: string, opts?: { limit?: number }
       url.searchParams.set("orderby", "relevance");
       url.searchParams.set("username", geonamesUser);
 
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetchWithTimeout(url, { cache: "no-store" });
       if (!response.ok) throw new GeocodeError("provider_error", "Geocoding provider request failed");
 
       const json = (await response.json()) as Parameters<typeof normalizeGeoNames>[0];
@@ -53,7 +54,7 @@ export async function geocodeCandidates(query: string, opts?: { limit?: number }
     url.searchParams.set("limit", "5");
     url.searchParams.set("autocomplete", "true");
 
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetchWithTimeout(url, { cache: "no-store" });
     if (!response.ok) throw new GeocodeError("provider_error", "Geocoding provider request failed");
 
     const json = (await response.json()) as { features?: MapboxFeature[] };
@@ -74,6 +75,7 @@ export async function geocodeCandidates(query: string, opts?: { limit?: number }
     return typeof limit === "number" ? results.slice(0, Math.max(0, limit)) : results;
   } catch (error) {
     if (error instanceof GeocodeError) throw error;
+    if (error instanceof FetchTimeoutError) throw new GeocodeError("provider_timeout", "Geocoding provider request timed out");
     throw new GeocodeError("provider_error", "Geocoding provider request failed");
   }
 }

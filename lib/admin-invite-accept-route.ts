@@ -5,6 +5,7 @@ import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { normalizeEmail } from "@/lib/beta/access";
 import { hashInviteToken } from "@/lib/admin-invites-route";
+import { UnauthorizedError, isUnauthorizedError } from "@/lib/http-errors";
 
 const acceptSchema = z.object({ token: z.string().min(32).max(512) });
 
@@ -56,7 +57,7 @@ export async function handleAdminInviteAccept(req: NextRequest, deps: AcceptDeps
 
     const result = await deps.appDb.$transaction(async (tx) => {
       const userBefore = await tx.user.findUnique({ where: { id: sessionUser.id }, select: { id: true, role: true, email: true } });
-      if (!userBefore) throw new Error("unauthorized");
+      if (!userBefore) throw new UnauthorizedError();
 
       const afterRole = higherRole(userBefore.role, invite.intendedRole);
 
@@ -92,7 +93,7 @@ export async function handleAdminInviteAccept(req: NextRequest, deps: AcceptDeps
 
     return NextResponse.json({ success: true, role: result.role });
   } catch (error) {
-    if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
+    if (isUnauthorizedError(error)) return apiError(401, "unauthorized", "Authentication required");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

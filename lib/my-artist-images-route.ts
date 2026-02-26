@@ -20,6 +20,7 @@ import {
   principalRateLimitKey,
   rateLimitErrorResponse,
 } from "@/lib/rate-limit";
+import { ForbiddenError, isForbiddenError, isUnauthorizedError } from "@/lib/http-errors";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 
@@ -60,7 +61,7 @@ function withNoStore(response: NextResponse) {
 
 async function requireOwnedArtistId(deps: Pick<HandleDeps, "getOwnedArtistId">, userId: string) {
   const artistId = await deps.getOwnedArtistId(userId);
-  if (!artistId) throw new Error("forbidden");
+  if (!artistId) throw new ForbiddenError();
   return artistId;
 }
 
@@ -103,8 +104,8 @@ export async function handleArtistImageUpload(
     return withNoStore(NextResponse.json(jsonResponse, { headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
-    if (error instanceof Error && error.message === "forbidden") return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isForbiddenError(error)) return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
     if (error instanceof Error && error.message === "invalid_upload_payload") return withNoStore(apiError(400, "invalid_request", "Invalid payload"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
@@ -139,8 +140,8 @@ export async function handleCreateArtistImage(
     return withNoStore(NextResponse.json({ image: mapImage(image) }, { status: 201, headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
-    if (error instanceof Error && error.message === "forbidden") return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isForbiddenError(error)) return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
 }
@@ -171,8 +172,8 @@ export async function handleReorderArtistImages(
     return withNoStore(NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
-    if (error instanceof Error && error.message === "forbidden") return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isForbiddenError(error)) return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
 }
@@ -204,7 +205,7 @@ export async function handlePatchArtistImage(
     return withNoStore(NextResponse.json({ image: mapImage(image) }, { headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
 }
@@ -235,7 +236,7 @@ export async function handleDeleteArtistImage(
     return withNoStore(NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
 }
@@ -276,8 +277,8 @@ export async function handleSetArtistCover(
     return withNoStore(NextResponse.json({ cover }, { headers: NO_STORE_HEADERS }));
   } catch (error) {
     if (isRateLimitError(error)) return withNoStore(rateLimitErrorResponse(error));
-    if (error instanceof Error && error.message === "unauthorized") return withNoStore(apiError(401, "unauthorized", "Authentication required"));
-    if (error instanceof Error && error.message === "forbidden") return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
+    if (isUnauthorizedError(error)) return withNoStore(apiError(401, "unauthorized", "Authentication required"));
+    if (isForbiddenError(error)) return withNoStore(apiError(403, "forbidden", "Artist ownership required"));
     return withNoStore(apiError(500, "internal_error", "Unexpected server error"));
   }
 }
