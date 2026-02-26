@@ -4,6 +4,23 @@ type WindowState = { windowStart: number; count: number };
 
 const memoryStore = new Map<string, WindowState>();
 
+
+let hasWarnedAboutMemoryFallback = false;
+
+function isProductionLikeEnv() {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+}
+
+function warnRateLimitMemoryFallbackOnce() {
+  if (!isProductionLikeEnv() || hasWarnedAboutMemoryFallback) return;
+  hasWarnedAboutMemoryFallback = true;
+  console.warn("[rate-limit] Upstash Redis is not configured or unavailable in production-like runtime; falling back to in-memory rate limiting.");
+}
+
+export function __resetRateLimitWarningsForTests() {
+  hasWarnedAboutMemoryFallback = false;
+}
+
 type RateLimitOptions = {
   key: string;
   limit: number;
@@ -76,6 +93,7 @@ function memoryIncr(key: string, windowMs: number) {
 async function consumeRateLimit(options: RateLimitOptions) {
   const redisResult = await redisIncr(options.key, options.windowMs).catch(() => null);
   if (redisResult) return redisResult;
+  warnRateLimitMemoryFallbackOnce();
   return memoryIncr(options.key, options.windowMs);
 }
 

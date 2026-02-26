@@ -7,6 +7,7 @@ import { logWarn } from "@/lib/logging";
 import { trackMetric } from "@/lib/telemetry";
 import { getBetaConfig, isEmailAllowed, normalizeEmail } from "@/lib/beta/access";
 import { getAuthDebugRequestMeta, logAuthDebug } from "@/lib/auth-debug";
+import { ForbiddenError } from "@/lib/http-errors";
 
 export type SessionUser = { id: string; email: string; name: string | null; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -236,8 +237,8 @@ export async function requireVenueRole(venueId: string, minRole: VenueMembership
   if (hasGlobalVenueAccess(user.role)) return user;
 
   const membership = await isVenueMember(user.id, venueId);
-  if (!membership) throw new Error("forbidden");
-  if (!hasMinimumVenueRole(membership.role, minRole)) throw new Error("forbidden");
+  if (!membership) throw new ForbiddenError();
+  if (!hasMinimumVenueRole(membership.role, minRole)) throw new ForbiddenError();
 
   return user;
 }
@@ -248,13 +249,13 @@ export function hasGlobalVenueAccess(role: SessionUser["role"]) {
 
 export async function requireEditor() {
   const user = await requireAuth();
-  if (user.role !== "EDITOR" && user.role !== "ADMIN") throw new Error("forbidden");
+  if (user.role !== "EDITOR" && user.role !== "ADMIN") throw new ForbiddenError();
   return user;
 }
 
 export async function requireAdmin() {
   const user = await requireAuth();
-  if (user.role !== "ADMIN") throw new Error("forbidden");
+  if (user.role !== "ADMIN") throw new ForbiddenError();
   return user;
 }
 

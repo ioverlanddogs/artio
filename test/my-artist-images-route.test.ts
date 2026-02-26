@@ -8,6 +8,7 @@ import {
   handleSetArtistCover,
 } from "@/lib/my-artist-images-route";
 import { artistUploadRequestSchema } from "@/lib/validators";
+import { ForbiddenError } from "@/lib/http-errors";
 
 const imageId = "11111111-1111-4111-8111-111111111111";
 
@@ -151,4 +152,24 @@ test("artist cover clears when imageId is null", async () => {
   });
 
   assert.equal(res.status, 200);
+});
+
+
+test("artist image create maps typed forbidden errors to 403", async () => {
+  const req = new NextRequest("http://localhost/api/my/artist/images", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url: "https://example.com/a.jpg" }),
+  });
+
+  const res = await handleCreateArtistImage(req, {
+    requireAuth: async () => ({ id: "user-1" }),
+    getOwnedArtistId: async () => { throw new ForbiddenError(); },
+    findMaxSortOrder: async () => 0,
+    createArtistImage: async () => ({ id: imageId, artistId: "artist-1", url: "https://example.com/a.jpg", alt: null, sortOrder: 1, assetId: null }),
+  });
+
+  assert.equal(res.status, 403);
+  const body = await res.json();
+  assert.equal(body.error.code, "forbidden");
 });

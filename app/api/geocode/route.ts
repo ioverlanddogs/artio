@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
     if (error instanceof GeocodeError && error.code === "not_configured") {
       return NextResponse.json({ error: "not_configured" }, { status: 501 });
     }
+    if (error instanceof GeocodeError && error.code === "provider_timeout") {
+      return apiError(504, "provider_timeout", "Geocoding provider request timed out");
+    }
     return apiError(502, "provider_error", "Geocoding provider request failed");
   }
 }
