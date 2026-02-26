@@ -47,26 +47,56 @@ export function buildNearbyEventsQuery(input: NearbyFetchInput): URLSearchParams
   return query;
 }
 
-export async function fetchNearbyEvents<T>(
-  input: NearbyFetchInput,
-  fetchImpl: typeof fetch = fetch,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  const query = buildNearbyEventsQuery(input);
-  if (!query) return { ok: false, error: "Choose a location and radius to search nearby" };
+export function buildNearbyVenuesQuery(input: NearbyFetchInput): URLSearchParams | null {
+  const latNum = normalizeNearbyNumber(input.lat);
+  const lngNum = normalizeNearbyNumber(input.lng);
+  const radiusNum = normalizeNearbyNumber(input.radiusKm);
 
-  const response = await fetchImpl(`/api/events/nearby?${query.toString()}`, { cache: "no-store" });
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum) || !Number.isFinite(radiusNum) || radiusNum <= 0) return null;
+
+  const query = new URLSearchParams({
+    lat: latNum.toFixed(6),
+    lng: lngNum.toFixed(6),
+    radiusKm: String(radiusNum),
+    limit: String(input.limit ?? 24),
+  });
+
+  if (input.filters.q) query.set("q", input.filters.q);
+  if (input.cursor) query.set("cursor", input.cursor);
+  return query;
+}
+
+async function fetchNearby<T>(url: string, fetchImpl: typeof fetch, fallbackError: string): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const response = await fetchImpl(url, { cache: "no-store" });
   if (!response.ok) {
-    let errorMessage = "Unable to load nearby events.";
+    let errorMessage = fallbackError;
     try {
       const body = (await response.json()) as { error?: string; message?: string };
       if (response.status === 400 && (body.error === "invalid_request" || body.message)) {
-        errorMessage = body.message ?? "Unable to load nearby events.";
+        errorMessage = body.message ?? fallbackError;
       }
     } catch {
       // ignore JSON parse issues
     }
     return { ok: false, error: errorMessage };
   }
-
   return { ok: true, data: (await response.json()) as T };
+}
+
+export async function fetchNearbyEvents<T>(
+  input: NearbyFetchInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const query = buildNearbyEventsQuery(input);
+  if (!query) return { ok: false, error: "Choose a location and radius to search nearby" };
+  return fetchNearby<T>(`/api/events/nearby?${query.toString()}`, fetchImpl, "Unable to load nearby events.");
+}
+
+export async function fetchNearbyVenues<T>(
+  input: NearbyFetchInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  const query = buildNearbyVenuesQuery(input);
+  if (!query) return { ok: false, error: "Choose a location and radius to search nearby" };
+  return fetchNearby<T>(`/api/venues/nearby?${query.toString()}`, fetchImpl, "Unable to load nearby venues.");
 }

@@ -435,6 +435,17 @@ export const nearbyEventsQuerySchema = z.object({
   }
 });
 
+
+
+export const nearbyVenuesQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  radiusKm: z.coerce.number().int().min(1).max(200),
+  q: z.string().trim().min(1).max(100).optional(),
+  cursor: z.string().max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(24),
+});
+
 export const adminArtistCreateSchema = z.object({
   name: z.string().trim().min(1),
   slug: slugSchema,

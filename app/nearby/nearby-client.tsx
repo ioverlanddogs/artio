@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LocationPreferencesForm } from "@/components/location/location-preferences-form";
 import { NearbyMap } from "@/components/nearby/nearby-map";
 import { ErrorCard } from "@/components/ui/error-card";
-import { resolveNearbyView, type NearbyEventItem, type NearbyView } from "@/lib/nearby-map";
+import { resolveNearbyView, type NearbyEventItem, type NearbyVenueItem, type NearbyView } from "@/lib/nearby-map";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
 import { trackEngagement } from "@/lib/engagement-client";
 import { track } from "@/lib/analytics/client";
@@ -16,7 +16,8 @@ import { EventsFiltersBar } from "@/components/events/events-filters-bar";
 import { EventCardSkeleton } from "@/components/events/event-card-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { parseNearbyFilters } from "@/lib/nearby-filters";
-import { fetchNearbyEvents, normalizeNearbyNumber } from "@/lib/nearby-client-fetch";
+import { fetchNearbyEvents, fetchNearbyVenues, normalizeNearbyNumber } from "@/lib/nearby-client-fetch";
+import { VenueCard } from "@/components/venues/venue-card";
 
 const VIEW_STORAGE_KEY = "nearby:view";
 
@@ -27,22 +28,15 @@ function safeRadiusKm(value: string, fallback = "25") {
   return Number.isFinite(radius) && radius > 0 ? String(radius) : fallback;
 }
 
-function toKmLabel(userLat: string, userLng: string, event: NearbyEventItem) {
-  const lat1 = Number(userLat);
-  const lng1 = Number(userLng);
-  const lat2 = event.mapLat ?? event.lat;
-  const lng2 = event.mapLng ?? event.lng;
-  if (Number.isNaN(lat1) || Number.isNaN(lng1) || lat2 == null || lng2 == null) return undefined;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return `${(6371 * c).toFixed(1)} km`;
+function toKmLabel(item: { distanceKm?: number | null }) {
+  if (typeof item.distanceKm !== "number") return undefined;
+  return `${item.distanceKm.toFixed(1)} km`;
 }
 
 export function NearbyClient({ initialLocation, isAuthenticated, initialView }: { initialLocation: LocationDraft; isAuthenticated: boolean; initialView: NearbyView }) {
   const [form, setForm] = useState<LocationDraft>(initialLocation);
-  const [items, setItems] = useState<NearbyEventItem[]>([]);
+  const [eventItems, setEventItems] = useState<NearbyEventItem[]>([]);
+  const [venueItems, setVenueItems] = useState<NearbyVenueItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +58,7 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [pathname, router, searchParams]);
 
-  const loadEvents = useCallback(async ({ mode = "reset", cursor, override }: { mode?: "reset" | "append"; cursor?: string | null; override?: { lat: string; lng: string } } = {}) => {
+  const loadNearby = useCallback(async ({ mode = "reset", cursor, override }: { mode?: "reset" | "append"; cursor?: string | null; override?: { lat: string; lng: string } } = {}) => {
     const targetLat = override?.lat ?? form.lat;
     const targetLng = override?.lng ?? form.lng;
     const radiusNum = normalizeNearbyNumber(form.radiusKm || "25");
@@ -76,25 +70,43 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
     setMessage(null);
     setIsLoading(true);
     try {
-      const result = await fetchNearbyEvents<{ items: NearbyEventItem[]; nextCursor: string | null }>({
-        lat: targetLat,
-        lng: targetLng,
-        radiusKm: radiusNum,
-        cursor,
-        filters: { sort: filters.sort, q: filters.q, tags: filters.tags, from: filters.from, to: filters.to, days: filters.days },
-      });
-      if (!result.ok) {
-        setMessage(result.error);
-        if (mode !== "append") setItems([]);
+      const [eventsResult, venuesResult] = await Promise.all([
+        fetchNearbyEvents<{ items: NearbyEventItem[]; nextCursor: string | null }>({
+          lat: targetLat,
+          lng: targetLng,
+          radiusKm: radiusNum,
+          cursor,
+          filters: { sort: filters.sort, q: filters.q, tags: filters.tags, from: filters.from, to: filters.to, days: filters.days },
+        }),
+        fetchNearbyVenues<{ items: NearbyVenueItem[]; nextCursor: string | null }>({
+          lat: targetLat,
+          lng: targetLng,
+          radiusKm: radiusNum,
+          filters: { sort: filters.sort, q: filters.q, tags: filters.tags, from: filters.from, to: filters.to, days: filters.days },
+        }),
+      ]);
+
+      if (!eventsResult.ok || !venuesResult.ok) {
+        const nextError = !eventsResult.ok ? eventsResult.error : (!venuesResult.ok ? venuesResult.error : "Unable to load nearby results.");
+        setMessage(nextError);
+        if (mode !== "append") {
+          setEventItems([]);
+          setVenueItems([]);
+        }
         setNextCursor(null);
         return;
       }
-      const data = result.data;
-      setItems((prev) => mode === "append" ? [...prev, ...data.items.filter((item) => !prev.some((existing) => existing.id === item.id))] : data.items);
-      setNextCursor(data.nextCursor);
+
+      const eventData = eventsResult.data;
+      setEventItems((prev) => mode === "append" ? [...prev, ...eventData.items.filter((item) => !prev.some((existing) => existing.id === item.id))] : eventData.items);
+      if (mode !== "append") setVenueItems(venuesResult.data.items);
+      setNextCursor(eventData.nextCursor);
     } catch {
-      setMessage("Unable to load nearby events.");
-      if (mode !== "append") setItems([]);
+      setMessage("Unable to load nearby results.");
+      if (mode !== "append") {
+        setEventItems([]);
+        setVenueItems([]);
+      }
       setNextCursor(null);
     } finally {
       setIsLoading(false);
@@ -108,7 +120,7 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
     if (stored !== view) updateView(stored);
   }, [searchParams, updateView, view]);
 
-  useEffect(() => { if (canSearch) void loadEvents({ mode: "reset" }); }, [canSearch, loadEvents]);
+  useEffect(() => { if (canSearch) void loadNearby({ mode: "reset" }); }, [canSearch, loadNearby]);
 
   useEffect(() => {
     track("events_list_viewed", { source: "nearby", hasLocation: canSearch });
@@ -116,16 +128,16 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
   }, [canSearch]);
 
   useEffect(() => {
-    const visible = items.slice(0, 10);
+    const visible = eventItems.slice(0, 10);
     for (const [index, item] of visible.entries()) {
       const key = `${item.id}:${index}`;
       if (viewedImpressionKeys.current.has(key)) continue;
       viewedImpressionKeys.current.add(key);
       trackEngagement({ surface: "NEARBY", action: "VIEW", targetType: "EVENT", targetId: item.id, meta: { position: index } });
     }
-  }, [items]);
+  }, [eventItems]);
 
-  const tags = useMemo(() => Array.from(new Set(items.flatMap((item) => (item.tags ?? []).map((tag) => tag.slug)))), [items]);
+  const tags = useMemo(() => Array.from(new Set(eventItems.flatMap((item) => (item.tags ?? []).map((tag) => tag.slug)))), [eventItems]);
 
   const enableLocation = async () => {
     track("location_enable_clicked", { page: "nearby" });
@@ -137,26 +149,42 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(async (position) => {
-      const nextLat = String(position.coords.latitude);
-      const nextLng = String(position.coords.longitude);
-      const nextLabel = form.locationLabel.trim() || "Current location";
-      const nextForm = { ...form, lat: nextLat, lng: nextLng, locationLabel: nextLabel, radiusKm: safeRadiusKm(form.radiusKm) };
-      setForm(nextForm);
-      if (isAuthenticated) {
-        await fetch("/api/me/location", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ locationLabel: nextLabel, lat: position.coords.latitude, lng: position.coords.longitude, radiusKm: Number(form.radiusKm || "25") }),
-        });
+      try {
+        const nextLat = String(position.coords.latitude);
+        const nextLng = String(position.coords.longitude);
+        const nextLabel = form.locationLabel.trim() || "Current location";
+        setForm((prev) => ({ ...prev, lat: nextLat, lng: nextLng, locationLabel: nextLabel, radiusKm: safeRadiusKm(prev.radiusKm) }));
+        if (isAuthenticated) {
+          await fetch("/api/me/location", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ locationLabel: nextLabel, lat: position.coords.latitude, lng: position.coords.longitude, radiusKm: Number(form.radiusKm || "25") }),
+          });
+        }
+        await loadNearby({ mode: "reset", override: { lat: nextLat, lng: nextLng } });
+        track("location_enable_result", { result: "granted" });
+      } finally {
+        setIsLocating(false);
       }
-      track("location_enable_result", { result: "granted" });
-      setIsLocating(false);
-    }, () => {
+    }, (error) => {
       track("location_enable_result", { result: "denied" });
-      setMessage("Location permission was denied.");
+      if (error.code === error.PERMISSION_DENIED) {
+        setMessage("Location permission denied. Search for a place instead.");
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        setMessage("Location unavailable. Try again or search for a place.");
+      } else if (error.code === error.TIMEOUT) {
+        setMessage("Location request timed out. Try again.");
+      } else {
+        setMessage("Unable to access your location. Search for a place instead.");
+      }
       setIsLocating(false);
-    });
+    }, { timeout: 10000, maximumAge: 300000, enableHighAccuracy: false });
   };
+
+  const mapItems = useMemo(() => [
+    ...eventItems.map((item) => ({ ...item, kind: "event" as const })),
+    ...venueItems.map((item) => ({ ...item, kind: "venue" as const })),
+  ], [eventItems, venueItems]);
 
   return (
     <div className="space-y-5">
@@ -172,6 +200,12 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
           }}
           afterSave={(next) => setForm((prev) => ({ ...prev, ...next, radiusKm: safeRadiusKm(next.radiusKm) }))}
         />
+        <div className="mt-3 rounded-md border p-3">
+          <p className="text-sm text-muted-foreground">Use your device location for faster nearby results.</p>
+          <button type="button" className="mt-2 rounded border px-3 py-1 text-sm" onClick={() => void enableLocation()} disabled={isLocating}>
+            {isLocating ? "Locating..." : "Use my current location"}
+          </button>
+        </div>
         {isAuthenticated && canSearch ? <div className="mt-3"><SaveSearchButton type="NEARBY" params={{ lat: Number(form.lat), lng: Number(form.lng), radiusKm: Number(form.radiusKm || "25"), q: filters.q || undefined, tags: filters.tags, days: filters.from || filters.to ? undefined : filters.days, from: filters.from || undefined, to: filters.to || undefined, sort: filters.sort, view }} defaultName={`Nearby: ${form.locationLabel || "Current location"} (${form.radiusKm || "25"}km)`} /></div> : null}
       </div>
 
@@ -183,7 +217,7 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
         <button className={`rounded px-3 py-1 text-sm ${view === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`} onClick={() => updateView("map")} type="button" role="tab" aria-selected={view === "map"}>Map</button>
       </div>
 
-      {message ? <ErrorCard message={message} onRetry={() => void loadEvents({ mode: "reset" })} /> : null}
+      {message ? <ErrorCard message={message} onRetry={() => void loadNearby({ mode: "reset" })} /> : null}
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -191,14 +225,14 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
         </div>
       ) : null}
 
-      {view === "map" && !isLoading ? <NearbyMap events={items} lat={form.lat} lng={form.lng} radiusKm={form.radiusKm} days={filters.days} onSearchArea={async (center) => { const nextLat = String(center.lat); const nextLng = String(center.lng); setForm((prev) => ({ ...prev, lat: nextLat, lng: nextLng })); await loadEvents({ mode: "reset", override: { lat: nextLat, lng: nextLng } }); }} /> : null}
+      {view === "map" && !isLoading ? <NearbyMap items={mapItems} lat={form.lat} lng={form.lng} radiusKm={form.radiusKm} days={filters.days} onSearchArea={async (center) => { const nextLat = String(center.lat); const nextLng = String(center.lng); setForm((prev) => ({ ...prev, lat: nextLat, lng: nextLng })); await loadNearby({ mode: "reset", override: { lat: nextLat, lng: nextLng } }); }} /> : null}
 
       {view === "list" && !isLoading ? (
-        items.length === 0 ? (
+        eventItems.length === 0 && venueItems.length === 0 ? (
           canSearch ? (
             <EmptyState
-              title="No nearby events found"
-              description="Increase your radius, or try another area to discover events."
+              title="No nearby results found"
+              description="Increase your radius, or try another area to discover events and venues."
               actions={[{ label: isAuthenticated ? "Manage location" : "Sign in", href: isAuthenticated ? "/account" : "/login", variant: "secondary" }]}
             />
           ) : (
@@ -206,32 +240,45 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
               <h3 className="font-medium">Enable location</h3>
               <p className="mt-1 text-sm text-muted-foreground">Nearby uses your device location to compute distance.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void enableLocation()} disabled={isLocating}>{isLocating ? "Enabling..." : "Enable location"}</button>
+                <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void enableLocation()} disabled={isLocating}>{isLocating ? "Locating..." : "Use my current location"}</button>
                 <Link href="/events" className="rounded border px-3 py-1 text-sm">Browse all events</Link>
               </div>
             </div>
           )
         ) : (
           <>
-            <section className="space-y-3">
-              <h2 className="text-lg font-semibold tracking-tight">Near-term picks</h2>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {items.slice(0, 6).map((item) => (
-                  <div key={`rail-${item.id}`} onClick={() => { trackEngagement({ surface: "NEARBY", action: "CLICK", targetType: "EVENT", targetId: item.id }); track("event_viewed", { eventSlug: item.slug, source: "nearby", ui: "rail" }); }}>
-                    <EventRailCard href={`/events/${item.slug}`} title={item.title} startAt={item.startAt} venueName={item.venueName} imageUrl={item.primaryImageUrl} distanceLabel={toKmLabel(form.lat, form.lng, item)} />
+            {eventItems.length > 0 ? (
+              <>
+                <section className="space-y-3">
+                  <h2 className="text-lg font-semibold tracking-tight">Near-term picks</h2>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {eventItems.slice(0, 6).map((item) => (
+                      <div key={`rail-${item.id}`} onClick={() => { trackEngagement({ surface: "NEARBY", action: "CLICK", targetType: "EVENT", targetId: item.id }); track("event_viewed", { eventSlug: item.slug, source: "nearby", ui: "rail" }); }}>
+                        <EventRailCard href={`/events/${item.slug}`} title={item.title} startAt={item.startAt} venueName={item.venueName} imageUrl={item.primaryImageUrl} distanceLabel={toKmLabel(item)} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
+                </section>
 
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item, idx) => (
-                <div key={item.id} onClick={() => { trackEngagement({ surface: "NEARBY", action: "CLICK", targetType: "EVENT", targetId: item.id, meta: { position: idx } }); track("event_viewed", { eventSlug: item.slug, source: "nearby", ui: "card" }); }}>
-                  <EventCard href={`/events/${item.slug}`} title={item.title} startAt={item.startAt} venueName={item.venueName} imageUrl={item.primaryImageUrl} distanceLabel={toKmLabel(form.lat, form.lng, item)} badges={(item.tags ?? []).map((tag) => tag.slug)} />
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {eventItems.map((item, idx) => (
+                    <div key={item.id} onClick={() => { trackEngagement({ surface: "NEARBY", action: "CLICK", targetType: "EVENT", targetId: item.id, meta: { position: idx } }); track("event_viewed", { eventSlug: item.slug, source: "nearby", ui: "card" }); }}>
+                      <EventCard href={`/events/${item.slug}`} title={item.title} startAt={item.startAt} venueName={item.venueName} imageUrl={item.primaryImageUrl} distanceLabel={toKmLabel(item)} badges={(item.tags ?? []).map((tag) => tag.slug)} />
+                    </div>
+                  ))}
+                </section>
+                {nextCursor ? <div className="pt-2"><button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void loadNearby({ mode: "append", cursor: nextCursor })} disabled={isLoading}>{isLoading ? "Loading..." : "Load more"}</button></div> : null}
+              </>
+            ) : null}
+
+            {venueItems.length > 0 ? (
+              <section className="space-y-3">
+                <h2 className="text-lg font-semibold tracking-tight">Nearby venues</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {venueItems.map((item) => <VenueCard key={item.id} venue={item} />)}
                 </div>
-              ))}
-            </section>
-            {nextCursor ? <div className="pt-2"><button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void loadEvents({ mode: "append", cursor: nextCursor })} disabled={isLoading}>{isLoading ? "Loading..." : "Load more"}</button></div> : null}
+              </section>
+            ) : null}
           </>
         )
       ) : null}
