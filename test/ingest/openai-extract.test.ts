@@ -163,6 +163,18 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
   assert.equal(text?.format?.name, "event_extraction");
   assert.equal(text?.format?.strict, true);
   assert.ok(text?.format?.schema);
+  const schema = text?.format?.schema as {
+    properties?: {
+      events?: {
+        items?: {
+          properties?: {
+            sourceUrl?: Record<string, unknown>;
+          };
+        };
+      };
+    };
+  } | undefined;
+  assert.equal(schema?.properties?.events?.items?.properties?.sourceUrl?.format, undefined);
   assert.equal(capturedBody.response_format, undefined);
 
   const input = capturedBody.input;
@@ -225,7 +237,7 @@ test("extractEventsWithOpenAI surfaces non-ok response diagnostics", async () =>
       assert.equal(error.meta?.status, 400);
       assert.match(String(error.meta?.responseTextPrefix), /Missing required parameter/);
       assert.equal(error.meta?.requestMaxOutputTokens, 4000);
-      assert.equal(error.meta?.requestHasResponseFormat, true);
+      assert.equal(error.meta?.requestHasTextFormat, true);
       assert.ok(String(error.meta?.responseTextPrefix).length <= 500);
       return true;
     },

@@ -38,7 +38,7 @@ const extractionJsonSchema = {
           timezone: { type: ["string", "null"] },
           locationText: { type: ["string", "null"] },
           description: { type: ["string", "null"] },
-          sourceUrl: { type: ["string", "null"], format: "uri" },
+          sourceUrl: { type: ["string", "null"] },
         },
       },
     },
@@ -195,7 +195,7 @@ export async function extractEventsWithOpenAI(params: {
       responseTextPrefix: responseText.slice(0, 500),
       requestModel: model,
       requestMaxOutputTokens: maxOutputTokens,
-      requestHasResponseFormat: true,
+      requestHasTextFormat: true,
     });
   }
 
