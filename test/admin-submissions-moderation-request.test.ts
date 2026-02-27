@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildModerationRequest } from "@/app/(admin)/admin/_components/SubmissionsModeration";
+import { buildModerationRequest, normalizeModerationErrorMessage } from "@/app/(admin)/admin/_components/SubmissionsModeration";
 
 function makeItem(type: "EVENT" | "VENUE" | "ARTIST") {
   return {
@@ -55,4 +55,12 @@ test("VENUE reject keeps request-changes endpoint and message payload", () => {
     endpoint: "/api/admin/submissions/sub_123/request-changes",
     payload: { message: "Update photos" },
   });
+});
+
+
+test("normalizes nested API error object messages without throwing", () => {
+  assert.equal(normalizeModerationErrorMessage({ code: "invalid_request", message: "Invalid payload" }), "Invalid payload");
+  assert.equal(normalizeModerationErrorMessage({ code: "forbidden" }), "forbidden");
+  assert.equal(normalizeModerationErrorMessage("Forbidden"), "Forbidden");
+  assert.equal(normalizeModerationErrorMessage(null), undefined);
 });
