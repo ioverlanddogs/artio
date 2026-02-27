@@ -120,7 +120,7 @@ export function MyHeaderBar() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button asChild size="sm"><Link href="/my/events/new">+ Event</Link></Button>
+          <Button asChild size="sm"><Link href={venueId ? `/my/events/new?venueId=${encodeURIComponent(venueId)}` : "/my/events/new"}>+ Event</Link></Button>
           <Button asChild size="sm" variant="secondary"><Link href="/my/venues/new">+ Venue</Link></Button>
           <Button asChild size="sm" variant="secondary"><Link href="/my/artwork/new">+ Artwork</Link></Button>
           {!hasArtistProfile ? (

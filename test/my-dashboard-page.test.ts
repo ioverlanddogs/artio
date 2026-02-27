@@ -16,7 +16,7 @@ test("/my overview renders grouped status sections and totals", () => {
   assert.match(groups, /makeDashboardTabHref\("\/my\/artwork", status, venueId\)/);
 });
 
-test("/my venues quick list renders completeness bar and truncates missing list", () => {
+test("/my venues quick list renders completeness bar and onboarding callout gating", () => {
   const page = readFileSync("app/my/page.tsx", "utf8");
   const bar = readFileSync("app/my/_components/CompletenessBar.tsx", "utf8");
 
@@ -24,6 +24,24 @@ test("/my venues quick list renders completeness bar and truncates missing list"
   assert.match(bar, /% complete/);
   assert.match(bar, /missing\.slice\(0, 3\)/);
   assert.match(bar, /Missing:/);
+  assert.match(page, /const shouldShowOnboarding = data\.quickLists\.venues\.length === 0 && data\.quickLists\.upcomingEvents\.length === 0/);
+  assert.match(page, /Get set up/);
+  assert.match(page, /Create a venue profile/);
+  assert.match(page, /Add your first event/);
+  assert.match(page, /Submit for review/);
+});
+
+test("/my venue cards use status-aware primary CTAs", () => {
+  const source = readFileSync("app/my/page.tsx", "utf8");
+  assert.match(source, /label: "Complete profile"/);
+  assert.match(source, /label: "Submit for review"/);
+  assert.match(source, /label: "Pending review"/);
+  assert.match(source, /label: "\+ New event"/);
+  assert.match(source, /label: "Fix & resubmit"/);
+  assert.match(source, /href: `\/my\/events\/new\?venueId=\$\{venue\.id\}`/);
+  assert.doesNotMatch(source, /\/submit-event/);
+  assert.match(source, /Edit venue/);
+  assert.match(source, /View events/);
 });
 
 test("/my includes section empty states", () => {
@@ -63,12 +81,22 @@ test("/my needs attention sorts within groups and preserves CTA href", () => {
   assert.match(panel, /\{item\.ctaLabel\}/);
 });
 
-test("header includes + Artwork, conditional artist profile CTA, and dashboard error copy", () => {
+test("header includes contextual + Event link and artist profile CTA", () => {
   const header = readFileSync("app/my/_components/my-header-bar.tsx", "utf8");
+  assert.match(header, /const venueId = searchParams\.get\("venueId"\) \?\? ""/);
+  assert.match(header, /href=\{venueId \? `\/my\/events\/new\?venueId=\$\{encodeURIComponent\(venueId\)\}` : "\/my\/events\/new"\}/);
   assert.match(header, /\+ Artwork/);
   assert.match(header, /!hasArtistProfile/);
   assert.match(header, /Create Artist Profile/);
   assert.match(header, /Unable to load dashboard \(invalid response\)\./);
+});
+
+test("my sub-nav renders primary and secondary groups", () => {
+  const source = readFileSync("app/my/_components/my-sub-nav.tsx", "utf8");
+  assert.match(source, /const primaryTabs = \[/);
+  assert.match(source, /const secondaryTabs = \[/);
+  assert.match(source, /tone: "primary" \| "secondary"/);
+  assert.match(source, /bg-muted\/60 text-muted-foreground/);
 });
 
 test("/my layout includes shared shell components", () => {
