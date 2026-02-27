@@ -400,6 +400,7 @@ model Event {
   eventArtists  EventArtist[]
   submissions   Submission[]
   artworkEvents ArtworkEvent[]
+  ingestExtractedCandidate IngestExtractedEvent? @relation("IngestExtractedEventCreatedEvent")
 
   @@index([startAt])
   @@index([isPublished])
@@ -453,10 +454,13 @@ model IngestExtractedEvent {
   rawJson         Json
   model           String?
   rejectionReason String?
+  createdEventId  String?                    @db.Uuid
   run             IngestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
   venue           Venue                      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  createdEvent    Event?                     @relation("IngestExtractedEventCreatedEvent", fields: [createdEventId], references: [id], onDelete: SetNull)
 
   @@unique([venueId, fingerprint])
+  @@unique([createdEventId])
   @@index([runId])
 }
 

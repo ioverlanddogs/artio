@@ -1,0 +1,195 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { NextRequest } from "next/server";
+import {
+  handleAdminIngestApprove,
+  handleAdminIngestReject,
+  handleAdminIngestRun,
+} from "../lib/admin-ingest-route";
+
+type Candidate = {
+  id: string;
+  runId: string;
+  venueId: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  title: string;
+  startAt: Date | null;
+  endAt: Date | null;
+  timezone: string | null;
+  locationText: string | null;
+  description: string | null;
+  sourceUrl: string;
+  createdEventId: string | null;
+  rejectionReason: string | null;
+};
+
+test("approve creates draft event + submission and updates candidate", async () => {
+  const events: Array<{ id: string; isPublished: boolean; ingestSourceRunId: string | null }> = [];
+  const submissions: Array<{ targetEventId: string; status: string; kind: string | null }> = [];
+  const candidate: Candidate = {
+    id: "11111111-1111-4111-8111-111111111111",
+    runId: "22222222-2222-4222-8222-222222222222",
+    venueId: "33333333-3333-4333-8333-333333333333",
+    status: "PENDING",
+    title: "AI Event",
+    startAt: new Date("2026-01-01T18:00:00Z"),
+    endAt: null,
+    timezone: "UTC",
+    locationText: "Main Hall",
+    description: "Test description",
+    sourceUrl: "https://venue.example/events",
+    createdEventId: null,
+    rejectionReason: null,
+  };
+
+  let eventCounter = 0;
+  const tx = {
+    ingestExtractedEvent: {
+      findUnique: async () => ({ ...candidate, run: { id: candidate.runId, venueId: candidate.venueId } }),
+      update: async ({ data }: { data: Partial<Candidate> }) => {
+        Object.assign(candidate, data);
+        return { id: candidate.id, createdEventId: candidate.createdEventId, runId: candidate.runId, venueId: candidate.venueId };
+      },
+    },
+    event: {
+      findUnique: async ({ where }: { where: { slug: string } }) => events.find((event) => event.id === where.slug) ? { id: where.slug } : null,
+      create: async ({ data }: { data: { isPublished: boolean; ingestSourceRunId: string | null } }) => {
+        eventCounter += 1;
+        const id = `event-${eventCounter}`;
+        events.push({ id, isPublished: data.isPublished, ingestSourceRunId: data.ingestSourceRunId });
+        return { id };
+      },
+    },
+    submission: {
+      create: async ({ data }: { data: { targetEventId: string; status: string; kind: string | null } }) => {
+        submissions.push({ targetEventId: data.targetEventId, status: data.status, kind: data.kind });
+        return { id: `submission-${submissions.length}` };
+      },
+    },
+  };
+
+  const req = new NextRequest("http://localhost/api/admin/ingest/extracted-events/11111111-1111-4111-8111-111111111111/approve", { method: "POST" });
+  const res = await handleAdminIngestApprove(req, { id: candidate.id }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: { $transaction: async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx) } as never,
+    logAction: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.isPublished, false);
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0]?.targetEventId, body.createdEventId);
+  assert.equal(submissions[0]?.status, "SUBMITTED");
+  assert.equal(candidate.status, "APPROVED");
+  assert.equal(candidate.createdEventId, body.createdEventId);
+});
+
+test("approve is idempotent and does not duplicate event/submission", async () => {
+  const candidate: Candidate = {
+    id: "11111111-1111-4111-8111-111111111112",
+    runId: "22222222-2222-4222-8222-222222222222",
+    venueId: "33333333-3333-4333-8333-333333333333",
+    status: "APPROVED",
+    title: "AI Event",
+    startAt: new Date("2026-01-01T18:00:00Z"),
+    endAt: null,
+    timezone: "UTC",
+    locationText: "Main Hall",
+    description: "Test description",
+    sourceUrl: "https://venue.example/events",
+    createdEventId: "event-1",
+    rejectionReason: null,
+  };
+
+  let submissionCreates = 0;
+  let eventCreates = 0;
+  const tx = {
+    ingestExtractedEvent: {
+      findUnique: async () => ({ ...candidate, run: { id: candidate.runId, venueId: candidate.venueId } }),
+      update: async ({ data }: { data: Partial<Candidate> }) => {
+        Object.assign(candidate, data);
+        return { id: candidate.id, createdEventId: candidate.createdEventId, runId: candidate.runId, venueId: candidate.venueId };
+      },
+    },
+    event: {
+      findUnique: async () => null,
+      create: async () => {
+        eventCreates += 1;
+        return { id: "event-2" };
+      },
+    },
+    submission: {
+      create: async () => {
+        submissionCreates += 1;
+        return { id: "submission-2" };
+      },
+    },
+  };
+
+  const req = new NextRequest("http://localhost/api/admin/ingest/extracted-events/11111111-1111-4111-8111-111111111112/approve", { method: "POST" });
+  const res = await handleAdminIngestApprove(req, { id: candidate.id }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: { $transaction: async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx) } as never,
+    logAction: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.createdEventId, "event-1");
+  assert.equal(eventCreates, 0);
+  assert.equal(submissionCreates, 0);
+});
+
+test("reject marks candidate rejected and stores reason", async () => {
+  const candidate = {
+    id: "11111111-1111-4111-8111-111111111113",
+    runId: "22222222-2222-4222-8222-222222222222",
+    venueId: "33333333-3333-4333-8333-333333333333",
+    status: "PENDING",
+    rejectionReason: null,
+  };
+
+  const req = new NextRequest("http://localhost/api/admin/ingest/extracted-events/11111111-1111-4111-8111-111111111113/reject", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ rejectionReason: "duplicate listing" }),
+  });
+
+  const res = await handleAdminIngestReject(req, { id: candidate.id }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: {
+      ingestExtractedEvent: {
+        update: async ({ data }: { data: { status: string; rejectionReason: string } }) => {
+          candidate.status = data.status as "REJECTED";
+          candidate.rejectionReason = data.rejectionReason;
+          return candidate;
+        },
+      },
+    } as never,
+    logAction: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(candidate.status, "REJECTED");
+  assert.equal(candidate.rejectionReason, "duplicate listing");
+});
+
+test("run endpoint requires source url when venue has no website", async () => {
+  const req = new NextRequest("http://localhost/api/admin/ingest/venues/11111111-1111-4111-8111-111111111111/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  const res = await handleAdminIngestRun(req, { venueId: "11111111-1111-4111-8111-111111111111" }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: { venue: { findUnique: async () => ({ id: "11111111-1111-4111-8111-111111111111", websiteUrl: null, name: "Venue" }) } } as never,
+    runExtraction: async () => ({ runId: "run-1", createdCount: 0, dedupedCount: 0 }),
+    logAction: async () => undefined,
+  });
+
+  assert.equal(res.status, 400);
+});
