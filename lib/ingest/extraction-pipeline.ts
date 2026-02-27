@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { IngestError } from "@/lib/ingest/errors";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { extractEventsWithOpenAI } from "@/lib/ingest/openai-extract";
+import { computeConfidence, sanitizeReasons } from "@/lib/ingest/confidence";
 import { parseExtractedEventsFromModel, type NormalizedExtractedEvent } from "@/lib/ingest/schemas";
 import { clusterCandidates, computeSimilarityKey, scoreSimilarity } from "@/lib/ingest/similarity";
 
@@ -241,6 +242,7 @@ export async function runVenueIngestExtraction(
     }
 
     const createdPrimaryIdByTempId = new Map<string, string>();
+    const confidenceByTempId = new Map<string, { score: number; band: "HIGH" | "MEDIUM" | "LOW"; reasons: string[] }>();
     let createdCount = 0;
     let createdDuplicateCount = 0;
 
@@ -258,6 +260,9 @@ export async function runVenueIngestExtraction(
         sourceUrl: candidate.event.sourceUrl,
       };
 
+      const confidence = computeConfidence(candidate.event, { status: "PENDING" });
+      confidenceByTempId.set(candidate.tempId, confidence);
+
       const created = await store.ingestExtractedEvent.create({
         data: {
           runId: run.id,
@@ -273,6 +278,9 @@ export async function runVenueIngestExtraction(
           timezone: candidate.event.timezone,
           locationText: candidate.event.locationText,
           description: candidate.event.description,
+          confidenceScore: confidence.score,
+          confidenceBand: confidence.band,
+          confidenceReasons: sanitizeReasons(confidence.reasons),
           rawJson,
           model: extracted.model,
         },
@@ -301,6 +309,11 @@ export async function runVenueIngestExtraction(
 
       if (!duplicateOfId) continue;
 
+      const inheritedConfidence = assignment?.duplicateOfId ? confidenceByTempId.get(assignment.duplicateOfId) : null;
+      const confidence = inheritedConfidence
+        ? { ...inheritedConfidence, reasons: sanitizeReasons([...inheritedConfidence.reasons, "duplicate inherited confidence"]) }
+        : computeConfidence(candidate.event, { status: "DUPLICATE" });
+
       const rawJson: Prisma.JsonObject = {
         title: candidate.event.title,
         startAt: candidate.event.startAt ? candidate.event.startAt.toISOString() : null,
@@ -328,6 +341,9 @@ export async function runVenueIngestExtraction(
           timezone: candidate.event.timezone,
           locationText: candidate.event.locationText,
           description: candidate.event.description,
+          confidenceScore: confidence.score,
+          confidenceBand: confidence.band,
+          confidenceReasons: sanitizeReasons(confidence.reasons),
           rawJson,
           model: extracted.model,
         },

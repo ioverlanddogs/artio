@@ -19,6 +19,8 @@ test("admin ingest run detail includes candidate moderation actions", () => {
   assert.match(actionsSource, /router\.refresh\(\)/);
   const candidatesSource = readFileSync("app/(admin)/admin/ingest/_components/ingest-run-candidates.tsx", "utf8");
   assert.match(candidatesSource, /Show duplicates/);
+  assert.match(candidatesSource, /Triage:/);
+  assert.match(candidatesSource, /Needs review/);
   assert.match(candidatesSource, /No actions/);
 });
 

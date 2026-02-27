@@ -136,3 +136,14 @@ Safe overrides:
 - Similarity is deterministic and local (title token overlap + date + location bonuses) using `AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD` (default `85`).
 - Cross-run matching scans only the recent window configured by `AI_INGEST_DUPLICATE_LOOKBACK_DAYS` (default `30`).
 - Admin run detail defaults to primary candidates; use “Show duplicates” to inspect suppressed rows.
+
+## Confidence scoring and triage lanes
+- Each persisted ingest candidate receives deterministic advisory confidence metadata: `confidenceScore` (0–100), `confidenceBand` (`HIGH`/`MEDIUM`/`LOW`), and bounded `confidenceReasons`.
+- Confidence is heuristic guidance for triage only. It does **not** auto-approve candidates and does **not** publish events.
+- Threshold tuning:
+  - `AI_INGEST_CONFIDENCE_HIGH_MIN` (default `75`)
+  - `AI_INGEST_CONFIDENCE_MEDIUM_MIN` (default `45`)
+  - Scores below medium threshold are `LOW`.
+- Heuristics reward complete scheduling/location/description/source signals and penalize generic/nav-like titles plus missing core fields.
+- Duplicate handling: in-run duplicates inherit the primary confidence where available; otherwise duplicates are recomputed with a duplicate penalty.
+- Admin run detail includes triage lanes (High, Needs review, Low, All) and defaults to High-confidence primaries sorted by confidence descending.
