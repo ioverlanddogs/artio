@@ -177,9 +177,9 @@ export async function extractEventsWithOpenAI(params: {
       temperature: 0,
       max_output_tokens: maxOutputTokens,
       input,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
+      text: {
+        format: {
+          type: "json_schema",
           name: "event_extraction",
           strict: true,
           schema: extractionJsonSchema,

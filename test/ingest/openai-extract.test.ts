@@ -158,7 +158,12 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
   assert.equal(typeof capturedBody.model, "string");
   assert.ok(String(capturedBody.model).trim().length > 0);
   assert.equal(capturedBody.max_output_tokens, 4000);
-  assert.equal((capturedBody.response_format as { type?: string })?.type, "json_schema");
+  const text = capturedBody.text as { format?: { type?: string; name?: string; strict?: boolean; schema?: unknown } } | undefined;
+  assert.equal(text?.format?.type, "json_schema");
+  assert.equal(text?.format?.name, "event_extraction");
+  assert.equal(text?.format?.strict, true);
+  assert.ok(text?.format?.schema);
+  assert.equal(capturedBody.response_format, undefined);
 
   const input = capturedBody.input;
   assert.ok(Array.isArray(input));
@@ -168,6 +173,37 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
     typeof firstItem.content === "string"
       || (Array.isArray(firstItem.content)
         && firstItem.content.every((part) => (part as { type?: string }).type === "input_text")),
+  );
+});
+
+
+test("extractEventsWithOpenAI surfaces response_format 400 diagnostics", async () => {
+  process.env.OPENAI_API_KEY = "test-key";
+
+  const responseFormatError = JSON.stringify({
+    error: {
+      message: "Unsupported parameter: 'response_format'. In the Responses API, this parameter has moved to 'text.format'.",
+      type: "invalid_request_error",
+      param: "response_format",
+      code: "unsupported_parameter",
+    },
+  });
+
+  global.fetch = (async () => new Response(responseFormatError, { status: 400 })) as typeof fetch;
+
+  await assert.rejects(
+    () =>
+      extractEventsWithOpenAI({
+        html: "<html><body>Bad response</body></html>",
+        sourceUrl: "https://example.com",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof IngestError);
+      assert.equal(error.code, "FETCH_FAILED");
+      assert.equal(error.meta?.status, 400);
+      assert.match(String(error.meta?.responseTextPrefix), /Unsupported parameter: 'response_format'/);
+      return true;
+    },
   );
 });
 
