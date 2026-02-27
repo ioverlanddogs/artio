@@ -4,11 +4,13 @@ import { extractEventsWithOpenAI } from "@/lib/ingest/openai-extract";
 import { IngestError } from "@/lib/ingest/errors";
 
 const previousApiKey = process.env.OPENAI_API_KEY;
+const previousOpenAiModel = process.env.OPENAI_MODEL;
 const originalFetch = global.fetch;
 
 test.afterEach(() => {
   global.fetch = originalFetch;
   process.env.OPENAI_API_KEY = previousApiKey;
+  process.env.OPENAI_MODEL = previousOpenAiModel;
 });
 
 test("extractEventsWithOpenAI reads structured JSON output without parsing output_text", async () => {
@@ -132,6 +134,63 @@ test("extractEventsWithOpenAI returns debug signature when no valid JSON is foun
       assert.ok(Array.isArray(debug?.content_types));
       assert.equal(typeof debug?.has_output_text, "boolean");
       assert.ok(debug?.output_text_length === null || typeof debug?.output_text_length === "number");
+      return true;
+    },
+  );
+});
+
+test("extractEventsWithOpenAI uses default model and Responses API request shape", async () => {
+  process.env.OPENAI_API_KEY = "test-key";
+  delete process.env.OPENAI_MODEL;
+
+  let capturedBody: Record<string, unknown> | null = null;
+  global.fetch = (async (_input, init) => {
+    capturedBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+  }) as typeof fetch;
+
+  await extractEventsWithOpenAI({
+    html: "<html><body><h1>Test</h1></body></html>",
+    sourceUrl: "https://example.com",
+  });
+
+  assert.ok(capturedBody);
+  assert.equal(typeof capturedBody.model, "string");
+  assert.ok(String(capturedBody.model).trim().length > 0);
+  assert.equal(capturedBody.max_output_tokens, 4000);
+  assert.equal((capturedBody.response_format as { type?: string })?.type, "json_schema");
+
+  const input = capturedBody.input;
+  assert.ok(Array.isArray(input));
+  const firstItem = input[0] as { role?: string; content?: unknown };
+  assert.equal(typeof firstItem.role, "string");
+  assert.ok(
+    typeof firstItem.content === "string"
+      || (Array.isArray(firstItem.content)
+        && firstItem.content.every((part) => (part as { type?: string }).type === "input_text")),
+  );
+});
+
+test("extractEventsWithOpenAI surfaces non-ok response diagnostics", async () => {
+  process.env.OPENAI_API_KEY = "test-key";
+
+  const longBody = `${JSON.stringify({ error: { message: "Missing required parameter: model", type: "invalid_request_error" } })}${"x".repeat(600)}`;
+  global.fetch = (async () => new Response(longBody, { status: 400 })) as typeof fetch;
+
+  await assert.rejects(
+    () =>
+      extractEventsWithOpenAI({
+        html: "<html><body>Bad response</body></html>",
+        sourceUrl: "https://example.com",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof IngestError);
+      assert.equal(error.code, "FETCH_FAILED");
+      assert.equal(error.meta?.status, 400);
+      assert.match(String(error.meta?.responseTextPrefix), /Missing required parameter/);
+      assert.equal(error.meta?.requestMaxOutputTokens, 4000);
+      assert.equal(error.meta?.requestHasResponseFormat, true);
+      assert.ok(String(error.meta?.responseTextPrefix).length <= 500);
       return true;
     },
   );

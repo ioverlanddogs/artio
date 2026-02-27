@@ -149,7 +149,8 @@ export async function extractEventsWithOpenAI(params: {
     throw new IngestError("FETCH_FAILED", "OPENAI_API_KEY is required for extraction");
   }
 
-  const model = params.model ?? "gpt-4o-mini";
+  const model = params.model?.trim() || process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
+  const maxOutputTokens = 4000;
   const input = [
     {
       role: "system",
@@ -174,12 +175,12 @@ export async function extractEventsWithOpenAI(params: {
     body: JSON.stringify({
       model,
       temperature: 0,
-      max_output_tokens: 4000,
+      max_output_tokens: maxOutputTokens,
       input,
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "venue_event_extraction",
+          name: "event_extraction",
           strict: true,
           schema: extractionJsonSchema,
         },
@@ -191,7 +192,10 @@ export async function extractEventsWithOpenAI(params: {
     const responseText = await response.text().catch(() => "");
     throw new IngestError("FETCH_FAILED", "OpenAI extraction request failed", {
       status: response.status,
-      responseTextPrefix: responseText.slice(0, 300),
+      responseTextPrefix: responseText.slice(0, 500),
+      requestModel: model,
+      requestMaxOutputTokens: maxOutputTokens,
+      requestHasResponseFormat: true,
     });
   }
 
