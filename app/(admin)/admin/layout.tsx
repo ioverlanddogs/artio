@@ -10,6 +10,7 @@ const ADMIN_LINKS = [
   { href: "/admin/artists", label: "Artists" },
   { href: "/admin/artwork", label: "Artwork" },
   { href: "/admin/moderation", label: "Moderation" },
+  { href: "/admin/ingest", label: "Ingest" },
   { href: "/admin/submissions", label: "Submissions" },
   { href: "/admin/perf", label: "Performance" },
   { href: "/admin/analytics", label: "Analytics" },
