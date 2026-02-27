@@ -48,7 +48,33 @@ Dry-run each cron route safely (all responses include `cronRunId`):
 curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/outbox/send?dryRun=1"
 curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/digests/weekly?dryRun=1"
 curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/retention/engagement?dryRun=1"
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/ingest/venues?dryRun=1&limit=10&minHoursSinceLastRun=24"
 ```
+
+## Cron ingest venues
+- Route: `GET|POST /api/cron/ingest/venues`
+- Purpose: scheduled AI extraction runs per venue website.
+- Safety: route only creates `IngestRun` + extracted candidates. It never auto-approves candidates and never creates published events.
+- Gate: `AI_INGEST_ENABLED` must be `1`; otherwise cron returns `ok=true` with `skipped=true` and `reason=ingest_disabled`.
+- Locking: advisory lock key `cron:ingest:venues` prevents concurrent execution.
+- Defaults: `limit=10` (max 25), `minHoursSinceLastRun=24`.
+
+Manual dry-run:
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/ingest/venues?dryRun=1&limit=10&minHoursSinceLastRun=24"
+```
+
+Interpretation:
+- `considered`: venues scanned as potential candidates.
+- `selected`: venues eligible after cooldown filter.
+- `wouldRun`: number of venues that would execute in dry-run.
+- `runCount/succeeded/failed`: execution counts for non-dry-run.
+- `createdCandidates/dedupedCandidates`: extracted candidate outcomes.
+
+Common failures:
+- `lock_not_acquired`: another invocation is active.
+- `ingest_disabled`: `AI_INGEST_ENABLED` not set to `1`.
+- Venue-level `errorCode` values (for example fetch/model errors) in `venues[]`.
 
 ## Alert triggers
 - Cron failure alert: any cron exception, `ok=false`, or non-zero `errorCount`.
