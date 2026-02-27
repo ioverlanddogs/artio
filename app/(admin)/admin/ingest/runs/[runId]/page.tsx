@@ -16,6 +16,15 @@ type RunDetailResponse = {
     sourceUrl: string;
     fetchStatus: string | null;
     errorCode: string | null;
+    errorMessage: string | null;
+    errorDetail: string | null;
+    model: string | null;
+    usagePromptTokens: number | null;
+    usageCompletionTokens: number | null;
+    usageTotalTokens: number | null;
+    fetchFinalUrl: string | null;
+    fetchContentType: string | null;
+    fetchBytes: number | null;
     startedAt: string | null;
     finishedAt: string | null;
     venue: { id: string; name: string };
@@ -77,11 +86,23 @@ export default async function AdminIngestRunDetailPage({ params }: { params: Pro
           <div><dt className="text-muted-foreground">Finished At</dt><dd>{run.finishedAt ? new Date(run.finishedAt).toLocaleString() : "—"}</dd></div>
           <div><dt className="text-muted-foreground">Fetch Status</dt><dd>{run.fetchStatus ?? "—"}</dd></div>
           <div><dt className="text-muted-foreground">Error Code</dt><dd>{run.errorCode ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Fetch Final URL</dt><dd className="break-all text-xs">{run.fetchFinalUrl ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Fetch Content-Type</dt><dd>{run.fetchContentType ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Fetch Bytes</dt><dd>{run.fetchBytes ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Error Message</dt><dd>{run.errorMessage ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Model</dt><dd>{run.model ?? "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Tokens</dt><dd>{run.usageTotalTokens ?? "—"}</dd></div>
           <div><dt className="text-muted-foreground">Candidates</dt><dd>{counts.total} total</dd></div>
           <div><dt className="text-muted-foreground">Primaries</dt><dd>{counts.primaries}</dd></div>
           <div><dt className="text-muted-foreground">Duplicates</dt><dd>{counts.duplicates}</dd></div>
           <div><dt className="text-muted-foreground">Pending</dt><dd>{counts.pending}</dd></div>
         </dl>
+        {run.status === "FAILED" && run.errorDetail ? (
+          <div className="mt-4">
+            <h3 className="text-sm font-medium text-muted-foreground">Error Detail</h3>
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs">{run.errorDetail}</pre>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-lg border bg-background p-4">

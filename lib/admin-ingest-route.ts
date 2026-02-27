@@ -133,7 +133,23 @@ export async function handleAdminIngestRunGet(req: NextRequest, params: { runId?
 
     const run = await resolved.appDb.ingestRun.findUnique({
       where: { id: parsedParams.data.runId },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        sourceUrl: true,
+        fetchStatus: true,
+        fetchFinalUrl: true,
+        fetchContentType: true,
+        fetchBytes: true,
+        errorCode: true,
+        errorMessage: true,
+        errorDetail: true,
+        model: true,
+        usagePromptTokens: true,
+        usageCompletionTokens: true,
+        usageTotalTokens: true,
+        startedAt: true,
+        finishedAt: true,
         venue: { select: { id: true, name: true } },
         extractedEvents: {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],

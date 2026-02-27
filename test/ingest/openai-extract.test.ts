@@ -87,3 +87,52 @@ test("extractEventsWithOpenAI throws BAD_MODEL_OUTPUT for invalid structured JSO
     },
   );
 });
+
+
+test("extractEventsWithOpenAI parses JSON from output_text fallback", async () => {
+  process.env.OPENAI_API_KEY = "test-key";
+
+  global.fetch = (async () => new Response(JSON.stringify({
+    output_text: '{"events":[{"title":"Test"}]}',
+  }), { status: 200 })) as typeof fetch;
+
+  const result = await extractEventsWithOpenAI({
+    html: "<html><body><h1>Test</h1></body></html>",
+    sourceUrl: "https://example.com",
+  });
+
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0]?.title, "Test");
+});
+
+test("extractEventsWithOpenAI returns debug signature when no valid JSON is found", async () => {
+  process.env.OPENAI_API_KEY = "test-key";
+
+  global.fetch = (async () => new Response(JSON.stringify({
+    output: [
+      {
+        content: [{ type: "output_text", text: "not json" }],
+      },
+    ],
+  }), { status: 200 })) as typeof fetch;
+
+  await assert.rejects(
+    () =>
+      extractEventsWithOpenAI({
+        html: "<html><body>Bad output</body></html>",
+        sourceUrl: "https://example.com",
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof IngestError);
+      assert.equal(error.code, "BAD_MODEL_OUTPUT");
+      const debug = error.meta?.debug as Record<string, unknown> | undefined;
+      assert.ok(debug);
+      assert.equal(typeof debug?.has_output_parsed, "boolean");
+      assert.equal(typeof debug?.output_item_count, "number");
+      assert.ok(Array.isArray(debug?.content_types));
+      assert.equal(typeof debug?.has_output_text, "boolean");
+      assert.ok(debug?.output_text_length === null || typeof debug?.output_text_length === "number");
+      return true;
+    },
+  );
+});
