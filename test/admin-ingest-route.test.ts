@@ -5,6 +5,7 @@ import {
   handleAdminIngestApprove,
   handleAdminIngestReject,
   handleAdminIngestRun,
+  handleAdminIngestRunGet,
 } from "../lib/admin-ingest-route";
 
 type Candidate = {
@@ -192,4 +193,44 @@ test("run endpoint requires source url when venue has no website", async () => {
   });
 
   assert.equal(res.status, 400);
+});
+
+
+test("run detail includes error diagnostics fields", async () => {
+  const req = new NextRequest("http://localhost/api/admin/ingest/runs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", { method: "GET" });
+
+  const res = await handleAdminIngestRunGet(req, { runId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: {
+      ingestRun: {
+        findUnique: async () => ({
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          status: "FAILED",
+          sourceUrl: "https://example.com/events",
+          fetchStatus: "200",
+          fetchFinalUrl: "https://example.com/events",
+          fetchContentType: "text/html",
+          fetchBytes: 1024,
+          errorCode: "BAD_MODEL_OUTPUT",
+          errorMessage: "OpenAI output did not match expected event schema",
+          errorDetail: '{"debug":{"output_item_count":1}}',
+          model: "gpt-4o-mini",
+          usagePromptTokens: 100,
+          usageCompletionTokens: 20,
+          usageTotalTokens: 120,
+          startedAt: new Date("2026-01-01T00:00:00.000Z"),
+          finishedAt: new Date("2026-01-01T00:00:02.000Z"),
+          venue: { id: "venue-1", name: "Venue" },
+          extractedEvents: [],
+        }),
+      },
+    } as never,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.run.errorMessage, "OpenAI output did not match expected event schema");
+  assert.equal(body.run.errorDetail, '{"debug":{"output_item_count":1}}');
+  assert.equal(body.run.model, "gpt-4o-mini");
 });

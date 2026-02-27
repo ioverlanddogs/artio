@@ -45,23 +45,83 @@ const extractionJsonSchema = {
   },
 } as const;
 
-function extractStructuredJson(raw: {
-  output?: Array<{ content?: Array<{ type?: string; json?: unknown }> }>;
-  response?: { output?: Array<{ content?: Array<{ type?: string; json?: unknown }> }> };
+type ResponseOutputContentItem = {
+  type?: string;
+  json?: unknown;
+  text?: string;
+};
+
+type ResponseOutputItem = {
+  content?: ResponseOutputContentItem[];
+};
+
+type OpenAIResponsesApiResponse = {
+  output?: ResponseOutputItem[];
+  response?: { output?: ResponseOutputItem[] };
   output_parsed?: unknown;
-}): unknown {
+  output_text?: string;
+  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+};
+
+function getOutputItems(raw: OpenAIResponsesApiResponse): ResponseOutputItem[] {
+  const primary = raw.output ?? [];
+  const nested = raw.response?.output ?? [];
+  return [...primary, ...nested];
+}
+
+function getStructuredPayload(raw: OpenAIResponsesApiResponse): unknown {
   if (raw.output_parsed !== undefined) return raw.output_parsed;
 
-  const outputs = raw.output ?? raw.response?.output ?? [];
+  const outputs = getOutputItems(raw);
   for (const item of outputs) {
     for (const contentItem of item.content ?? []) {
       if (contentItem.type === "output_json" || contentItem.type === "json_schema") {
-        return contentItem.json;
+        if (contentItem.json !== undefined) return contentItem.json;
+      }
+    }
+  }
+
+  if (typeof raw.output_text === "string" && raw.output_text.trim().length > 0) {
+    try {
+      return JSON.parse(raw.output_text);
+    } catch {
+      // Ignore and continue fallback order.
+    }
+  }
+
+  for (const item of outputs) {
+    for (const contentItem of item.content ?? []) {
+      if (contentItem.type === "output_text" && typeof contentItem.text === "string" && contentItem.text.trim().length > 0) {
+        try {
+          return JSON.parse(contentItem.text);
+        } catch {
+          // Ignore and continue scanning output_text items.
+        }
       }
     }
   }
 
   return undefined;
+}
+
+function buildModelOutputDebugSignature(raw: OpenAIResponsesApiResponse) {
+  const outputs = getOutputItems(raw);
+  const contentTypes = outputs
+    .flatMap((item) => item.content ?? [])
+    .map((item) => item.type)
+    .filter((type): type is string => typeof type === "string")
+    .slice(0, 10);
+
+  return {
+    has_output_parsed: raw.output_parsed !== undefined,
+    output_item_count: outputs.length,
+    content_types: contentTypes,
+    has_output_text: typeof raw.output_text === "string" && raw.output_text.length > 0,
+    output_text_length: typeof raw.output_text === "string" ? raw.output_text.length : null,
+    output_text_prefix: typeof raw.output_text === "string" && raw.output_text.length > 0
+      ? raw.output_text.slice(0, 200)
+      : undefined,
+  };
 }
 
 function isExtractResponse(value: unknown): value is StructuredExtractResponse {
@@ -128,20 +188,19 @@ export async function extractEventsWithOpenAI(params: {
   });
 
   if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
     throw new IngestError("FETCH_FAILED", "OpenAI extraction request failed", {
       status: response.status,
+      responseTextPrefix: responseText.slice(0, 300),
     });
   }
 
-  const raw = (await response.json()) as {
-    output?: Array<{ content?: Array<{ type?: string; json?: unknown }> }>;
-    response?: { output?: Array<{ content?: Array<{ type?: string; json?: unknown }> }> };
-    output_parsed?: unknown;
-    usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
-  };
-  const parsed = extractStructuredJson(raw);
+  const raw = (await response.json()) as OpenAIResponsesApiResponse;
+  const parsed = getStructuredPayload(raw);
   if (!isExtractResponse(parsed)) {
-    throw new IngestError("BAD_MODEL_OUTPUT", "OpenAI output did not match expected event schema");
+    throw new IngestError("BAD_MODEL_OUTPUT", "OpenAI output did not match expected event schema", {
+      debug: buildModelOutputDebugSignature(raw),
+    });
   }
 
   const events = parsed.events;
