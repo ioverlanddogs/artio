@@ -31,6 +31,9 @@ type RunDetailResponse = {
       similarityScore: number | null;
       similarityKey: string;
       clusterKey: string;
+      confidenceScore: number;
+      confidenceBand: "HIGH" | "MEDIUM" | "LOW" | null;
+      confidenceReasons: string[] | null;
     }>;
   };
   counts: { total: number; pending: number; approved: number; rejected: number; duplicates: number; primaries: number };

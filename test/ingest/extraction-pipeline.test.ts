@@ -147,9 +147,14 @@ test("within-run near duplicate is persisted as DUPLICATE", async () => {
 
   assert.equal(result.createdCount, 1);
   assert.equal(result.createdDuplicateCount, 1);
+  const primary = store.extracted.find((row) => row.status === "PENDING");
+  assert.equal(typeof primary?.confidenceScore, "number");
+  assert.match(String(primary?.confidenceBand), /HIGH|MEDIUM|LOW/);
   const duplicate = store.extracted.find((row) => row.status === "DUPLICATE");
   assert.ok(duplicate);
   assert.equal(typeof duplicate.duplicateOfId, "string");
+  assert.equal(duplicate?.confidenceScore, primary?.confidenceScore);
+  assert.equal(duplicate?.confidenceBand, primary?.confidenceBand);
 });
 
 test("historical near duplicate links to existing primary", async () => {
@@ -188,6 +193,7 @@ test("historical near duplicate links to existing primary", async () => {
   const created = store.extracted.find((row) => row.id !== "historical-1");
   assert.equal(created?.status, "DUPLICATE");
   assert.equal(created?.duplicateOfId, "historical-1");
+  assert.equal(typeof created?.confidenceScore, "number");
 });
 
 test("invalid model output marks run as failed", async () => {

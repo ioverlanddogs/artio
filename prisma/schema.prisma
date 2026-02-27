@@ -471,6 +471,9 @@ model IngestExtractedEvent {
   description     String?
   rawJson         Json
   model           String?
+  confidenceScore Int                        @default(0)
+  confidenceBand  String?
+  confidenceReasons Json?
   rejectionReason String?
   createdEventId  String?                    @db.Uuid
   duplicateOfId   String?                    @db.Uuid
@@ -485,7 +488,9 @@ model IngestExtractedEvent {
   @@unique([createdEventId])
   @@index([runId])
   @@index([runId, clusterKey])
+  @@index([runId, confidenceScore])
   @@index([venueId, similarityKey])
+  @@index([venueId, confidenceScore])
   @@index([duplicateOfId])
 }
 
