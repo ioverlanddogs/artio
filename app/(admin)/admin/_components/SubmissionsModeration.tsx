@@ -57,10 +57,26 @@ export function buildModerationRequest(item: SubmissionItem, action: SubmissionA
   return { endpoint, payload };
 }
 
+export function normalizeModerationErrorMessage(value: unknown) {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return undefined;
+
+  const withMessage = value as { message?: unknown; code?: unknown };
+  if (typeof withMessage.message === "string") return withMessage.message;
+  if (typeof withMessage.code === "string") return withMessage.code;
+
+  return undefined;
+}
+
 async function readErrorMessage(res: Response) {
   try {
-    const body = (await res.json()) as { error?: string; message?: string; details?: string; reason?: string };
-    return body.message || body.details || body.reason || body.error;
+    const body = (await res.json()) as { error?: unknown; message?: unknown; details?: unknown; reason?: unknown };
+    return (
+      normalizeModerationErrorMessage(body.message) ||
+      normalizeModerationErrorMessage(body.details) ||
+      normalizeModerationErrorMessage(body.reason) ||
+      normalizeModerationErrorMessage(body.error)
+    );
   } catch {
     return undefined;
   }
