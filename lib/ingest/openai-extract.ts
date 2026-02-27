@@ -30,7 +30,7 @@ const extractionJsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["title"],
+        required: ["title", "startAt", "endAt", "timezone", "locationText", "description", "sourceUrl"],
         properties: {
           title: { type: "string", minLength: 1 },
           startAt: { type: ["string", "null"] },

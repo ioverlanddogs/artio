@@ -167,13 +167,21 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
     properties?: {
       events?: {
         items?: {
+          required?: string[];
           properties?: {
+            startAt?: { type?: unknown };
             sourceUrl?: Record<string, unknown>;
           };
         };
       };
     };
   } | undefined;
+  const eventItems = schema?.properties?.events?.items;
+  assert.ok(Array.isArray(eventItems?.required));
+  assert.deepEqual(eventItems?.required, ["title", "startAt", "endAt", "timezone", "locationText", "description", "sourceUrl"]);
+  const startAtType = eventItems?.properties?.startAt?.type;
+  assert.ok(Array.isArray(startAtType));
+  assert.deepEqual(startAtType, ["string", "null"]);
   assert.equal(schema?.properties?.events?.items?.properties?.sourceUrl?.format, undefined);
   assert.equal(capturedBody.response_format, undefined);
 
