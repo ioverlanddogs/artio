@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 
 type IngestStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
-type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED";
+type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
 
 const statusClassMap: Record<IngestStatus | CandidateStatus, string> = {
   PENDING: "bg-amber-100 text-amber-900 hover:bg-amber-100",
@@ -10,6 +10,7 @@ const statusClassMap: Record<IngestStatus | CandidateStatus, string> = {
   FAILED: "bg-red-100 text-red-900 hover:bg-red-100",
   APPROVED: "bg-green-100 text-green-900 hover:bg-green-100",
   REJECTED: "bg-neutral-200 text-neutral-900 hover:bg-neutral-200",
+  DUPLICATE: "bg-slate-200 text-slate-900 hover:bg-slate-200",
 };
 
 export default function IngestStatusBadge({ status }: { status: IngestStatus | CandidateStatus }) {

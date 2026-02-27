@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InlineBanner } from "@/components/ui/inline-banner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED";
+type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
 
 function getActionError(status: number) {
   if (status === 401 || status === 403) return "Not authorized.";

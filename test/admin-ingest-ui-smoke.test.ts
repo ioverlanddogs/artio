@@ -13,9 +13,13 @@ test("admin ingest run detail includes candidate moderation actions", () => {
   const detailSource = readFileSync("app\/(admin)\/admin\/ingest\/runs\/\[runId\]\/page.tsx", "utf8");
   const actionsSource = readFileSync("app/(admin)/admin/ingest/_components/ingest-candidate-actions.tsx", "utf8");
   assert.match(detailSource, /Extracted Candidates/);
+  assert.match(detailSource, /Primaries/);
   assert.match(actionsSource, /Approve/);
   assert.match(actionsSource, /Reject/);
   assert.match(actionsSource, /router\.refresh\(\)/);
+  const candidatesSource = readFileSync("app/(admin)/admin/ingest/_components/ingest-run-candidates.tsx", "utf8");
+  assert.match(candidatesSource, /Show duplicates/);
+  assert.match(candidatesSource, /No actions/);
 });
 
 test("admin sidebar includes ingest route", () => {

@@ -101,6 +101,7 @@ enum IngestExtractedEventStatus {
   PENDING
   APPROVED
   REJECTED
+  DUPLICATE
 }
 
 enum FavoriteTargetType {
@@ -432,6 +433,7 @@ model IngestRun {
   finishedAt       DateTime?
   durationMs       Int?
   createdCandidates Int                 @default(0)
+  createdDuplicates Int                 @default(0)
   dedupedCandidates Int                 @default(0)
   totalCandidatesReturned Int           @default(0)
   model            String?
@@ -458,6 +460,8 @@ model IngestExtractedEvent {
   venueId         String                     @db.Uuid
   status          IngestExtractedEventStatus @default(PENDING)
   fingerprint     String
+  similarityKey   String
+  clusterKey      String
   sourceUrl       String
   title           String
   startAt         DateTime?
@@ -469,13 +473,20 @@ model IngestExtractedEvent {
   model           String?
   rejectionReason String?
   createdEventId  String?                    @db.Uuid
+  duplicateOfId   String?                    @db.Uuid
   run             IngestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
   venue           Venue                      @relation(fields: [venueId], references: [id], onDelete: Cascade)
   createdEvent    Event?                     @relation("IngestExtractedEventCreatedEvent", fields: [createdEventId], references: [id], onDelete: SetNull)
+  duplicateOf     IngestExtractedEvent?      @relation("IngestDuplicateOf", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates      IngestExtractedEvent[]     @relation("IngestDuplicateOf")
+  similarityScore Int?
 
   @@unique([venueId, fingerprint])
   @@unique([createdEventId])
   @@index([runId])
+  @@index([runId, clusterKey])
+  @@index([venueId, similarityKey])
+  @@index([duplicateOfId])
 }
 
 model VenueMembership {

@@ -79,7 +79,7 @@ export async function handleAdminIngestRun(req: NextRequest, params: { venueId?:
       req,
     });
 
-    return NextResponse.json({ runId: result.runId, createdCount: result.createdCount, dedupedCount: result.dedupedCount }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ runId: result.runId, createdCount: result.createdCount, dedupedCount: result.dedupedCount, createdDuplicateCount: result.createdDuplicateCount }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required", undefined, requestId);
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Editor role required", undefined, requestId);
@@ -146,6 +146,10 @@ export async function handleAdminIngestRunGet(req: NextRequest, params: { runId?
             locationText: true,
             sourceUrl: true,
             fingerprint: true,
+            similarityKey: true,
+            clusterKey: true,
+            duplicateOfId: true,
+            similarityScore: true,
             rejectionReason: true,
             createdEventId: true,
           },
@@ -160,8 +164,10 @@ export async function handleAdminIngestRunGet(req: NextRequest, params: { runId?
       if (candidate.status === "PENDING") acc.pending += 1;
       if (candidate.status === "APPROVED") acc.approved += 1;
       if (candidate.status === "REJECTED") acc.rejected += 1;
+      if (candidate.status === "DUPLICATE") acc.duplicates += 1;
+      if (candidate.status !== "DUPLICATE") acc.primaries += 1;
       return acc;
-    }, { total: 0, pending: 0, approved: 0, rejected: 0 });
+    }, { total: 0, pending: 0, approved: 0, rejected: 0, duplicates: 0, primaries: 0 });
 
     return NextResponse.json({ ok: true, run, counts }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -58,6 +58,8 @@ Optional:
 - `AI_INGEST_ENABLED` (set to `1` to enable server-side AI ingest extraction; defaults to disabled)
 - `OPENAI_API_KEY` (required only when `AI_INGEST_ENABLED=1`)
 - `AI_INGEST_MAX_CANDIDATES_PER_VENUE_RUN` (default `25`, per-run cap after normalization)
+- `AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD` (default `85`, score threshold for near-duplicate suppression)
+- `AI_INGEST_DUPLICATE_LOOKBACK_DAYS` (default `30`, historical window for cross-run duplicate matching)
 - `AI_INGEST_CRON_MAX_VENUES` (default `10`, hard cap enforced at max `25`)
 - `AI_INGEST_CRON_MAX_TOTAL_CREATED_CANDIDATES` (default `100`, total candidates cap per cron invocation)
 - `AI_INGEST_CRON_TIME_BUDGET_MS` (default `120000`, soft runtime budget for cron)

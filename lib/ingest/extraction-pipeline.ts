@@ -4,11 +4,13 @@ import { db } from "@/lib/db";
 import { IngestError } from "@/lib/ingest/errors";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { extractEventsWithOpenAI } from "@/lib/ingest/openai-extract";
-import { parseExtractedEventsFromModel } from "@/lib/ingest/schemas";
+import { parseExtractedEventsFromModel, type NormalizedExtractedEvent } from "@/lib/ingest/schemas";
+import { clusterCandidates, computeSimilarityKey, scoreSimilarity } from "@/lib/ingest/similarity";
 
 const MAX_ERROR_MESSAGE_LENGTH = 500;
 const MAX_ERROR_DETAIL_LENGTH = 1000;
 const DEFAULT_MAX_CANDIDATES_PER_RUN = 25;
+const DEFAULT_DUPLICATE_LOOKBACK_DAYS = 30;
 
 const CANDIDATE_CAP_STOP_REASON = "CANDIDATE_CAP_REACHED";
 
@@ -28,6 +30,7 @@ type IngestStore = {
   };
   ingestExtractedEvent: {
     findUnique: typeof db.ingestExtractedEvent.findUnique;
+    findMany: typeof db.ingestExtractedEvent.findMany;
     create: typeof db.ingestExtractedEvent.create;
   };
 };
@@ -46,13 +49,7 @@ function dayStamp(input: Date | null): string {
 }
 
 function fingerprintForCandidate(params: { venueId: string; title: string; startAt: Date | null; locationText: string | null }): string {
-  const signature = [
-    params.venueId,
-    normalizeText(params.title),
-    dayStamp(params.startAt),
-    normalizeText(params.locationText),
-  ].join("|");
-
+  const signature = [params.venueId, normalizeText(params.title), dayStamp(params.startAt), normalizeText(params.locationText)].join("|");
   return createHash("sha256").update(signature).digest("hex");
 }
 
@@ -60,6 +57,12 @@ function getMaxCandidatesPerVenueRun() {
   const parsed = Number.parseInt(process.env.AI_INGEST_MAX_CANDIDATES_PER_VENUE_RUN ?? "", 10);
   if (Number.isFinite(parsed) && parsed > 0) return parsed;
   return DEFAULT_MAX_CANDIDATES_PER_RUN;
+}
+
+function getDuplicateLookbackDays() {
+  const parsed = Number.parseInt(process.env.AI_INGEST_DUPLICATE_LOOKBACK_DAYS ?? "", 10);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return DEFAULT_DUPLICATE_LOOKBACK_DAYS;
 }
 
 async function markRunFailed(
@@ -84,6 +87,13 @@ async function markRunFailed(
   });
 }
 
+type PendingCandidate = {
+  tempId: string;
+  event: NormalizedExtractedEvent;
+  fingerprint: string;
+  similarityKey: string;
+};
+
 export async function runVenueIngestExtraction(
   params: RunIngestParams,
   deps: {
@@ -92,7 +102,7 @@ export async function runVenueIngestExtraction(
     extractWithOpenAI?: Extractor;
     now?: () => number;
   } = {},
-): Promise<{ runId: string; createdCount: number; dedupedCount: number }> {
+): Promise<{ runId: string; createdCount: number; dedupedCount: number; createdDuplicateCount: number }> {
   const store = deps.store ?? db;
   const fetchHtml = deps.fetchHtml ?? fetchHtmlWithGuards;
   const extractWithOpenAI = deps.extractWithOpenAI ?? extractEventsWithOpenAI;
@@ -123,12 +133,12 @@ export async function runVenueIngestExtraction(
 
     if (process.env.AI_INGEST_ENABLED !== "1") {
       await markRunFailed(store, run.id, startedAtMs, "INGEST_DISABLED", "AI ingest is disabled");
-      return { runId: run.id, createdCount: 0, dedupedCount: 0 };
+      return { runId: run.id, createdCount: 0, dedupedCount: 0, createdDuplicateCount: 0 };
     }
 
     if (!process.env.OPENAI_API_KEY) {
       await markRunFailed(store, run.id, startedAtMs, "MISSING_OPENAI_KEY", "OPENAI_API_KEY is not configured");
-      return { runId: run.id, createdCount: 0, dedupedCount: 0 };
+      return { runId: run.id, createdCount: 0, dedupedCount: 0, createdDuplicateCount: 0 };
     }
 
     const extracted = await extractWithOpenAI({ html: fetched.html, sourceUrl: fetched.finalUrl, model: params.model });
@@ -138,10 +148,10 @@ export async function runVenueIngestExtraction(
     const cappedCandidates = normalized.slice(0, maxCandidates);
     const stopReason = totalCandidatesReturned > maxCandidates ? CANDIDATE_CAP_STOP_REASON : null;
 
-    let createdCount = 0;
     let dedupedCount = 0;
+    const candidates: PendingCandidate[] = [];
 
-    for (const event of cappedCandidates) {
+    for (const [index, event] of cappedCandidates.entries()) {
       const fingerprint = fingerprintForCandidate({
         venueId: params.venueId,
         title: event.title,
@@ -164,34 +174,165 @@ export async function runVenueIngestExtraction(
         continue;
       }
 
+      candidates.push({
+        tempId: `new-${index}`,
+        event,
+        fingerprint,
+        similarityKey: computeSimilarityKey(event),
+      });
+    }
+
+    const clustered = clusterCandidates(
+      candidates.map((candidate) => ({
+        id: candidate.tempId,
+        venueId: params.venueId,
+        title: candidate.event.title,
+        startAt: candidate.event.startAt,
+        locationText: candidate.event.locationText,
+        similarityKey: candidate.similarityKey,
+      })),
+    );
+
+    const assignmentById = new Map(clustered.assignments.map((assignment) => [assignment.id, assignment]));
+
+    const lookbackStart = new Date(now() - getDuplicateLookbackDays() * 24 * 60 * 60 * 1000);
+    const historicalPrimaries = await store.ingestExtractedEvent.findMany({
+      where: {
+        venueId: params.venueId,
+        createdAt: { gte: lookbackStart },
+        status: { in: ["PENDING", "APPROVED"] },
+        duplicateOfId: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        startAt: true,
+        locationText: true,
+        similarityKey: true,
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+
+    const historicalLinkByTempId = new Map<string, { duplicateOfId: string; similarityScore: number }>();
+
+    for (const candidate of candidates) {
+      const assignment = assignmentById.get(candidate.tempId);
+      if (!assignment || !assignment.isPrimary) continue;
+
+      let best: { id: string; score: number } | null = null;
+      for (const historical of historicalPrimaries) {
+        const score = historical.similarityKey === candidate.similarityKey
+          ? 100
+          : scoreSimilarity(candidate.event, {
+            title: historical.title,
+            startAt: historical.startAt,
+            locationText: historical.locationText,
+          });
+
+        if (!best || score > best.score || (score === best.score && historical.id < best.id)) {
+          best = { id: historical.id, score };
+        }
+      }
+
+      const threshold = Number.parseInt(process.env.AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD ?? "85", 10) || 85;
+      if (best && best.score >= threshold) {
+        historicalLinkByTempId.set(candidate.tempId, { duplicateOfId: best.id, similarityScore: best.score });
+      }
+    }
+
+    const createdPrimaryIdByTempId = new Map<string, string>();
+    let createdCount = 0;
+    let createdDuplicateCount = 0;
+
+    for (const candidate of candidates) {
+      const assignment = assignmentById.get(candidate.tempId);
+      if (!assignment || !assignment.isPrimary || historicalLinkByTempId.has(candidate.tempId)) continue;
+
       const rawJson: Prisma.JsonObject = {
-        title: event.title,
-        startAt: event.startAt ? event.startAt.toISOString() : null,
-        endAt: event.endAt ? event.endAt.toISOString() : null,
-        timezone: event.timezone,
-        locationText: event.locationText,
-        description: event.description,
-        sourceUrl: event.sourceUrl,
+        title: candidate.event.title,
+        startAt: candidate.event.startAt ? candidate.event.startAt.toISOString() : null,
+        endAt: candidate.event.endAt ? candidate.event.endAt.toISOString() : null,
+        timezone: candidate.event.timezone,
+        locationText: candidate.event.locationText,
+        description: candidate.event.description,
+        sourceUrl: candidate.event.sourceUrl,
+      };
+
+      const created = await store.ingestExtractedEvent.create({
+        data: {
+          runId: run.id,
+          venueId: params.venueId,
+          status: "PENDING",
+          fingerprint: candidate.fingerprint,
+          similarityKey: candidate.similarityKey,
+          clusterKey: assignment.clusterKey,
+          sourceUrl: candidate.event.sourceUrl ?? fetched.finalUrl,
+          title: candidate.event.title,
+          startAt: candidate.event.startAt,
+          endAt: candidate.event.endAt,
+          timezone: candidate.event.timezone,
+          locationText: candidate.event.locationText,
+          description: candidate.event.description,
+          rawJson,
+          model: extracted.model,
+        },
+        select: { id: true },
+      });
+
+      createdPrimaryIdByTempId.set(candidate.tempId, created.id);
+      createdCount += 1;
+    }
+
+    for (const candidate of candidates) {
+      const assignment = assignmentById.get(candidate.tempId);
+      if (!assignment) continue;
+
+      let duplicateOfId: string | null = null;
+      let similarityScore: number | null = null;
+
+      if (historicalLinkByTempId.has(candidate.tempId)) {
+        const linked = historicalLinkByTempId.get(candidate.tempId)!;
+        duplicateOfId = linked.duplicateOfId;
+        similarityScore = linked.similarityScore;
+      } else if (!assignment.isPrimary && assignment.duplicateOfId) {
+        duplicateOfId = createdPrimaryIdByTempId.get(assignment.duplicateOfId) ?? historicalLinkByTempId.get(assignment.duplicateOfId)?.duplicateOfId ?? null;
+        similarityScore = assignment.similarityScore;
+      }
+
+      if (!duplicateOfId) continue;
+
+      const rawJson: Prisma.JsonObject = {
+        title: candidate.event.title,
+        startAt: candidate.event.startAt ? candidate.event.startAt.toISOString() : null,
+        endAt: candidate.event.endAt ? candidate.event.endAt.toISOString() : null,
+        timezone: candidate.event.timezone,
+        locationText: candidate.event.locationText,
+        description: candidate.event.description,
+        sourceUrl: candidate.event.sourceUrl,
       };
 
       await store.ingestExtractedEvent.create({
         data: {
           runId: run.id,
           venueId: params.venueId,
-          status: "PENDING",
-          fingerprint,
-          sourceUrl: event.sourceUrl ?? fetched.finalUrl,
-          title: event.title,
-          startAt: event.startAt,
-          endAt: event.endAt,
-          timezone: event.timezone,
-          locationText: event.locationText,
-          description: event.description,
+          status: "DUPLICATE",
+          duplicateOfId,
+          similarityScore,
+          fingerprint: candidate.fingerprint,
+          similarityKey: candidate.similarityKey,
+          clusterKey: assignment.clusterKey,
+          sourceUrl: candidate.event.sourceUrl ?? fetched.finalUrl,
+          title: candidate.event.title,
+          startAt: candidate.event.startAt,
+          endAt: candidate.event.endAt,
+          timezone: candidate.event.timezone,
+          locationText: candidate.event.locationText,
+          description: candidate.event.description,
           rawJson,
           model: extracted.model,
         },
       });
-      createdCount += 1;
+      createdDuplicateCount += 1;
     }
 
     const finishedAt = new Date(now());
@@ -202,6 +343,7 @@ export async function runVenueIngestExtraction(
         finishedAt,
         durationMs: finishedAt.getTime() - startedAtMs,
         createdCandidates: createdCount,
+        createdDuplicates: createdDuplicateCount,
         dedupedCandidates: dedupedCount,
         totalCandidatesReturned,
         model: extracted.model,
@@ -212,7 +354,7 @@ export async function runVenueIngestExtraction(
       },
     });
 
-    return { runId: run.id, createdCount, dedupedCount };
+    return { runId: run.id, createdCount, dedupedCount, createdDuplicateCount };
   } catch (error) {
     if (error instanceof IngestError) {
       await markRunFailed(store, run.id, startedAtMs, error.code, error.message, error.meta ? JSON.stringify(error.meta) : undefined);

@@ -129,3 +129,10 @@ Safe overrides:
 - Increase one cap at a time and monitor `/admin/ingest/health` for failure/error spikes.
 - Prefer raising `AI_INGEST_CRON_MAX_TOTAL_CREATED_CANDIDATES` before increasing `AI_INGEST_CRON_MAX_VENUES`.
 - Keep circuit breaker enabled in production; only relax thresholds temporarily with an incident note.
+
+
+## Duplicate suppression
+- Near duplicates are auto-persisted as `DUPLICATE` and linked via `duplicateOfId` to a primary candidate (either from the same run or recent historical `PENDING`/`APPROVED` candidate).
+- Similarity is deterministic and local (title token overlap + date + location bonuses) using `AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD` (default `85`).
+- Cross-run matching scans only the recent window configured by `AI_INGEST_DUPLICATE_LOOKBACK_DAYS` (default `30`).
+- Admin run detail defaults to primary candidates; use “Show duplicates” to inspect suppressed rows.
