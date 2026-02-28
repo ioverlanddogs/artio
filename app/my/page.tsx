@@ -87,7 +87,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
                   </div>
                   <div className="space-x-2">
                     <Link className="underline" href={`/my/venues/${venue.id}`}>Edit venue</Link>
-                    <Link className="underline" href={`/my/venues/${venue.id}`}>View events</Link>
+                    <Link className="underline" href={`/my/events?venueId=${venue.id}`}>View events</Link>
                     {venue.status === "Published" ? <Link className="underline" href={`/venues/${venue.id}`}>View Public</Link> : null}
                   </div>
                 </div>

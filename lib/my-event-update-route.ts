@@ -20,6 +20,7 @@ type UpdateEventInput = {
   timezone?: string;
   startAt?: Date;
   endAt?: Date | null;
+  venueId?: string | null;
   featuredAssetId?: string | null;
   images?: Array<{ assetId?: string | null; url?: string | null; alt?: string | null; sortOrder: number }>;
 };
@@ -28,7 +29,9 @@ type Deps = {
   requireAuth: () => Promise<SessionUser>;
   findSubmission: (eventId: string, userId: string) => Promise<SubmissionRecord | null>;
   countOwnedAssets: (assetIds: string[], userId: string) => Promise<number>;
+  hasVenueMembership: (userId: string, venueId: string) => Promise<boolean>;
   updateEvent: (eventId: string, data: UpdateEventInput) => Promise<unknown>;
+  updateSubmissionVenue: (submissionId: string, venueId: string | null) => Promise<void>;
   updateSubmissionNote: (submissionId: string, note: string | null) => Promise<void>;
 };
 
@@ -44,8 +47,13 @@ export async function handlePatchMyEvent(req: NextRequest, params: Promise<{ eve
 
     if (!submission || submission.submitterUserId !== user.id) return apiError(403, "forbidden", "Submission owner required");
     if (submission.targetEvent?.isPublished) return apiError(400, "invalid_request", "Published events must use revision workflow");
-    if (!submission.venue?.memberships.length) return apiError(403, "forbidden", "Venue membership required");
+    if (submission.venue && !submission.venue.memberships.length) return apiError(403, "forbidden", "Venue membership required");
     if (!canEditSubmission(submission.status)) return apiError(409, "invalid_state", "Only draft or rejected submissions are editable");
+
+    if (parsed.data.venueId !== undefined && parsed.data.venueId !== null) {
+      const hasMembership = await deps.hasVenueMembership(user.id, parsed.data.venueId);
+      if (!hasMembership) return apiError(403, "forbidden", "Venue membership required");
+    }
 
     const { note, images } = parsed.data;
 
@@ -65,11 +73,16 @@ export async function handlePatchMyEvent(req: NextRequest, params: Promise<{ eve
       ...(parsed.data.timezone !== undefined ? { timezone: parsed.data.timezone } : {}),
       ...(parsed.data.startAt ? { startAt: new Date(parsed.data.startAt) } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "endAt") ? { endAt: parsed.data.endAt ? new Date(parsed.data.endAt) : null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(parsed.data, "venueId") ? { venueId: parsed.data.venueId ?? null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "featuredAssetId") ? { featuredAssetId: parsed.data.featuredAssetId ?? null } : {}),
       ...(images ? { images } : {}),
     };
 
     const event = await deps.updateEvent(parsedId.data.eventId, updateInput);
+
+    if (parsed.data.venueId !== undefined) {
+      await deps.updateSubmissionVenue(submission.id, parsed.data.venueId ?? null);
+    }
 
     if (note !== undefined) {
       await deps.updateSubmissionNote(submission.id, note ?? null);

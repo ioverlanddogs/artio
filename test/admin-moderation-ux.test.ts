@@ -19,10 +19,10 @@ test("moderation queue actions use row-level loading and refreshes via router", 
   assert.match(moderationSource, /enqueueToast\(/);
 });
 
-test("admin moderation pages use AdminPageHeader", () => {
+test("admin moderation route redirects to submissions and canonical page uses AdminPageHeader", () => {
   const moderationPage = readFileSync("app/(admin)/admin/moderation/page.tsx", "utf8");
   const submissionsPage = readFileSync("app/(admin)/admin/submissions/page.tsx", "utf8");
 
-  assert.match(moderationPage, /<AdminPageHeader[\s\S]*title="Moderation"/);
+  assert.match(moderationPage, /redirect\("\/admin\/submissions"\)/);
   assert.match(submissionsPage, /<AdminPageHeader[\s\S]*title="Submissions"/);
 });
