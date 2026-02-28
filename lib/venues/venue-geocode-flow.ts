@@ -48,3 +48,15 @@ export async function geocodeForVenueUpdate(args: {
     countryCode: normalizeCountryCode(merged.country),
   });
 }
+
+export async function geocodeForVenueUpdateBestEffort(args: {
+  existing: VenueGeocodeFields;
+  patch: Partial<VenueGeocodeFields>;
+}, geocodeFn = geocodeVenueAddressToLatLng, log: (message: string) => void = console.warn): Promise<LatLng | null> {
+  try {
+    return await geocodeForVenueUpdate(args, geocodeFn);
+  } catch {
+    log(`my_venue_update_geocode_failed venueId=${String((args.existing as { id?: string }).id ?? "unknown")}`);
+    return null;
+  }
+}

@@ -6,8 +6,7 @@ import { myVenuePatchSchema, parseBody, venueIdParamSchema, zodDetails } from "@
 import { submissionSubmittedDedupeKey } from "@/lib/notification-keys";
 import { buildInAppFromTemplate, enqueueNotification } from "@/lib/notifications";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
-import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
-import { geocodeForVenueUpdate } from "@/lib/venues/venue-geocode-flow";
+import { geocodeForVenueUpdateBestEffort } from "@/lib/venues/venue-geocode-flow";
 import { inferTimezoneFromLatLng, isValidIanaTimezone } from "@/lib/timezone";
 
 export const runtime = "nodejs";
@@ -62,16 +61,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updateData.timezone = inferTimezoneFromLatLng(lat, lng);
     }
 
-    try {
-      const result = await geocodeForVenueUpdate({ existing, patch: safeFields });
-      if (result) {
-        updateData.lat = result.lat;
-        updateData.lng = result.lng;
-      }
-    } catch (error) {
-      if (!(error instanceof MapboxForwardGeocodeError && ["not_configured", "provider_error", "provider_timeout"].includes(error.code))) {
-        console.warn(`my_venue_update_geocode_failed venueId=${existing.id} city=${safeFields.city ?? existing.city ?? ""} postcode=${safeFields.postcode ?? existing.postcode ?? ""}`);
-      }
+    const geocodeResult = await geocodeForVenueUpdateBestEffort({ existing, patch: safeFields }, undefined, (message) => {
+      console.warn(`${message} city=${safeFields.city ?? existing.city ?? ""} postcode=${safeFields.postcode ?? existing.postcode ?? ""}`);
+    });
+    if (geocodeResult) {
+      updateData.lat = geocodeResult.lat;
+      updateData.lng = geocodeResult.lng;
     }
 
     const venue = await db.venue.update({ where: { id: existing.id }, data: updateData });

@@ -28,3 +28,9 @@ test("getVenuePublishIssues returns no issues for valid venue", () => {
   const issues = getVenuePublishIssues(baseVenue);
   assert.deepEqual(issues, []);
 });
+
+
+test("getVenuePublishIssues accepts 20-char description", () => {
+  const issues = getVenuePublishIssues({ ...baseVenue, description: "12345678901234567890" });
+  assert.equal(issues.some((issue) => issue.field === "description"), false);
+});

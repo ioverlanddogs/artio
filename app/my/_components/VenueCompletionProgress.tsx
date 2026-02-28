@@ -13,7 +13,6 @@ const ITEMS: Array<{ key: keyof Checks; label: string }> = [
   { key: "location", label: "Location" },
   { key: "images", label: "Images" },
   { key: "contact", label: "Contact/Details" },
-  { key: "publishReady", label: "Ready to submit" },
 ];
 
 export default function VenueCompletionProgress({ checks }: { checks: Checks }) {
@@ -26,7 +25,7 @@ export default function VenueCompletionProgress({ checks }: { checks: Checks }) 
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm font-medium">{completeCount} of {ITEMS.length} complete</p>
-        <ul className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+        <ul className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
           {ITEMS.map((item) => (
             <li key={item.key} className="flex items-center gap-2 rounded border px-3 py-2">
               <span aria-hidden>{checks[item.key] ? "✓" : "✕"}</span>

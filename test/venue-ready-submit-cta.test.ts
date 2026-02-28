@@ -21,3 +21,10 @@ test("venue setup header uses explicit draft/submitted status descriptions", () 
   assert.match(header, /Published — visible on ArtPulse\./);
   assert.match(header, /Changes requested — fix issues and resubmit\./);
 });
+
+
+test("venue setup page includes publish-ready banner and publish panel jump", () => {
+  const page = readFileSync("app/my/venues/[id]/page.tsx", "utf8");
+  assert.match(page, /This venue is ready to submit for review\./);
+  assert.match(page, /href="#publish-panel"/);
+});

@@ -20,7 +20,7 @@ export type VenuePublishInput = {
 
 const venuePublishSchema = z.object({
   name: z.string().trim().min(1, "Venue name is required"),
-  description: z.string().trim().min(50, "Description must be at least 50 characters"),
+  description: z.string().trim().min(20, "Description must be at least 20 characters"),
   hasCoverImage: z.boolean().refine((value) => value, "Add a cover image before submitting"),
   hasLocation: z.boolean().refine((value) => value, "Add an address or city + country before submitting"),
   websiteUrl: httpUrlSchema.optional().nullable(),

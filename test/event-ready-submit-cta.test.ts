@@ -17,3 +17,10 @@ test("location section shows fix venue location link when coords are missing", (
   assert.match(page, /Fix venue location/);
   assert.match(page, /\/my\/venues\/\$\{event\.venue\.id\}/);
 });
+
+
+test("event setup page includes inline ready-to-submit CTA", () => {
+  const page = readFileSync("app/my/events/[eventId]/page.tsx", "utf8");
+  assert.match(page, /Ready to submit\?/);
+  assert.match(page, /href="#publish-panel"/);
+});

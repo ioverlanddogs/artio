@@ -90,6 +90,12 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
           <EventSetupSection title="Links (optional)" description="Add ticketing or reference links." complete={Boolean(event.ticketUrl)}>
             <EventLinksForm event={{ id: event.id, ticketUrl: event.ticketUrl }} />
           </EventSetupSection>
+
+          <div className="rounded-md border bg-muted/20 p-4 text-sm">
+            <p className="font-medium">Ready to submit?</p>
+            <p className="mt-1 text-muted-foreground">If your checklist is complete, submit your event for moderation.</p>
+            <Link className="mt-2 inline-block underline" href="#publish-panel">Submit for review</Link>
+          </div>
         </section>
 
         <aside className="order-1 lg:order-2 lg:col-span-1">

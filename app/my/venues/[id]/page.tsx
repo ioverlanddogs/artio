@@ -14,7 +14,6 @@ import VenuePublishPanel from "@/app/my/_components/VenuePublishPanel";
 import VenueArtistRequestsPanel from "@/app/my/_components/VenueArtistRequestsPanel";
 import { Button } from "@/components/ui/button";
 import { resolveVenueIdFromRouteParam } from "./route-param";
-import { VenueLocationMissingBanner } from "@/app/my/_components/VenueLocationMissingBanner";
 import VenueSetupHeader from "@/app/my/_components/VenueSetupHeader";
 import VenueCompletionProgress from "@/app/my/_components/VenueCompletionProgress";
 import VenueSetupSection from "@/app/my/_components/VenueSetupSection";
@@ -25,7 +24,7 @@ export default async function MyVenueEditPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }> ;
+  params: Promise<{ id: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
@@ -118,6 +117,9 @@ export default async function MyVenueEditPage({
   const checks = getVenueCompletionChecks(venue);
   const isOwner = memberRole === "OWNER" || user.role === "ADMIN";
 
+  const isCreatedFirstVisit = query.created === "1";
+  const firstRequired = !checks.basicInfo ? "basic" : !checks.location ? "location" : !checks.images ? "images" : "basic";
+
   return (
     <main className="space-y-6 p-6">
       <PageHeader
@@ -135,45 +137,68 @@ export default async function MyVenueEditPage({
 
       <VenueSetupHeader venue={{ name: venue.name, isPublished: venue.isPublished }} submissionStatus={submission?.status ?? null} />
 
-      {query.created === "1" ? <VenueCreatedDraftBanner venueId={venue.id} missingRequired={checks.missingRequired} /> : null}
+      {isCreatedFirstVisit ? <VenueCreatedDraftBanner venueId={venue.id} missingRequired={checks.missingRequired} /> : null}
 
       <VenueCompletionProgress checks={checks} />
 
+      {checks.publishReady && submission?.status !== "SUBMITTED" && !venue.isPublished ? (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-emerald-900">This venue is ready to submit for review.</p>
+            <Button asChild>
+              <Link href="#publish-panel">Submit for review</Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="order-2 space-y-4 lg:order-1 lg:col-span-2">
-          <VenueSetupSection title="Basic information" description="Name and description are required." complete={checks.basicInfo}>
-            <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} />
-          </VenueSetupSection>
+          <div id={`basic-section-${venue.id}`}>
+            <VenueSetupSection title="Basic information" description="Name and description are required." complete={checks.basicInfo} defaultOpen={!isCreatedFirstVisit || firstRequired === "basic"}>
+              <div className="space-y-4">
+                <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} />
+                <div className="text-right">
+                  <Link className="text-sm underline" href={`#location-section-${venue.id}`}>Next: Location</Link>
+                </div>
+              </div>
+            </VenueSetupSection>
+          </div>
 
           <div id={`location-section-${venue.id}`}>
-            <VenueSetupSection title="Location" description="Used for maps and nearby discovery." complete={checks.location}>
+            <VenueSetupSection title="Location" description="Used for maps and nearby discovery." complete={checks.location} defaultOpen={!isCreatedFirstVisit || firstRequired === "location"}>
               <div className="space-y-3">
-              {venue.lat == null || venue.lng == null ? <VenueLocationMissingBanner venueId={venue.id} /> : null}
-              <p className="text-sm text-muted-foreground">
-                {venue.lat != null && venue.lng != null
-                  ? `Coordinates set: ${venue.lat}, ${venue.lng}`
-                  : "Set latitude and longitude in Basic information, then retry geocoding if needed."}
-              </p>
+                <p className="text-sm text-muted-foreground">
+                  Location is complete when city and country are set. Coordinates are generated automatically after address updates.
+                </p>
+                <div className="text-right">
+                  <Link className="text-sm underline" href={`#images-section-${venue.id}`}>Next: Images</Link>
+                </div>
               </div>
             </VenueSetupSection>
           </div>
 
           <div id={`images-section-${venue.id}`}>
-            <VenueSetupSection title="Images" description="At least one image is required before submit." complete={checks.images}>
+            <VenueSetupSection title="Images" description="At least one image is required before submit." complete={checks.images} defaultOpen={!isCreatedFirstVisit || firstRequired === "images"}>
               <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">{venue.images.length} image{venue.images.length === 1 ? "" : "s"} uploaded.</p>
-              <VenueGalleryManager
-                venueId={venue.id}
-                initialImages={venue.images}
-                initialCover={{ featuredImageUrl: resolveImageUrl(venue.featuredAsset?.url, venue.featuredImageUrl) }}
-              />
+                <p className="text-sm text-muted-foreground">{venue.images.length} image{venue.images.length === 1 ? "" : "s"} uploaded.</p>
+                <VenueGalleryManager
+                  venueId={venue.id}
+                  initialImages={venue.images}
+                  initialCover={{ featuredImageUrl: resolveImageUrl(venue.featuredAsset?.url, venue.featuredImageUrl) }}
+                />
+                <div className="text-right">
+                  <Link className="text-sm underline" href={`#contact-section-${venue.id}`}>Next: Contact & details</Link>
+                </div>
               </div>
             </VenueSetupSection>
           </div>
 
-          <VenueSetupSection title="Contact & details" description="Optional but recommended for trust and discovery." complete={checks.contact}>
-            <p className="text-sm text-muted-foreground">Add website or Instagram in the form above.</p>
-          </VenueSetupSection>
+          <div id={`contact-section-${venue.id}`}>
+            <VenueSetupSection title="Contact & details" description="Optional but recommended for trust and discovery." complete={checks.contact} defaultOpen={!isCreatedFirstVisit}>
+              <p className="text-sm text-muted-foreground">Add website or Instagram in the form above.</p>
+            </VenueSetupSection>
+          </div>
         </section>
 
         <aside className="order-1 lg:order-2 lg:col-span-1">

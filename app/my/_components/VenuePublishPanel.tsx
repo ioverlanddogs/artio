@@ -48,6 +48,16 @@ export default function VenuePublishPanel({
           <li className="flex items-center justify-between"><span>Contact/Details</span><span>{checks.contact ? "✓" : "○"}</span></li>
         </ul>
 
+        <div className="rounded-md border bg-muted/20 p-3 text-sm">
+          <p className="font-medium">What happens next</p>
+          <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+            <li>Submitting sends your venue to the moderation queue for review.</li>
+            <li>We review core listing details like description, location, links, and images.</li>
+            <li>Most reviews are completed quickly, but timing can vary with queue volume.</li>
+            <li>You can continue editing while your submission is under review.</li>
+          </ul>
+        </div>
+
         {showPublished ? (
           <div className="space-y-1 text-sm">
             <p className="font-medium text-emerald-700">Published</p>
