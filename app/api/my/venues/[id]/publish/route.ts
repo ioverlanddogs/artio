@@ -16,9 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     requireVenueRole: (venueId) => requireVenueRole(venueId, "EDITOR"),
     findVenueForPublish: (venueId) => db.venue.findUnique({
       where: { id: venueId },
-      select: { id: true, slug: true, name: true, description: true, featuredAssetId: true, city: true, country: true, websiteUrl: true, deletedAt: true, isPublished: true },
+      select: { id: true, slug: true, name: true, description: true, featuredAssetId: true, city: true, country: true, lat: true, lng: true, websiteUrl: true, deletedAt: true, isPublished: true, status: true },
     }),
-    updateVenuePublishState: (venueId, isPublished) => db.venue.update({ where: { id: venueId }, data: { isPublished, deletedAt: null, deletedByAdminId: null, deletedReason: null }, select: { id: true, slug: true, name: true, description: true, featuredAssetId: true, city: true, country: true, websiteUrl: true, deletedAt: true, isPublished: true } }),
+    updateVenuePublishState: (venueId, isPublished) => db.venue.update({ where: { id: venueId }, data: { isPublished, status: isPublished ? "PUBLISHED" : "APPROVED", deletedAt: null, deletedByAdminId: null, deletedReason: null }, select: { id: true, slug: true, name: true, description: true, featuredAssetId: true, city: true, country: true, lat: true, lng: true, websiteUrl: true, deletedAt: true, isPublished: true, status: true } }),
     logAdminAction,
   });
 }

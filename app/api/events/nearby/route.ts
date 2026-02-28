@@ -8,6 +8,7 @@ import { distanceKm, getBoundingBox, isWithinRadiusKm } from "@/lib/geo";
 import { buildNearbyEventsFilters } from "@/lib/nearby-events";
 import { decodeNearbyCursor, encodeNearbyCursor } from "@/lib/nearby-cursor";
 import { nearbyEventsQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
+import { publishedEventWhere } from "@/lib/publish-status";
 
 export const runtime = "nodejs";
 
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
 
     const batch = (await db.event.findMany({
       where: {
-        isPublished: true,
+        ...publishedEventWhere(),
         deletedAt: null,
         AND: [...andFilters, { OR: [{ venueId: null }, { venue: { deletedAt: null } }] }],
       },

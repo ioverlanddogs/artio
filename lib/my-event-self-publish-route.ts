@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api";
 import { canSelfPublish } from "@/lib/auth";
 import type { AdminAuditInput } from "@/lib/admin-audit";
 import { evaluateEventReadiness } from "@/lib/publish-readiness";
+import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 
 type SessionUser = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN"; isTrustedPublisher?: boolean | null };
 
@@ -12,9 +13,12 @@ type EventRecord = {
   startAt: Date;
   endAt: Date | null;
   venueId: string | null;
+  timezone?: string | null;
   ticketUrl: string | null;
   isPublished: boolean;
   deletedAt: Date | null;
+  venue?: { status?: string | null; isPublished?: boolean | null } | null;
+  status?: string | null;
 };
 
 type Deps = {
@@ -37,6 +41,10 @@ export async function handleEventSelfPublish(req: NextRequest, input: { eventId:
     if (event.deletedAt) return apiError(409, "invalid_state", "Archived events cannot be directly published");
 
     if (input.isPublished) {
+      const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone ?? null, venue: event.venue ?? null });
+      if (blockers.length > 0) {
+        return NextResponse.json({ error: "publish_blocked", blockers }, { status: 409 });
+      }
       const readiness = evaluateEventReadiness(event, event.venueId ? { id: event.venueId } : null);
       if (!readiness.ready) {
         return NextResponse.json({ error: "NOT_READY", message: "Complete required fields before publishing.", blocking: readiness.blocking, warnings: readiness.warnings }, { status: 400 });

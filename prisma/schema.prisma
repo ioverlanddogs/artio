@@ -320,6 +320,7 @@ model Venue {
   featuredImageUrl   String?
   featuredAssetId    String?                  @db.Uuid
   isPublished        Boolean                  @default(false)
+  status             String                   @default("DRAFT")
   aiGenerated        Boolean                  @default(false)
   aiGeneratedAt      DateTime?
   claimStatus        VenueClaimStatus         @default(UNCLAIMED)
@@ -342,6 +343,7 @@ model Venue {
   claimRequests      VenueClaimRequest[]
 
   @@index([isPublished])
+  @@index([status])
   @@index([featuredAssetId])
   @@index([deletedAt])
   @@index([timezone])
@@ -448,6 +450,7 @@ model Event {
   lat           Float?
   lng           Float?
   isPublished   Boolean        @default(false)
+  status        String         @default("DRAFT")
   publishedAt   DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -468,6 +471,7 @@ model Event {
 
   @@index([startAt])
   @@index([isPublished])
+  @@index([status])
   @@index([venueId])
   @@index([featuredAssetId])
   @@index([isPublished, startAt])

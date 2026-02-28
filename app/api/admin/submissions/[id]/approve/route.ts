@@ -24,7 +24,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       },
     }),
     publishVenue: async (venueId) => {
-      await db.venue.update({ where: { id: venueId }, data: { isPublished: true } });
+      await db.venue.update({ where: { id: venueId }, data: { isPublished: true, status: "PUBLISHED" } });
     },
     setVenueDraft: async () => undefined,
     publishArtist: async (artistId) => {
@@ -32,7 +32,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     },
     setArtistDraft: async () => undefined,
     publishEvent: async (eventId) => {
-      await db.event.update({ where: { id: eventId }, data: { isPublished: true, publishedAt: new Date() } });
+      await db.event.update({ where: { id: eventId }, data: { isPublished: true, status: "PUBLISHED", publishedAt: new Date() } });
     },
     setEventDraft: async () => undefined,
     markApproved: async (submissionId, decidedByUserId) => {
@@ -43,6 +43,6 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     },
     markNeedsChanges: async () => undefined,
     findEventUpdatedAt: async (eventId) => { const item = await db.event.findUnique({ where: { id: eventId }, select: { updatedAt: true } }); return item?.updatedAt ?? null; },
-    applyEventRevisionUpdate: async (eventId, data) => { await db.event.update({ where: { id: eventId }, data: { ...data, isPublished: true } }); },
+    applyEventRevisionUpdate: async (eventId, data) => { await db.event.update({ where: { id: eventId }, data: { ...data, isPublished: true, status: "PUBLISHED" } }); },
   });
 }

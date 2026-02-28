@@ -14,12 +14,34 @@ function buildVenue(overrides: Partial<{ isPublished: boolean; deletedAt: Date |
     featuredAssetId: "asset-1",
     city: "London",
     country: "UK",
+    lat: 51.5,
+    lng: -0.12,
     websiteUrl: "https://example.com",
     deletedAt: null,
     isPublished: false,
     ...overrides,
   };
 }
+
+test("publish returns 409 publish_blocked when coordinates are missing", async () => {
+  let state = { ...buildVenue({ isPublished: false }), lat: null, lng: null };
+  const req = new NextRequest(`http://localhost/api/my/venues/${venueId}/publish`, { method: "POST" });
+
+  const res = await handleVenueSelfPublish(req, { venueId, isPublished: true }, {
+    requireVenueRole: async () => ({ id: "admin-1", email: "admin@example.com", name: "Admin", role: "ADMIN" }),
+    findVenueForPublish: async () => state,
+    updateVenuePublishState: async (_, isPublished) => {
+      state = { ...state, isPublished };
+      return state;
+    },
+    logAdminAction: async () => undefined,
+  });
+
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error, "publish_blocked");
+  assert.equal(Array.isArray(body.blockers), true);
+});
 
 test("ADMIN can publish own venue directly", async () => {
   let state = buildVenue({ isPublished: false });

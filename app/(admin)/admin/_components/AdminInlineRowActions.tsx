@@ -112,7 +112,11 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
       const payload = computeDraftPatch(initial, draft);
       const res = await requestInlinePatch(patchUrl, payload);
       if (!res.ok) {
-        const message = actionErrorMessage(res.status, "Save failed");
+        const body = await res.json().catch(() => null);
+        const blockerMessage = Array.isArray(body?.error?.details?.blockers)
+          ? `Publish blocked: ${body.error.details.blockers.map((b: { message?: string }) => b.message).filter(Boolean).join(" ")}`
+          : null;
+        const message = blockerMessage ?? actionErrorMessage(res.status, "Save failed");
         setRowError(message);
         enqueueToast({ title: message, variant: "error" });
         return;

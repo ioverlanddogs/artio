@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { resolveImageUrl } from "@/lib/assets";
 import { distanceKm, getBoundingBox, isWithinRadiusKm } from "@/lib/geo";
 import { nearbyVenuesQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
+import { publishedVenueWhere } from "@/lib/publish-status";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const batch = (await db.venue.findMany({
     where: {
-      isPublished: true,
+      ...publishedVenueWhere(),
       deletedAt: null,
       lat: { gte: box.minLat, lte: box.maxLat },
       lng: { gte: box.minLng, lte: box.maxLng },

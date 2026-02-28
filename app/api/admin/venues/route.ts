@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     await requireEditor();
     const parsed = adminVenueCreateSchema.safeParse(await parseBody(req));
     if (!parsed.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsed.error));
-    const item = await db.venue.create({ data: parsed.data });
+    const item = await db.venue.create({ data: { ...parsed.data, status: parsed.data.isPublished ? "PUBLISHED" : "DRAFT" } });
     return Response.json(item, { status: 201 });
   } catch {
     return apiError(403, "forbidden", "Editor role required");

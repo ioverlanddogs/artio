@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         startAt: new Date(startAt),
         endAt: endAt ? new Date(endAt) : null,
         isPublished: Boolean(isPublished),
+        status: isPublished ? "PUBLISHED" : "DRAFT",
         publishedAt: isPublished ? new Date() : null,
         eventTags: tagSlugs.length ? { create: tagSlugs.map((slug) => ({ tag: { connect: { slug } } })) } : undefined,
         eventArtists: artistSlugs.length ? { create: artistSlugs.map((slug) => ({ artist: { connect: { slug } } })) } : undefined,

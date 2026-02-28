@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { getSessionUser } from "@/lib/auth";
 import { slugParamSchema, zodDetails } from "@/lib/validators";
 import { followStatusResponse, getFollowersCount } from "@/lib/follow-counts";
+import { publishedVenueWhere } from "@/lib/publish-status";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ slug: stri
   const parsed = slugParamSchema.safeParse(await params);
   if (!parsed.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsed.error));
 
-  const venue = await db.venue.findFirst({ where: { slug: parsed.data.slug, isPublished: true }, select: { id: true } });
+  const venue = await db.venue.findFirst({ where: { slug: parsed.data.slug, ...publishedVenueWhere() }, select: { id: true } });
   if (!venue) return apiError(404, "not_found", "Venue not found");
 
   const user = await getSessionUser();

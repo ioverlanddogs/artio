@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
+import { computeEventPublishBlockers, computeVenuePublishBlockers } from "@/lib/publish-blockers";
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -35,6 +36,7 @@ const venuePatchSchema = z.object({
   timezone: z.string().trim().max(80).nullable().optional(),
   websiteUrl: z.string().trim().url().nullable().optional(),
   isPublished: z.boolean().optional(),
+  status: z.enum(["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "ARCHIVED"]).optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   featuredAssetId: z.string().uuid().nullable().optional(),
 }).strict();
@@ -46,6 +48,7 @@ const eventPatchSchema = z.object({
   venueId: z.string().uuid().nullable().optional(),
   ticketUrl: z.string().trim().url().nullable().optional(),
   isPublished: z.boolean().optional(),
+  status: z.enum(["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "ARCHIVED"]).optional(),
 }).strict().superRefine((data, ctx) => {
   if (data.startAt && data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
@@ -79,8 +82,8 @@ const importPreviewBodySchema = z.object({
 });
 
 const defaultFields = {
-  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "timezone", "websiteUrl", "isPublished", "description", "featuredAssetId", "deletedAt"] as const,
-  events: ["id", "title", "startAt", "endAt", "venueId", "ticketUrl", "isPublished", "deletedAt"] as const,
+  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "timezone", "websiteUrl", "isPublished", "status", "description", "featuredAssetId", "deletedAt"] as const,
+  events: ["id", "title", "startAt", "endAt", "venueId", "ticketUrl", "isPublished", "status", "deletedAt"] as const,
   artists: ["id", "name", "websiteUrl", "bio", "featuredAssetId", "isPublished", "deletedAt"] as const,
   artwork: ["id", "title", "slug", "artistId", "isPublished", "deletedAt"] as const,
 };
@@ -319,16 +322,47 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
       if (entity === "venues") {
         const before = await tx.venue.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
-        const patch = parsedBody.data as z.infer<typeof venuePatchSchema>;
+        const payload = parsedBody.data as z.infer<typeof venuePatchSchema>;
+        const patch: Prisma.VenueUpdateInput = { ...payload };
+        const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
+        if (wantsPublish) {
+          const blockers = computeVenuePublishBlockers(before);
+          if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);
+          patch.status = "PUBLISHED";
+          patch.isPublished = true;
+        } else if (payload.status === "REJECTED") {
+          patch.status = "REJECTED";
+          patch.isPublished = false;
+        } else if (payload.isPublished === false) {
+          patch.status = payload.status ?? "APPROVED";
+          patch.isPublished = false;
+        }
         const row = await tx.venue.update({ where: { id: entityId }, data: patch });
-        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "venue", targetId: entityId, metadata: { entityType: "venue", entityId, before, after: patch, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
+        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "venue", targetId: entityId, metadata: { entityType: "venue", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
         return row;
       }
       if (entity === "events") {
         const before = await tx.event.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const payload = parsedBody.data as z.infer<typeof eventPatchSchema>;
-        const patch = { ...payload, ...(payload.startAt ? { startAt: new Date(payload.startAt) } : {}), ...(payload.endAt !== undefined ? { endAt: payload.endAt ? new Date(payload.endAt) : null } : {}) };
+        const patch: Prisma.EventUpdateInput = { ...payload, ...(payload.startAt ? { startAt: new Date(payload.startAt) } : {}), ...(payload.endAt !== undefined ? { endAt: payload.endAt ? new Date(payload.endAt) : null } : {}) };
+        const venue = before.venueId ? await tx.venue.findUnique({ where: { id: before.venueId }, select: { status: true, isPublished: true } }) : null;
+        const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
+        if (wantsPublish) {
+          const blockers = computeEventPublishBlockers({ startAt: before.startAt, timezone: before.timezone, venue });
+          if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);
+          patch.status = "PUBLISHED";
+          patch.isPublished = true;
+          patch.publishedAt = new Date();
+        } else if (payload.status === "REJECTED") {
+          patch.status = "REJECTED";
+          patch.isPublished = false;
+          patch.publishedAt = null;
+        } else if (payload.isPublished === false) {
+          patch.status = payload.status ?? "APPROVED";
+          patch.isPublished = false;
+          patch.publishedAt = null;
+        }
         const row = await tx.event.update({ where: { id: entityId }, data: patch });
         await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "event", targetId: entityId, metadata: { entityType: "event", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
         return row;
@@ -353,6 +387,10 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
   } catch (error) {
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
     if (error instanceof Error && error.message === "not_found") return apiError(404, "not_found", "Entity not found");
+    if (error instanceof Error && error.message.startsWith("publish_blocked:")) {
+      const blockers = JSON.parse(error.message.slice("publish_blocked:".length));
+      return apiError(409, "publish_blocked", "Publishing is blocked", { blockers });
+    }
     return apiError(401, "unauthorized", "Authentication required");
   }
 }

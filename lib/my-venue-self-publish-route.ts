@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api";
 import { canSelfPublish, type SessionUser } from "@/lib/auth";
 import type { AdminAuditInput } from "@/lib/admin-audit";
 import { evaluateVenueReadiness } from "@/lib/publish-readiness";
+import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
 
 type VenueRecord = {
   id: string;
@@ -12,9 +13,12 @@ type VenueRecord = {
   featuredAssetId: string | null;
   city: string | null;
   country: string | null;
+  lat?: number | null;
+  lng?: number | null;
   websiteUrl: string | null;
   deletedAt: Date | null;
   isPublished: boolean;
+  status?: string | null;
 };
 
 type Deps = {
@@ -34,6 +38,10 @@ export async function handleVenueSelfPublish(req: NextRequest, input: { venueId:
     if (venue.deletedAt) return apiError(409, "invalid_state", "Archived venues cannot be directly published");
 
     if (input.isPublished) {
+      const blockers = computeVenuePublishBlockers(venue);
+      if (blockers.length > 0) {
+        return NextResponse.json({ error: "publish_blocked", blockers }, { status: 409 });
+      }
       const readiness = evaluateVenueReadiness(venue);
       if (!readiness.ready) {
         return NextResponse.json({ error: "NOT_READY", message: "Complete required fields before publishing.", blocking: readiness.blocking, warnings: readiness.warnings }, { status: 400 });

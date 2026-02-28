@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
+import { publishedEventWhere, publishedVenueWhere } from "@/lib/publish-status";
 
 type SItem = { slug: string; updatedAt?: Date };
 
@@ -25,8 +26,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const [eventsRaw, venuesRaw, artistsRaw] = await Promise.all([
-      db.event.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }) as Promise<SItem[]>,
-      db.venue.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }) as Promise<SItem[]>,
+      db.event.findMany({ where: publishedEventWhere(), select: { slug: true, updatedAt: true } }) as Promise<SItem[]>,
+      db.venue.findMany({ where: publishedVenueWhere(), select: { slug: true, updatedAt: true } }) as Promise<SItem[]>,
       db.artist.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }) as Promise<SItem[]>,
     ]);
 

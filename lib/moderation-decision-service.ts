@@ -57,10 +57,10 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
         await tx.artist.update({ where: { id: submission.targetArtistId }, data: { isPublished: true } });
       }
       if (submission.type === "VENUE" && submission.targetVenueId) {
-        await tx.venue.update({ where: { id: submission.targetVenueId }, data: { isPublished: true } });
+        await tx.venue.update({ where: { id: submission.targetVenueId }, data: { isPublished: true, status: "PUBLISHED" } });
       }
       if (submission.type === "EVENT" && submission.targetEventId) {
-        await tx.event.update({ where: { id: submission.targetEventId }, data: { isPublished: true, publishedAt: decidedAt } });
+        await tx.event.update({ where: { id: submission.targetEventId }, data: { isPublished: true, status: "PUBLISHED", publishedAt: decidedAt } });
       }
     }
 

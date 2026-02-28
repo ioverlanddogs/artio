@@ -11,6 +11,7 @@ import { captureException } from "@/lib/telemetry";
 import { collectGeoFilteredPage } from "@/lib/events-geo-pagination";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { resolveEntityPrimaryImage } from "@/lib/public-images";
+import { publishedEventWhere } from "@/lib/publish-status";
 
 type EventWithJoin = {
   id: string;
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
       const queryStartedAt = performance.now();
       const rows = (await db.event.findMany({
         where: {
-          isPublished: true,
+          ...publishedEventWhere(),
           deletedAt: null,
           AND: [...batchFilters, { OR: [{ venueId: null }, { venue: { deletedAt: null } }] }],
         },

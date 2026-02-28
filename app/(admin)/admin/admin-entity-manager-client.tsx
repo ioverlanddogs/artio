@@ -311,7 +311,12 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                         : String(item[field] ?? "")}
                     </td>
                   ))}
-                  <td className="px-3 py-2">{item.deletedAt ? <span className="rounded border px-2 py-0.5 text-xs">Archived</span> : null}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {typeof item.status === "string" ? <span className="rounded border px-2 py-0.5 text-xs">{item.status}</span> : null}
+                      {item.deletedAt ? <span className="rounded border px-2 py-0.5 text-xs">Archived</span> : null}
+                    </div>
+                  </td>
                   <td className="px-3 py-2">
                     <AdminInlineRowActions
                       entityLabel={entityLabelForEntity(entity)}
