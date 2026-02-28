@@ -1,5 +1,6 @@
 import Link from "next/link";
 import VenueSubmitButton from "@/app/my/_components/VenueSubmitButton";
+import DirectPublishButton from "@/app/my/_components/DirectPublishButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type SubmissionStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | null;
@@ -40,7 +41,7 @@ export default function VenuePublishPanel({
     <Card id="publish-panel" className="lg:sticky lg:top-4">
       <CardHeader>
         <CardTitle className="text-lg">Publish venue</CardTitle>
-        <CardDescription>{canPublishDirectly ? "Complete required items, then use admin moderation controls to publish." : "Complete required items before submitting for review."}</CardDescription>
+        <CardDescription>{canPublishDirectly ? "Trusted users can publish or unpublish directly from this panel." : "Complete required items before submitting for review."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <ul className="space-y-2 text-sm">
@@ -51,12 +52,12 @@ export default function VenuePublishPanel({
         </ul>
 
         <div className="rounded-md border bg-muted/20 p-3 text-sm">
-          <p className="font-medium">{canPublishDirectly ? "Admin publish control" : "What happens next"}</p>
+          <p className="font-medium">{canPublishDirectly ? "Direct publish control" : "What happens next"}</p>
           <ul className="mt-1 list-disc pl-5 text-muted-foreground">
             {canPublishDirectly ? (
               <>
-                <li>As an admin, you can publish this venue directly from moderation controls.</li>
-                <li>Submission endpoints remain available for standard review workflows.</li>
+                <li>Publish immediately when checks are complete.</li>
+                <li>Unpublish without archiving if you need to make changes.</li>
               </>
             ) : (
               <>
@@ -69,36 +70,44 @@ export default function VenuePublishPanel({
           </ul>
         </div>
 
-        {showPublished ? (
-          <div className="space-y-1 text-sm">
-            <p className="font-medium text-emerald-700">Published</p>
-            <Link className="underline" href={`/venues/${venue.slug}`}>View public page</Link>
-          </div>
-        ) : showAwaitingReview ? (
-          <p className="text-sm font-medium text-muted-foreground">Awaiting review (Admin queue)</p>
-        ) : (
-          <div className="space-y-2">
-            {checks.publishReady ? (
-              <p className="text-sm font-medium text-emerald-700">{canPublishDirectly ? "Ready for admin publish control" : "Ready to submit for admin approval"}</p>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-sm font-medium">What&apos;s missing</p>
-                <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                  {checks.missingRequired.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        <div className="space-y-2">
+          {showPublished ? (
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-emerald-700">Published</p>
+              <Link className="underline" href={`/venues/${venue.slug}`}>View public page</Link>
+            </div>
+          ) : showAwaitingReview ? (
+            <p className="text-sm font-medium text-muted-foreground">Awaiting review (Admin queue)</p>
+          ) : checks.publishReady ? (
+            <p className="text-sm font-medium text-emerald-700">{canPublishDirectly ? "Ready to publish directly" : "Ready to submit for admin approval"}</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">What&apos;s missing</p>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {checks.missingRequired.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {canPublishDirectly ? (
+            <DirectPublishButton
+              endpoint={showPublished ? `/api/my/venues/${venue.id}/unpublish` : `/api/my/venues/${venue.id}/publish`}
+              entityPath={`/my/venues/${venue.id}`}
+              nextPublished={!showPublished}
+              disabled={!showPublished && (!checks.publishReady || !isOwner)}
+            />
+          ) : (
             <VenueSubmitButton
               venueId={venue.id}
               isReady={checks.publishReady && isOwner}
-              ctaLabel={canPublishDirectly ? "Submit to review queue" : "Submit for review"}
+              ctaLabel="Submit for review"
               blocking={checks.missingRequired.map(blockingItemFromMissing)}
               initialStatus={submissionStatus}
             />
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );

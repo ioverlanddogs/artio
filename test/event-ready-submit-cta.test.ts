@@ -7,9 +7,10 @@ test("event setup page renders sticky EventPublishPanel", () => {
   assert.match(page, /<EventPublishPanel/);
 });
 
-test("publish panel wires submit button disabled state to readiness", () => {
+test("publish panel wires submit and direct publish controls", () => {
   const panel = readFileSync("app/my/_components/EventPublishPanel.tsx", "utf8");
   assert.match(panel, /isReady=\{checks\.readyToSubmit\}/);
+  assert.match(panel, /<DirectPublishButton/);
 });
 
 test("location section shows fix venue location link when coords are missing", () => {

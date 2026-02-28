@@ -9,8 +9,8 @@ test("venue setup page renders publish panel CTA instead of header CTA", () => {
   assert.match(page, /<VenuePublishPanel/);
   assert.doesNotMatch(page, /actions=\{\([\s\S]*VenueSubmitButton/);
   assert.match(panel, /<VenueSubmitButton/);
-  assert.match(panel, /Publish venue/);
-  assert.match(panel, /ctaLabel=\{canPublishDirectly \? "Submit to review queue" : "Submit for review"\}/);
+  assert.match(panel, /<DirectPublishButton/);
+  assert.match(panel, /canPublishDirectly \? \(/);
 });
 
 
