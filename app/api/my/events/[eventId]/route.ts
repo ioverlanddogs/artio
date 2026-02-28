@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
       include: { venue: { select: { memberships: { where: { userId }, select: { id: true } } } }, targetEvent: { select: { isPublished: true } } },
     }),
     countOwnedAssets: (assetIds, userId) => db.asset.count({ where: { id: { in: assetIds }, ownerUserId: userId } }),
+    hasVenueMembership: async (userId, venueId) => Boolean(await db.venueMembership.findUnique({ where: { userId_venueId: { userId, venueId } }, select: { id: true } })),
     updateEvent: (eventId, data) => db.event.update({
       where: { id: eventId },
       data: {
@@ -22,6 +23,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
         ...(data.timezone !== undefined ? { timezone: data.timezone } : {}),
         ...(data.startAt !== undefined ? { startAt: data.startAt } : {}),
         ...(data.endAt !== undefined ? { endAt: data.endAt } : {}),
+        ...(data.venueId !== undefined
+          ? {
+              venue: data.venueId
+                ? { connect: { id: data.venueId } }
+                : { disconnect: true },
+            }
+          : {}),
         ...(data.featuredAssetId !== undefined
           ? {
               featuredAsset: data.featuredAssetId
@@ -46,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
         publishedAt: null,
       },
     }),
+    updateSubmissionVenue: (submissionId, venueId) => db.submission.update({ where: { id: submissionId }, data: { venueId } }).then(() => undefined),
     updateSubmissionNote: (submissionId, note) => db.submission.update({ where: { id: submissionId }, data: { note } }).then(() => undefined),
   });
 }

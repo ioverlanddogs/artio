@@ -126,9 +126,9 @@ export default async function MyVenueEditPage({
         actions={(
           <div className="flex flex-col items-start gap-1 md:items-end">
             <Button asChild>
-              <Link href={`/my/venues/${venueId}/submit-event`}>Submit Event</Link>
+              <Link href={`/my/events?venueId=${venue.id}`}>View events</Link>
             </Button>
-            <p className="text-xs text-muted-foreground">Create and submit events for this venue</p>
+            <p className="text-xs text-muted-foreground">View and manage events for this venue</p>
           </div>
         )}
       />

@@ -42,6 +42,7 @@ test("/my venue cards use status-aware primary CTAs", () => {
   assert.doesNotMatch(source, /\/submit-event/);
   assert.match(source, /Edit venue/);
   assert.match(source, /View events/);
+  assert.match(source, /href=\{`\/my\/events\?venueId=\$\{venue\.id\}`\}>View events</);
 });
 
 test("/my includes section empty states", () => {

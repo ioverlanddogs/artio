@@ -627,6 +627,7 @@ export const myEventPatchSchema = z.object({
   timezone: z.string().trim().min(1).optional(),
   startAt: isoDatetimeSchema.optional(),
   endAt: isoDatetimeSchema.optional().nullable(),
+  venueId: z.string().uuid().optional().nullable(),
   images: z.array(eventImageSchema).optional(),
   featuredAssetId: z.string().uuid().optional().nullable(),
   note: z.string().trim().max(2000).optional().nullable(),

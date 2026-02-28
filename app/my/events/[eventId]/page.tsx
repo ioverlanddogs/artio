@@ -45,6 +45,12 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
   const submissionStatus = event.submissions[0]?.status ?? null;
   const checks = getEventCompletionChecks({ event, venueForEvent: event.venue });
 
+  const managedVenueMemberships = await db.venueMembership.findMany({
+    where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] } },
+    select: { venueId: true, venue: { select: { name: true } } },
+  });
+  const managedVenues = managedVenueMemberships.map((membership) => ({ id: membership.venueId, name: membership.venue.name }));
+
   return (
     <main className="space-y-6 p-6">
       <PageHeader title="Event Setup" subtitle="Complete your event details and submit for review." />
@@ -55,10 +61,10 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="order-2 space-y-4 lg:order-1 lg:col-span-2">
           <EventSetupSection title="Basic information" description="Title and venue selection are required." complete={checks.basics}>
-            <EventBasicsForm event={{ id: event.id, title: event.title }} />
-            <p className="mt-3 text-sm text-muted-foreground">
-              Venue: {event.venue ? event.venue.name : "No venue selected"}. {event.venueId ? null : <Link href="/my/events/new" className="underline">Assign venue from event creation flow</Link>}
-            </p>
+            <EventBasicsForm
+              event={{ id: event.id, title: event.title, venueId: event.venueId }}
+              venues={managedVenues}
+            />
           </EventSetupSection>
 
           <EventSetupSection title="Schedule" description="Start time is required. End time must be after start." complete={checks.schedule}>

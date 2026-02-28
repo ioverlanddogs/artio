@@ -46,12 +46,22 @@ function EventFieldSaveForm({ eventId, payload, children }: { eventId: string; p
   );
 }
 
-export function EventBasicsForm({ event }: { event: { id: string; title: string } }) {
+type VenueOption = { id: string; name: string };
+
+export function EventBasicsForm({ event, venues }: { event: { id: string; title: string; venueId: string | null }; venues: VenueOption[] }) {
   const [title, setTitle] = useState(event.title);
+  const [venueId, setVenueId] = useState(event.venueId ?? "");
 
   return (
-    <EventFieldSaveForm eventId={event.id} payload={() => ({ title })}>
+    <EventFieldSaveForm eventId={event.id} payload={() => ({ title, venueId: venueId || null })}>
       <label className="block" id="title"><span className="text-sm">Title</span><input className="w-full rounded border p-2" value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      <label className="block" id="venueId">
+        <span className="text-sm">Venue (optional)</span>
+        <select className="w-full rounded border p-2" value={venueId} onChange={(e) => setVenueId(e.target.value)}>
+          <option value="">No venue yet</option>
+          {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
+        </select>
+      </label>
     </EventFieldSaveForm>
   );
 }
