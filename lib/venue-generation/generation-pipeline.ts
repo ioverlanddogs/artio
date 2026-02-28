@@ -1,12 +1,35 @@
-import { VenueClaimStatus, type Prisma } from "@prisma/client";
+import { type Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 import { geocodeVenueAddressToLatLng } from "@/lib/geocode/mapbox-forward";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
 
+type ResponseOutputContentItem = {
+  type?: string;
+  json?: unknown;
+  text?: string;
+};
+
+type ResponseOutputItem = {
+  content?: ResponseOutputContentItem[];
+};
+
 type OpenAIResponse = {
+  output?: ResponseOutputItem[];
+  response?: { output?: ResponseOutputItem[] };
   output_parsed?: unknown;
   output_text?: string;
 };
+
+export class VenueGenerationError extends Error {
+  constructor(
+    public code: "OPENAI_HTTP_ERROR" | "OPENAI_BAD_OUTPUT" | "OPENAI_SCHEMA_MISMATCH",
+    message: string,
+    public details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
 
 type PipelineDb = {
   venue: {
@@ -32,12 +55,51 @@ function toJsonOpeningHours(value: string | null): Prisma.InputJsonValue | undef
   return { raw: value };
 }
 
-function parseOpenAIJson(raw: OpenAIResponse): unknown {
+function getOutputItems(raw: OpenAIResponse): ResponseOutputItem[] {
+  return [...(raw.output ?? []), ...(raw.response?.output ?? [])];
+}
+
+export function getStructuredPayloadFromResponses(raw: OpenAIResponse): unknown {
   if (raw.output_parsed !== undefined) return raw.output_parsed;
-  if (typeof raw.output_text === "string" && raw.output_text.trim()) {
-    return JSON.parse(raw.output_text);
+
+  for (const item of getOutputItems(raw)) {
+    for (const contentItem of item.content ?? []) {
+      if ((contentItem.type === "output_json" || contentItem.type === "json_schema") && contentItem.json !== undefined) {
+        return contentItem.json;
+      }
+    }
   }
-  throw new Error("missing_model_output");
+
+  if (typeof raw.output_text === "string" && raw.output_text.trim().length > 0) {
+    try {
+      return JSON.parse(raw.output_text);
+    } catch {
+      // Continue to other payload locations.
+    }
+  }
+
+  for (const item of getOutputItems(raw)) {
+    for (const contentItem of item.content ?? []) {
+      if (contentItem.type === "output_text" && typeof contentItem.text === "string" && contentItem.text.trim().length > 0) {
+        try {
+          return JSON.parse(contentItem.text);
+        } catch {
+          // Continue scanning output_text items.
+        }
+      }
+    }
+  }
+
+  throw new VenueGenerationError("OPENAI_BAD_OUTPUT", "OpenAI response did not include structured JSON output", {
+    hasOutputParsed: raw.output_parsed !== undefined,
+    hasOutputText: typeof raw.output_text === "string" && raw.output_text.length > 0,
+    outputItems: getOutputItems(raw).length,
+    contentTypes: getOutputItems(raw)
+      .flatMap((item) => item.content ?? [])
+      .map((item) => item.type)
+      .filter((type): type is string => typeof type === "string")
+      .slice(0, 20),
+  });
 }
 
 function venuePrompt(input: VenueGenerationInput) {
@@ -99,7 +161,19 @@ export async function runVenueGenerationPipeline(args: {
     },
   });
 
-  const parsed = generatedVenuesResponseSchema.parse(parseOpenAIJson(response));
+  const payload = getStructuredPayloadFromResponses(response);
+
+  let parsed: ReturnType<typeof generatedVenuesResponseSchema.parse>;
+  try {
+    parsed = generatedVenuesResponseSchema.parse(payload);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new VenueGenerationError("OPENAI_SCHEMA_MISMATCH", "OpenAI output did not match venue schema", {
+        issues: error.issues,
+      });
+    }
+    throw error;
+  }
   const geocodeFn = args.geocode ?? geocodeVenueAddressToLatLng;
 
   let totalCreated = 0;
@@ -150,7 +224,7 @@ export async function runVenueGenerationPipeline(args: {
         isPublished: false,
         aiGenerated: true,
         aiGeneratedAt: new Date(),
-        claimStatus: VenueClaimStatus.UNCLAIMED,
+        claimStatus: "UNCLAIMED",
       },
     });
 
@@ -201,7 +275,11 @@ export async function createOpenAIResponsesClient(args: { apiKey: string }) {
       });
 
       if (!response.ok) {
-        throw new Error(`openai_error_${response.status}`);
+        const responseText = await response.text().catch(() => "");
+        throw new VenueGenerationError("OPENAI_HTTP_ERROR", "OpenAI venue generation request failed", {
+          status: response.status,
+          responseTextPrefix: responseText.slice(0, 500),
+        });
       }
 
       return (await response.json()) as OpenAIResponse;
