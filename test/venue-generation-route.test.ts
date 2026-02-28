@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { handleVenueGenerationPost } from "../app/api/admin/venue-generation/route";
+import { handleVenueGenerationPost } from "../lib/venue-generation/admin-venue-generation-handler";
 import { VenueGenerationError } from "../lib/venue-generation/generation-pipeline";
 
 test("POST /api/admin/venue-generation returns 502 with stable code when model output is missing", async () => {
