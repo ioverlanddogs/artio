@@ -45,6 +45,7 @@ export function buildEditableDraft<T extends Record<string, unknown>>(
 export function computeDraftPatch(initial: Record<string, unknown>, draft: Record<string, unknown>) {
   const payload: Record<string, unknown> = {};
   Object.entries(draft).forEach(([key, value]) => {
+    if (key === "isPublished" || key === "status") return;
     const initialValue = initial[key];
     if (value !== initialValue) payload[key] = value;
   });
@@ -65,6 +66,14 @@ export async function requestInlinePatch(patchUrl: string, payload: Record<strin
 }
 
 export async function requestInlineArchiveToggle(url: string, fetchImpl: typeof fetch = fetch) {
+  return fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+}
+
+export async function requestLifecycleTransition(url: string, fetchImpl: typeof fetch = fetch) {
   return fetchImpl(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -116,7 +125,8 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
   const mutateDone = useMemo(() => onAfterMutate ?? (() => router.refresh()), [onAfterMutate, router]);
   const controlsDisabled = isSaving || isArchiving || isDeleting || isPublishing;
   const supportsModeratedPublish = entityType === "events" || entityType === "venues";
-  const canPublish = status === "APPROVED" && publishBlockers.length === 0;
+  const canPublish = status === "APPROVED";
+  const canUnpublish = status === "PUBLISHED";
   const readiness = getReadinessLabel(status, publishBlockers);
 
   async function save() {
@@ -144,24 +154,53 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
     }
   }
 
-  async function publish() {
-    if (!supportsModeratedPublish || !canPublish) return;
+  function formatBlockers(blockers: unknown) {
+    if (!Array.isArray(blockers) || blockers.length === 0) return null;
+    const messages = blockers
+      .map((blocker) => {
+        if (typeof blocker === "string") return blocker;
+        if (blocker && typeof blocker === "object" && "message" in blocker) return String((blocker as { message?: unknown }).message ?? "");
+        return "";
+      })
+      .filter(Boolean);
+    return messages.length > 0 ? messages.join(" ") : null;
+  }
+
+  async function runLifecycleTransition(url: string, successTitle: string, failureTitle: string) {
     setRowError(null);
     setIsPublishing(true);
     try {
-      const res = await requestInlinePatch(patchUrl, { status: "PUBLISHED", isPublished: true });
+      const res = await requestLifecycleTransition(url);
       if (!res.ok) {
-        const message = actionErrorMessage(res.status, "Publish failed");
+        const body = await res.json().catch(() => null);
+        const blockerMessage = res.status === 409 && body?.error === "publish_blocked"
+          ? formatBlockers(body?.blockers)
+          : null;
+        const message = blockerMessage ? `Publish blocked: ${blockerMessage}` : actionErrorMessage(res.status, failureTitle);
         setRowError(message);
         enqueueToast({ title: message, variant: "error" });
         return;
       }
-      enqueueToast({ title: `${entityLabel} published` });
-      mutateDone();
+      enqueueToast({ title: successTitle });
+      onCancelEdit();
+      router.refresh();
     } finally {
       setIsPublishing(false);
     }
   }
+
+  async function publish() {
+    if (!supportsModeratedPublish || !canPublish) return;
+    const url = entityType === "venues" ? `/api/admin/venues/${id}/publish` : `/api/admin/events/${id}/publish`;
+    await runLifecycleTransition(url, `${entityLabel} published`, "Publish failed");
+  }
+
+  async function unpublish() {
+    if (!supportsModeratedPublish || !canUnpublish) return;
+    const url = entityType === "venues" ? `/api/admin/venues/${id}/unpublish` : `/api/admin/events/${id}/unpublish`;
+    await runLifecycleTransition(url, `${entityLabel} unpublished`, "Unpublish failed");
+  }
+
 
   function cancel() {
     setDraft(buildEditableDraft(initial, editable));
@@ -235,9 +274,15 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
           </Button>
         )}
 
-        {supportsModeratedPublish ? (
+        {supportsModeratedPublish && canPublish ? (
           <Button type="button" size="sm" onClick={() => void publish()} disabled={controlsDisabled || !canPublish}>
             {isPublishing ? "Publishing…" : "Publish"}
+          </Button>
+        ) : null}
+
+        {supportsModeratedPublish && canUnpublish ? (
+          <Button type="button" size="sm" variant="outline" onClick={() => void unpublish()} disabled={controlsDisabled || !canUnpublish}>
+            {isPublishing ? "Working…" : "Unpublish"}
           </Button>
         ) : null}
 

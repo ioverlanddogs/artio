@@ -371,7 +371,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
                   ))}
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
-                      {typeof item.status === "string" ? <span className="rounded border px-2 py-0.5 text-xs">{item.status}</span> : null}
+                      {typeof item.status === "string" ? <span className="rounded border px-2 py-0.5 text-xs">{displayStatus(item.status)}</span> : null}
                       {item.deletedAt ? <span className="rounded border px-2 py-0.5 text-xs">Archived</span> : null}
                     </div>
                   </td>
@@ -423,33 +423,27 @@ function editableFieldsForEntity(entity: EntityName): EditableField[] {
       { key: "title", label: "Title", type: "text" },
       { key: "startAt", label: "Start at", type: "datetime" },
       { key: "endAt", label: "End at", type: "datetime" },
-      { key: "isPublished", label: "Published", type: "checkbox" },
-    ] as const;
+          ] as const;
   }
   if (entity === "venues") {
     return [
       { key: "name", label: "Name", type: "text" },
       { key: "city", label: "City", type: "text" },
       { key: "country", label: "Country", type: "text" },
-      { key: "isPublished", label: "Published", type: "checkbox" },
-    ] as const;
+          ] as const;
   }
   return [
     { key: "name", label: "Name", type: "text" },
-    { key: "isPublished", label: "Published", type: "checkbox" },
-  ] as const;
+      ] as const;
+}
+
+
+function displayStatus(status: string) {
+  if (status === "IN_REVIEW") return "PENDING_REVIEW";
+  return status;
 }
 
 function renderEditableField({ field, value, onChange }: { field: string; value: unknown; onChange: (value: unknown) => void }) {
-  if (field === "isPublished") {
-    return (
-      <label className="flex items-center gap-2 text-xs">
-        <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
-        Published
-      </label>
-    );
-  }
-
   if (field === "startAt" || field === "endAt") {
     const iso = typeof value === "string" ? value : "";
     return (
