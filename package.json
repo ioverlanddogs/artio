@@ -24,7 +24,8 @@
     "check-env": "node scripts/check-env.mjs",
     "perf:smoke": "node scripts/perf-smoke.mjs",
     "vercel:build": "node scripts/check-env.mjs && AUTH_SECRET=${AUTH_SECRET:-dev-secret} next build",
-    "vercel:install": "pnpm install --frozen-lockfile"
+    "vercel:install": "pnpm install --frozen-lockfile",
+    "prisma:safe-deploy": "tsx scripts/prisma-safe-deploy.ts"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.20",

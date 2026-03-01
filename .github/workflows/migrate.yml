@@ -88,11 +88,15 @@ jobs:
           node -e "console.log('DIRECT_URL host:', new URL(process.env.DIRECT_URL).hostname)"
           node -e "process.exit(new URL(process.env.DIRECT_URL).hostname.includes('-pooler') ? 1 : 0)"
 
+
+      - name: Generate Prisma Client
+        run: pnpm prisma:generate
+
       - name: Migrate deploy
         env:
           DATABASE_URL: ${{ steps.neon.outputs.database_url }}
           DIRECT_URL: ${{ steps.neon.outputs.direct_url }}
-        run: pnpm prisma migrate deploy
+        run: pnpm prisma:safe-deploy
 
       - name: Check migration status after deploy
         env:
@@ -100,8 +104,6 @@ jobs:
           DIRECT_URL: ${{ steps.neon.outputs.direct_url }}
         run: pnpm prisma migrate status
 
-      - name: Generate Prisma Client
-        run: pnpm prisma generate
 
       - name: Verify tables exist
         env:
