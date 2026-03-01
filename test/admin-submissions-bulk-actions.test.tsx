@@ -22,6 +22,19 @@ test("bulk approve/reject call existing endpoints and do a single refresh after 
   assert.match(source, /title: action === "approve" \? "Bulk approve completed" : "Bulk reject completed"/);
 });
 
+test("bulk publish button is disabled when no approved rows are selected", () => {
+  assert.match(source, /const selectedPublishableCount = useMemo\(/);
+  assert.match(source, /disabled=\{isBulkRunning \|\| selectedPublishableCount === 0\}/);
+});
+
+test("bulk publish records partial failures and renders blocked summary", () => {
+  assert.match(source, /const blocked: Array<\{ id: string; title: string; blockers: string\[] \}> = \[]/);
+  assert.match(source, /if \(result\.status === "blocked"\)/);
+  assert.match(source, /setPublishSummary\(\{ succeeded, blocked \}\)/);
+  assert.match(source, /Bulk publish summary/);
+  assert.match(source, /blocked\.length \? `, \$\{publishSummary\.blocked\.length\} blocked\.` : "\."/);
+});
+
 test("bulk reject dialog includes shared reason and confirm", () => {
   assert.match(source, /<Dialog open=\{bulkRejectDialogOpen\} onOpenChange=\{setBulkRejectDialogOpen\}>/);
   assert.match(source, /Reason \(optional\)/);

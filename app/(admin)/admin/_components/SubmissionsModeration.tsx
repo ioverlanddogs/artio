@@ -182,6 +182,12 @@ export default function SubmissionsModeration({ items }: { items: SubmissionItem
   const actionableItems = useMemo(() => items.filter((item) => item.status === "SUBMITTED"), [items]);
   const actionableById = useMemo(() => new Map(actionableItems.map((item) => [item.id, item])), [actionableItems]);
   const selectableIds = useMemo(() => items.filter((item) => item.status === "SUBMITTED" || (item.status === "APPROVED" && Boolean(getPublishTarget(item)))).map((item) => item.id), [items]);
+  const selectedPublishableCount = useMemo(() => {
+    return [...selectedIds].filter((id) => {
+      const item = items.find((entry) => entry.id === id);
+      return item?.status === "APPROVED" && Boolean(getPublishTarget(item));
+    }).length;
+  }, [items, selectedIds]);
   const selectedSubmissionId = searchParams.get("submissionId");
   const selectedSubmission = items.find((item) => item.id === selectedSubmissionId) ?? null;
 
@@ -354,7 +360,7 @@ export default function SubmissionsModeration({ items }: { items: SubmissionItem
             <Button size="sm" disabled={isBulkRunning} onClick={() => setBulkApproveDialogOpen(true)}>
               {isBulkRunning && bulkAction === "approve" ? "Approving…" : "Approve selected"}
             </Button>
-            <Button size="sm" variant="secondary" disabled={isBulkRunning} onClick={() => void runBulkPublish()}>
+            <Button size="sm" variant="secondary" disabled={isBulkRunning || selectedPublishableCount === 0} onClick={() => void runBulkPublish()}>
               {isBulkRunning && bulkAction === "publish" ? "Publishing…" : "Publish selected"}
             </Button>
             <Button size="sm" variant="outline" disabled={isBulkRunning} onClick={() => setBulkRejectDialogOpen(true)}>
