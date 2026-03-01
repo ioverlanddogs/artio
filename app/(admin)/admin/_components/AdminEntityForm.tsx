@@ -46,8 +46,16 @@ export default function AdminEntityForm({
       if (res.status === 409 && body?.error?.code === "publish_blocked") {
         const blockers: unknown[] = Array.isArray(body?.error?.details?.blockers) ? body.error.details.blockers : [];
         const nextFieldErrors = blockers.reduce<Record<string, string>>((acc, blocker) => {
-          if (typeof blocker?.id === "string" && typeof blocker?.message === "string") {
-            acc[blocker.id] = blocker.message;
+          if (
+            blocker !== null &&
+            typeof blocker === "object" &&
+            "id" in blocker &&
+            "message" in blocker &&
+            typeof (blocker as Record<string, unknown>).id === "string" &&
+            typeof (blocker as Record<string, unknown>).message === "string"
+          ) {
+            acc[(blocker as Record<string, unknown>).id as string] =
+              (blocker as Record<string, unknown>).message as string;
           }
           return acc;
         }, {});
