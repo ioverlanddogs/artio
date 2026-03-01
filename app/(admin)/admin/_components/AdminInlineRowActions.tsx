@@ -88,8 +88,9 @@ function actionErrorMessage(status: number, fallback: string) {
 }
 
 function getReadinessLabel(status?: string, blockers: string[] = []) {
-  if (status !== "APPROVED") return { icon: "❌", label: "Blocked" };
-  if (blockers.length > 0) return { icon: "⚠", label: `Missing ${blockers.length} fields` };
+  if (status === "ARCHIVED") return { icon: "❌", label: "Archived" };
+  if (blockers.length > 0) return { icon: "⚠️", label: `Missing ${blockers.length} fields` };
+  if (status === "PUBLISHED") return { icon: "✅", label: "Published" };
   return { icon: "✅", label: "Ready" };
 }
 
@@ -125,8 +126,9 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
   const mutateDone = useMemo(() => onAfterMutate ?? (() => router.refresh()), [onAfterMutate, router]);
   const controlsDisabled = isSaving || isArchiving || isDeleting || isPublishing;
   const supportsModeratedPublish = entityType === "events" || entityType === "venues";
-  const canPublish = status === "APPROVED";
+  const canPublish = !!status && status !== "PUBLISHED" && status !== "ARCHIVED";
   const canUnpublish = status === "PUBLISHED";
+  const advanceToStatus = status === "DRAFT" ? "IN_REVIEW" : status === "IN_REVIEW" ? "APPROVED" : null;
   const readiness = getReadinessLabel(status, publishBlockers);
 
   async function save() {
@@ -193,6 +195,26 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
     if (!supportsModeratedPublish || !canPublish) return;
     const url = entityType === "venues" ? `/api/admin/venues/${id}/publish` : `/api/admin/events/${id}/publish`;
     await runLifecycleTransition(url, `${entityLabel} published`, "Publish failed");
+  }
+
+  async function advance() {
+    if (!advanceToStatus) return;
+    setRowError(null);
+    setIsPublishing(true);
+    try {
+      const res = await requestInlinePatch(patchUrl, { status: advanceToStatus });
+      if (!res.ok) {
+        const message = actionErrorMessage(res.status, "Advance failed");
+        setRowError(message);
+        enqueueToast({ title: message, variant: "error" });
+        return;
+      }
+      enqueueToast({ title: `${entityLabel} moved to ${advanceToStatus}` });
+      onCancelEdit();
+      mutateDone();
+    } finally {
+      setIsPublishing(false);
+    }
   }
 
   async function unpublish() {
@@ -277,6 +299,12 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
         {supportsModeratedPublish && canPublish ? (
           <Button type="button" size="sm" onClick={() => void publish()} disabled={controlsDisabled || !canPublish}>
             {isPublishing ? "Publishing…" : "Publish"}
+          </Button>
+        ) : null}
+
+        {supportsModeratedPublish && advanceToStatus ? (
+          <Button type="button" size="sm" variant="outline" onClick={() => void advance()} disabled={controlsDisabled || !advanceToStatus}>
+            {isPublishing ? "Working…" : "Advance"}
           </Button>
         ) : null}
 
