@@ -30,10 +30,12 @@ export default function EventAdminForm({ title, endpoint, method, eventId, initi
   const [tagSlugsText, setTagSlugsText] = useState((initial.tagSlugs || []).join(","));
   const [artistSlugsText, setArtistSlugsText] = useState((initial.artistSlugs || []).join(","));
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
 
     const payload = {
       ...form,
@@ -48,6 +50,19 @@ export default function EventAdminForm({ title, endpoint, method, eventId, initi
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      if (res.status === 409 && body?.error?.code === "publish_blocked") {
+        const blockers = Array.isArray(body?.error?.details?.blockers) ? body.error.details.blockers : [];
+        const nextFieldErrors = blockers.reduce<Record<string, string>>((acc, blocker) => {
+          if (typeof blocker?.id === "string" && typeof blocker?.message === "string") {
+            acc[blocker.id] = blocker.message;
+          }
+          return acc;
+        }, {});
+        if (Object.keys(nextFieldErrors).length > 0) {
+          setFieldErrors(nextFieldErrors);
+          return;
+        }
+      }
       setError(body?.message || body?.error?.message || "Save failed");
       return;
     }
@@ -70,6 +85,7 @@ export default function EventAdminForm({ title, endpoint, method, eventId, initi
           <label key={key} className="block">
             <span className="text-sm">{label}</span>
             <input className="border p-2 rounded w-full" type={type || "text"} value={String(form[key as keyof typeof form] ?? "")} onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value || null }))} />
+            {fieldErrors[key === "venueId" ? "venue" : key] ? <p className="text-xs text-red-500 mt-0.5">{fieldErrors[key === "venueId" ? "venue" : key]}</p> : null}
           </label>
         ))}
         <label className="block">
