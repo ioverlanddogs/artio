@@ -54,7 +54,13 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
         <p className="text-sm text-emerald-900">Moderation action</p>
         <p className="text-sm text-emerald-800">Approve this venue from here when it is ready.</p>
         <div className="mt-3">
-          <AdminApproveButton entityType="venue" submissionId={pendingSubmission?.id ?? null} disabled={!pendingSubmission} />
+          <AdminApproveButton
+            entityType="venue"
+            entityId={venue.id}
+            submissionId={pendingSubmission?.id ?? null}
+            directStatusEndpoint={`/api/admin/venues/${venue.id}`}
+            disabled={venue.status === "PUBLISHED"}
+          />
         </div>
       </section>
       <section className="rounded-lg border border-destructive/30 bg-card p-4">

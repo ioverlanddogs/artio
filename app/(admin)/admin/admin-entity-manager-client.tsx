@@ -40,7 +40,8 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const rawStatus = searchParams.get("status");
-  const selectedStatus = moderationTabs.some((tab) => tab.value === rawStatus) ? (rawStatus as ModerationStatus) : "IN_REVIEW";
+  const defaultStatus: ModerationStatus = entity === "venues" ? "DRAFT" : "IN_REVIEW";
+  const selectedStatus = moderationTabs.some((tab) => tab.value === rawStatus) ? (rawStatus as ModerationStatus) : defaultStatus;
 
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
   const [query, setQuery] = useState("");
@@ -105,14 +106,14 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   useEffect(() => {
     if (!searchParams.get("status")) {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("status", "IN_REVIEW");
+      params.set("status", defaultStatus);
       router.replace(`${pathname}?${params.toString()}`);
       return;
     }
 
     const timer = setTimeout(() => void loadData(query, page), 250);
     return () => clearTimeout(timer);
-  }, [loadData, page, pathname, query, router, searchParams]);
+  }, [defaultStatus, loadData, page, pathname, query, router, searchParams]);
 
   useEffect(() => {
     if (!importOpen) return;

@@ -7,22 +7,33 @@ import { enqueueToast } from "@/lib/toast";
 type Props = {
   entityType: "venue" | "event";
   submissionId: string | null;
+  entityId?: string;
+  directStatusEndpoint?: string;
   disabled?: boolean;
 };
 
-export default function AdminApproveButton({ entityType, submissionId, disabled }: Props) {
+export default function AdminApproveButton({ entityType, submissionId, entityId, directStatusEndpoint, disabled }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function onApprove() {
-    if (!submissionId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/submissions/${submissionId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      if (!res.ok) {
+      let res: Response | null = null;
+      if (submissionId) {
+        res = await fetch(`/api/admin/submissions/${submissionId}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+      } else if (directStatusEndpoint && entityId) {
+        res = await fetch(directStatusEndpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "PUBLISHED" }),
+        });
+      }
+
+      if (!res || !res.ok) {
         enqueueToast({ title: "Approval failed", variant: "error" });
         return;
       }
@@ -33,7 +44,7 @@ export default function AdminApproveButton({ entityType, submissionId, disabled 
   }
 
   return (
-    <Button disabled={disabled || !submissionId || loading} onClick={onApprove}>
+    <Button disabled={Boolean(disabled) || loading || (!submissionId && !(directStatusEndpoint && entityId))} onClick={onApprove}>
       {loading ? "Approving…" : `Approve ${entityType}`}
     </Button>
   );

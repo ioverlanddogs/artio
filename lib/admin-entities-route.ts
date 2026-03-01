@@ -346,6 +346,10 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
 export async function handleAdminEntityPatch(req: NextRequest, entity: EntityName, params: { id: string }, deps: AdminEntitiesDeps) {
   try {
     const actor = await deps.requireAdminUser();
+    const validateTransitionForActor = (current: string, next: string) => {
+      if (actor.role === "ADMIN") return;
+      validateModerationTransition(current, next);
+    };
     const parsedId = entityIdSchema.safeParse(params);
     if (!parsedId.success) return apiError(400, "invalid_id", "Invalid entity id");
 
@@ -361,9 +365,13 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         const before = await tx.venue.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const payload = parsedBody.data as z.infer<typeof venuePatchSchema>;
-        if (payload.status) validateModerationTransition(before.status, payload.status);
         const patch: Prisma.VenueUpdateInput = { ...payload };
         const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
+        if (wantsPublish) {
+          validateTransitionForActor(before.status, "PUBLISHED");
+        } else if (payload.status) {
+          validateTransitionForActor(before.status, payload.status);
+        }
         if (wantsPublish) {
           const blockers = computeVenuePublishBlockers(before);
           if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);
@@ -384,10 +392,14 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         const before = await tx.event.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const payload = parsedBody.data as z.infer<typeof eventPatchSchema>;
-        if (payload.status) validateModerationTransition(before.status, payload.status);
         const patch: Prisma.EventUpdateInput = { ...payload, ...(payload.startAt ? { startAt: new Date(payload.startAt) } : {}), ...(payload.endAt !== undefined ? { endAt: payload.endAt ? new Date(payload.endAt) : null } : {}) };
         const venue = before.venueId ? await tx.venue.findUnique({ where: { id: before.venueId }, select: { status: true, isPublished: true } }) : null;
         const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
+        if (wantsPublish) {
+          validateTransitionForActor(before.status, "PUBLISHED");
+        } else if (payload.status) {
+          validateTransitionForActor(before.status, payload.status);
+        }
         if (wantsPublish) {
           const blockers = computeEventPublishBlockers({ startAt: before.startAt, timezone: before.timezone, venue });
           if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);

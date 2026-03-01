@@ -168,15 +168,32 @@ test("admin list includes computed publish blockers", async () => {
   assert.equal(body.items[0].publishBlockers.length > 0, true);
 });
 
-test("venue patch rejects invalid moderation transition", async () => {
-  const { appDb } = buildVenueDeps();
+test("venue patch allows admin moderation transition bypass", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "DRAFT" };
   const req = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111", {
     method: "PATCH",
-    body: JSON.stringify({ status: "PUBLISHED" }),
+    body: JSON.stringify({ status: "APPROVED" }),
     headers: { "content-type": "application/json" },
   });
 
   const res = await handleAdminEntityPatch(req, "venues", { id: "11111111-1111-4111-8111-111111111111" }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(res.status, 200);
+});
+
+test("venue patch still rejects invalid moderation transition for non-admin actor", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "DRAFT" };
+  const req = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111", {
+    method: "PATCH",
+    body: JSON.stringify({ status: "APPROVED" }),
+    headers: { "content-type": "application/json" },
+  });
+
+  const res = await handleAdminEntityPatch(req, "venues", { id: "11111111-1111-4111-8111-111111111111" }, {
+    requireAdminUser: async () => ({ id: "editor-id", email: "editor@example.com", role: "EDITOR" as const }),
+    appDb: appDb as never,
+  });
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_transition");
