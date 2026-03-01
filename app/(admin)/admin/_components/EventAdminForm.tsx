@@ -84,7 +84,9 @@ export default function EventAdminForm({ title, endpoint, method, eventId, initi
           <span className="text-sm">Artist slugs (comma-separated)</span>
           <input className="border p-2 rounded w-full" value={artistSlugsText} onChange={(e) => setArtistSlugsText(e.target.value)} />
         </label>
-        <label className="block text-sm"><input type="checkbox" className="mr-2" checked={Boolean(form.isPublished)} onChange={(e) => setForm((prev) => ({ ...prev, isPublished: e.target.checked }))} />Published</label>
+        {eventId ? (
+          <label className="block text-sm"><input type="checkbox" className="mr-2" checked={Boolean(form.isPublished)} onChange={(e) => setForm((prev) => ({ ...prev, isPublished: e.target.checked }))} />Published</label>
+        ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <button className="rounded border px-3 py-1">Save</button>
       </form>
