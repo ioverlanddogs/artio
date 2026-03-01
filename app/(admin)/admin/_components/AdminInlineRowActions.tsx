@@ -88,7 +88,9 @@ function actionErrorMessage(status: number, fallback: string) {
 }
 
 function getReadinessLabel(status?: string, blockers: string[] = []) {
-  if (status === "ARCHIVED") return { icon: "❌", label: "Archived" };
+  if (status === "ARCHIVED") return { icon: "🚫", label: "Archived" };
+  if (status === "REJECTED") return { icon: "↩️", label: "Rejected" };
+  if (status === "IN_REVIEW") return { icon: "⏳", label: "In Review" };
   if (blockers.length > 0) return { icon: "⚠️", label: `Missing ${blockers.length} fields` };
   if (status === "PUBLISHED") return { icon: "✅", label: "Published" };
   return { icon: "✅", label: "Ready" };
@@ -119,14 +121,15 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
   const [isArchiving, setIsArchiving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const mutateDone = useMemo(() => onAfterMutate ?? (() => router.refresh()), [onAfterMutate, router]);
-  const controlsDisabled = isSaving || isArchiving || isDeleting || isPublishing;
+  const controlsDisabled = isSaving || isArchiving || isDeleting || isPublishing || isAdvancing;
   const supportsModeratedPublish = entityType === "events" || entityType === "venues";
-  const canPublish = !!status && status !== "PUBLISHED" && status !== "ARCHIVED";
+  const canPublish = !!status && status !== "PUBLISHED" && status !== "ARCHIVED" && publishBlockers.length === 0;
   const canUnpublish = status === "PUBLISHED";
   const advanceToStatus = status === "DRAFT" ? "IN_REVIEW" : status === "IN_REVIEW" ? "APPROVED" : null;
   const readiness = getReadinessLabel(status, publishBlockers);
@@ -175,8 +178,8 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
       const res = await requestLifecycleTransition(url);
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        const blockerMessage = res.status === 409 && body?.error === "publish_blocked"
-          ? formatBlockers(body?.blockers)
+        const blockerMessage = res.status === 409 && body?.error?.code === "publish_blocked"
+          ? formatBlockers(body?.error?.details?.blockers)
           : null;
         const message = blockerMessage ? `Publish blocked: ${blockerMessage}` : actionErrorMessage(res.status, failureTitle);
         setRowError(message);
@@ -200,7 +203,7 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
   async function advance() {
     if (!advanceToStatus) return;
     setRowError(null);
-    setIsPublishing(true);
+    setIsAdvancing(true);
     try {
       const res = await requestInlinePatch(patchUrl, { status: advanceToStatus });
       if (!res.ok) {
@@ -213,7 +216,7 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
       onCancelEdit();
       mutateDone();
     } finally {
-      setIsPublishing(false);
+      setIsAdvancing(false);
     }
   }
 
@@ -304,7 +307,7 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
 
         {supportsModeratedPublish && advanceToStatus ? (
           <Button type="button" size="sm" variant="outline" onClick={() => void advance()} disabled={controlsDisabled || !advanceToStatus}>
-            {isPublishing ? "Working…" : "Advance"}
+            {isAdvancing ? "Advancing…" : "Advance"}
           </Button>
         ) : null}
 

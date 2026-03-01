@@ -13,7 +13,7 @@ import {
 
 function buildVenueDeps() {
   const venues = [
-    { id: "11111111-1111-4111-8111-111111111111", name: "Venue A", slug: "venue-a", city: "NY", postcode: "10001", country: "US", status: "IN_REVIEW", isPublished: false, websiteUrl: null, addressLine1: null, addressLine2: null, description: null, featuredAssetId: null, deletedAt: null, deletedByAdminId: null, deletedReason: null },
+    { id: "11111111-1111-4111-8111-111111111111", name: "Venue A", slug: "venue-a", city: "NY", postcode: "10001", country: "US", lat: null, lng: null, status: "IN_REVIEW", isPublished: false, websiteUrl: null, addressLine1: null, addressLine2: null, description: null, featuredAssetId: null, deletedAt: null, deletedByAdminId: null, deletedReason: null },
   ];
   const auditEntries: Array<Record<string, unknown>> = [];
 
@@ -191,6 +191,84 @@ test("venue patch still rejects invalid moderation transition for non-admin acto
   });
 
   const res = await handleAdminEntityPatch(req, "venues", { id: "11111111-1111-4111-8111-111111111111" }, {
+    requireAdminUser: async () => ({ id: "editor-id", email: "editor@example.com", role: "EDITOR" as const }),
+    appDb: appDb as never,
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, "invalid_transition");
+});
+
+
+test("venue publish route pattern publishes approved venue with complete data", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "APPROVED", name: "Venue A", city: "NY", country: "US", lat: 40.7128, lng: -74.0060 };
+  const publishReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/publish", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "PUBLISHED" }),
+  });
+
+  const res = await handleAdminEntityPatch(publishReq, "venues", { id: venues[0].id }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.item.status, "PUBLISHED");
+});
+
+test("venue publish route pattern blocks approved venue missing coordinates", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "APPROVED", name: "Venue A", city: "NY", country: "US", lat: null, lng: null };
+  const publishReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/publish", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "PUBLISHED" }),
+  });
+
+  const res = await handleAdminEntityPatch(publishReq, "venues", { id: venues[0].id }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error.code, "publish_blocked");
+  assert.equal(body.error.details.blockers.some((b: { id: string }) => b.id === "coordinates"), true);
+});
+
+test("venue publish route pattern allows admin bypass from draft", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "DRAFT", name: "Venue A", city: "NY", country: "US", lat: 40.7128, lng: -74.0060 };
+  const publishReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/publish", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "PUBLISHED" }),
+  });
+
+  const res = await handleAdminEntityPatch(publishReq, "venues", { id: venues[0].id }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(res.status, 200);
+});
+
+test("venue unpublish route pattern moves published venue to approved", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "PUBLISHED", isPublished: true };
+  const unpublishReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/unpublish", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "APPROVED" }),
+  });
+
+  const res = await handleAdminEntityPatch(unpublishReq, "venues", { id: venues[0].id }, { requireAdminUser: adminUser, appDb: appDb as never });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.item.status, "APPROVED");
+});
+
+test("venue publish route pattern rejects non-admin draft to published transition", async () => {
+  const { appDb, venues } = buildVenueDeps();
+  venues[0] = { ...venues[0], status: "DRAFT", name: "Venue A", city: "NY", country: "US", lat: 40.7128, lng: -74.0060 };
+  const publishReq = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111/publish", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "PUBLISHED" }),
+  });
+
+  const res = await handleAdminEntityPatch(publishReq, "venues", { id: venues[0].id }, {
     requireAdminUser: async () => ({ id: "editor-id", email: "editor@example.com", role: "EDITOR" as const }),
     appDb: appDb as never,
   });

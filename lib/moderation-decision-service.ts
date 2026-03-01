@@ -101,6 +101,7 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
           actorUserId: input.actor.id,
           submissionType: submission.type,
           decisionReason,
+          entityPublished: isApprove,
         },
       },
     });

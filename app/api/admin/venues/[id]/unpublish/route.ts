@@ -6,7 +6,7 @@ import { handleAdminEntityPatch } from "@/lib/admin-entities-route";
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const unpublishRequest = new NextRequest(req.url, {
     method: "PATCH",
-    headers: req.headers,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: "APPROVED" }),
   });
   return handleAdminEntityPatch(unpublishRequest, "venues", await params, { requireAdminUser: requireAdmin, appDb: db });

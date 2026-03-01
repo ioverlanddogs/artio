@@ -4,7 +4,7 @@ import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { computeEventPublishBlockers, computeReadiness, computeVenuePublishBlockers } from "@/lib/publish-blockers";
-import { validateModerationTransition } from "@/lib/moderation-decision-service";
+import { allowedTransitions, validateModerationTransition } from "@/lib/moderation-decision-service";
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -16,6 +16,12 @@ type AdminEntitiesDeps = {
 };
 
 const PAGE_SIZE = 20;
+
+class PublishBlockedError extends Error {
+  constructor(public readonly blockers: import("@/lib/publish-blockers").PublishBlocker[]) {
+    super("publish_blocked");
+  }
+}
 
 const listQuerySchema = z.object({
   query: z.string().trim().max(120).optional(),
@@ -374,7 +380,7 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         }
         if (wantsPublish) {
           const blockers = computeVenuePublishBlockers(before);
-          if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);
+          if (blockers.length > 0) throw new PublishBlockedError(blockers);
           patch.status = "PUBLISHED";
           patch.isPublished = true;
         } else if (payload.status === "REJECTED") {
@@ -385,7 +391,7 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
           patch.isPublished = false;
         }
         const row = await tx.venue.update({ where: { id: entityId }, data: patch });
-        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "venue", targetId: entityId, metadata: { entityType: "venue", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
+        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "venue", targetId: entityId, metadata: { entityType: "venue", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email, adminBypass: actor.role === "ADMIN" && !(allowedTransitions[before.status] ?? []).includes(patch.status as string) }, ip, userAgent } });
         return row;
       }
       if (entity === "events") {
@@ -402,7 +408,7 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         }
         if (wantsPublish) {
           const blockers = computeEventPublishBlockers({ startAt: before.startAt, timezone: before.timezone, venue });
-          if (blockers.length > 0) throw new Error(`publish_blocked:${JSON.stringify(blockers)}`);
+          if (blockers.length > 0) throw new PublishBlockedError(blockers);
           patch.status = "PUBLISHED";
           patch.isPublished = true;
           patch.publishedAt = new Date();
@@ -416,7 +422,7 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
           patch.publishedAt = null;
         }
         const row = await tx.event.update({ where: { id: entityId }, data: patch });
-        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "event", targetId: entityId, metadata: { entityType: "event", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
+        await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "event", targetId: entityId, metadata: { entityType: "event", entityId, before, after: payload, actorId: actor.id, actorEmail: actor.email, adminBypass: actor.role === "ADMIN" && !(allowedTransitions[before.status] ?? []).includes(patch.status as string) }, ip, userAgent } });
         return row;
       }
       if (entity === "artwork") {
@@ -439,9 +445,8 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
   } catch (error) {
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
     if (error instanceof Error && error.message === "not_found") return apiError(404, "not_found", "Entity not found");
-    if (error instanceof Error && error.message.startsWith("publish_blocked:")) {
-      const blockers = JSON.parse(error.message.slice("publish_blocked:".length));
-      return apiError(409, "publish_blocked", "Publishing is blocked", { blockers });
+    if (error instanceof PublishBlockedError) {
+      return apiError(409, "publish_blocked", "Publishing is blocked", { blockers: error.blockers });
     }
     if (error instanceof Error && "status" in error && "code" in error && (error as { code?: string }).code === "invalid_transition") {
       return apiError(400, "invalid_transition", error.message);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { enqueueToast } from "@/lib/toast";
 
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default function AdminApproveButton({ entityType, submissionId, entityId, directStatusEndpoint, disabled }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function onApprove() {
@@ -38,6 +40,7 @@ export default function AdminApproveButton({ entityType, submissionId, entityId,
         return;
       }
       enqueueToast({ title: `${entityType === "venue" ? "Venue" : "Event"} approved`, variant: "success" });
+      router.refresh();
     } finally {
       setLoading(false);
     }
