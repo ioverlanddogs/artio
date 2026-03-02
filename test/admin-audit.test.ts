@@ -20,7 +20,7 @@ test("logAdminAction writes an AdminAuditLog entry via Prisma client", async () 
       targetType: "test",
       targetId: "target-1",
       metadata: { sample: true },
-      req: new NextRequest("http://localhost:3000/api/admin/audit/test", {
+      req: new NextRequest("http://localhost:3000/api/admin/audit/selftest", {
         headers: {
           "x-forwarded-for": "203.0.113.9, 10.0.0.1",
           "user-agent": "test-agent",
