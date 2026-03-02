@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { canSelfPublish, getSessionUser } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import VenueSelfServeForm from "@/app/my/_components/VenueSelfServeForm";
 import VenueMembersManager from "@/app/my/_components/VenueMembersManager";
@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { VenueGalleryManager } from "@/components/venues/venue-gallery-manager";
 import { resolveImageUrl } from "@/lib/assets";
-import VenuePublishPanel from "@/app/my/_components/VenuePublishPanel";
+import { PublishPanel } from "@/components/my/PublishPanel";
 import VenueArtistRequestsPanel from "@/app/my/_components/VenueArtistRequestsPanel";
 import { Button } from "@/components/ui/button";
 import { resolveVenueIdFromRouteParam } from "./route-param";
@@ -53,6 +53,8 @@ export default async function MyVenueEditPage({
     featuredImageUrl: true,
     featuredAssetId: true,
     isPublished: true,
+    status: true,
+    deletedAt: true,
     slug: true,
     featuredAsset: { select: { url: true } },
     images: { select: { id: true, url: true, alt: true, sortOrder: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
@@ -116,7 +118,6 @@ export default async function MyVenueEditPage({
   const submission = venue.targetSubmissions[0] ?? null;
   const checks = getVenueCompletionChecks(venue);
   const isOwner = memberRole === "OWNER" || user.role === "ADMIN";
-  const canPublishDirectly = canSelfPublish(user);
 
   const isCreatedFirstVisit = query.created === "1";
   const firstRequired = !checks.basicInfo ? "basic" : !checks.location ? "location" : !checks.images ? "images" : "basic";
@@ -136,7 +137,7 @@ export default async function MyVenueEditPage({
         )}
       />
 
-      <VenueSetupHeader venue={{ name: venue.name, isPublished: venue.isPublished }} submissionStatus={submission?.status ?? null} />
+      <VenueSetupHeader venue={{ name: venue.name, isPublished: venue.isPublished, deletedAt: venue.deletedAt }} submissionStatus={venue.status ?? submission?.status ?? null} />
 
       {isCreatedFirstVisit ? <VenueCreatedDraftBanner venueId={venue.id} missingRequired={checks.missingRequired} /> : null}
 
@@ -145,9 +146,9 @@ export default async function MyVenueEditPage({
       {checks.publishReady && submission?.status !== "IN_REVIEW" && !venue.isPublished ? (
         <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-emerald-900">{canPublishDirectly ? "This venue is ready for direct publish control in admin moderation." : "This venue is ready to submit for review."}</p>
+            <p className="text-sm font-semibold text-emerald-900">This venue is ready to publish.</p>
             <Button asChild>
-              <Link href="#publish-panel">{canPublishDirectly ? "Open moderation controls" : "Submit for review"}</Link>
+              <Link href="#publish-panel">Open publish panel</Link>
             </Button>
           </div>
         </div>
@@ -203,12 +204,12 @@ export default async function MyVenueEditPage({
         </section>
 
         <aside className="order-1 lg:order-2 lg:col-span-1">
-          <VenuePublishPanel
-            venue={{ id: venue.id, slug: venue.slug, isPublished: venue.isPublished }}
-            checks={checks}
-            submissionStatus={submission?.status ?? null}
-            isOwner={isOwner}
-            canPublishDirectly={canPublishDirectly}
+          <PublishPanel
+            resourceType="venue"
+            id={venue.id}
+            status={venue.deletedAt ? "ARCHIVED" : venue.isPublished ? "PUBLISHED" : (venue.status ?? submission?.status ?? "DRAFT")}
+            title={venue.name}
+            publicUrl={venue.slug ? `/venues/${venue.slug}` : undefined}
           />
         </aside>
       </div>

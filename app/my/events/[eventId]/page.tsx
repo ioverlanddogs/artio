@@ -6,7 +6,7 @@ import { redirectToLogin } from "@/lib/auth-redirect";
 import { PageHeader } from "@/components/ui/page-header";
 import EventSetupHeader from "@/app/my/_components/EventSetupHeader";
 import EventSetupSection from "@/app/my/_components/EventSetupSection";
-import EventPublishPanel from "@/app/my/_components/EventPublishPanel";
+import { PublishPanel } from "@/components/my/PublishPanel";
 import { EventEditorForm } from "@/app/my/events/[eventId]/page-client";
 import { getEventReadiness } from "@/lib/events/getEventReadiness";
 import { ReadinessChecklist } from "@/components/publishing/ReadinessChecklist";
@@ -60,7 +60,7 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
     <main className="space-y-6 p-6">
       <PageHeader title="Event Setup" subtitle={canPublishDirectly ? "Complete your event details. As an admin, you can publish via moderation controls." : "Complete your event details and submit for review."} />
 
-      <EventSetupHeader event={{ title: event.title, isPublished: event.isPublished }} submissionStatus={null} />
+      <EventSetupHeader event={{ title: event.title, isPublished: event.isPublished, deletedAt: null }} submissionStatus={event.status} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="order-2 space-y-4 lg:order-1 lg:col-span-2">
@@ -95,16 +95,22 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
           </EventSetupSection>
 
           <div className="rounded-md border bg-muted/20 p-4 text-sm">
-            <p className="font-medium">Ready to submit?</p>
-            <p className="mt-1 text-muted-foreground">{canPublishDirectly ? "If your checklist is complete, use admin moderation controls to publish directly." : "If your checklist is complete, submit your event for moderation."}</p>
-            <Link className="mt-2 inline-block underline" href="#publish-panel">{canPublishDirectly ? "Open moderation controls" : "Submit for review"}</Link>
+            <p className="font-medium">Ready to publish?</p>
+            <p className="mt-1 text-muted-foreground">{canPublishDirectly ? "If your checklist is complete, use admin moderation controls to publish directly." : "If your checklist is complete, publish your event."}</p>
+            <Link className="mt-2 inline-block underline" href="#publish-panel">{canPublishDirectly ? "Open moderation controls" : "Publish"}</Link>
           </div>
         </section>
 
         <aside className="order-1 lg:order-2 lg:col-span-1">
           <div className="space-y-4">
             <ReadinessChecklist items={readiness.items} />
-            <EventPublishPanel event={{ id: event.id, slug: event.slug, status: event.status }} checks={{ readyToSubmit: readiness.isReady, missing: readiness.items.filter((item) => !item.complete).map((item) => item.label) }} canPublishDirectly={canPublishDirectly} />
+            <PublishPanel
+              resourceType="event"
+              id={event.id}
+              status={event.status}
+              title={event.title ?? "Untitled event"}
+              publicUrl={event.slug ? `/events/${event.slug}` : undefined}
+            />
           </div>
         </aside>
       </div>
