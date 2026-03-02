@@ -5,18 +5,15 @@ import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
-import AdminApproveButton from "@/app/(admin)/admin/_components/AdminApproveButton";
+import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
+import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
 
 export default async function AdminVenue({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const venue = await db.venue.findUnique({ where: { id } });
   if (!venue) notFound();
 
-  const pendingSubmission = await db.submission.findFirst({
-    where: { targetVenueId: id, status: "IN_REVIEW" },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
+  const blockers = computeVenuePublishBlockers(venue);
 
   return (
     <main className="space-y-6">
@@ -50,19 +47,7 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
         ]}
         altRequired={ADMIN_IMAGE_ALT_REQUIRED}
       />
-      <section className="rounded border border-emerald-300 bg-emerald-50 p-4">
-        <p className="text-sm text-emerald-900">Moderation action</p>
-        <p className="text-sm text-emerald-800">Approve this venue from here when it is ready.</p>
-        <div className="mt-3">
-          <AdminApproveButton
-            entityType="venue"
-            entityId={venue.id}
-            submissionId={pendingSubmission?.id ?? null}
-            directStatusEndpoint={`/api/admin/venues/${venue.id}`}
-            disabled={venue.status === "PUBLISHED"}
-          />
-        </div>
-      </section>
+      <ModerationPanel resource="venues" id={venue.id} status={venue.status} blockers={blockers.map((item) => item.message)} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
         <h2 className="text-base font-semibold">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">Archive or restore first. Permanent delete is irreversible.</p>

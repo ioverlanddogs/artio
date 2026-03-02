@@ -5,21 +5,18 @@ import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
-import AdminApproveButton from "@/app/(admin)/admin/_components/AdminApproveButton";
+import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
+import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 
 export default async function AdminEditEvent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const event = await db.event.findUnique({
     where: { id },
-    include: { eventTags: { include: { tag: true } }, eventArtists: { include: { artist: true } } },
+    include: { eventTags: { include: { tag: true } }, eventArtists: { include: { artist: true } }, venue: { select: { status: true, isPublished: true } } },
   });
   if (!event) notFound();
 
-  const pendingSubmission = await db.submission.findFirst({
-    where: { targetEventId: id, status: "IN_REVIEW" },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
+  const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone, venue: event.venue });
 
   return (
     <main className="space-y-6">
@@ -43,19 +40,7 @@ export default async function AdminEditEvent({ params }: { params: Promise<{ id:
         }}
         altRequired={ADMIN_IMAGE_ALT_REQUIRED}
       />
-      <section className="rounded border border-emerald-300 bg-emerald-50 p-4">
-        <p className="text-sm text-emerald-900">Moderation action</p>
-        <p className="text-sm text-emerald-800">Approve this event from here when it is ready.</p>
-        <div className="mt-3">
-          <AdminApproveButton
-            entityType="event"
-            entityId={event.id}
-            submissionId={pendingSubmission?.id ?? null}
-            directStatusEndpoint={`/api/admin/events/${event.id}`}
-            disabled={event.status === "PUBLISHED"}
-          />
-        </div>
-      </section>
+      <ModerationPanel resource="events" id={event.id} status={event.status} blockers={blockers.map((item) => item.message)} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
         <h2 className="text-base font-semibold">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">Archive or restore first. Permanent delete is irreversible.</p>

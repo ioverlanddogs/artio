@@ -4,6 +4,8 @@ import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiv
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
 import { db } from "@/lib/db";
 import ArtworkAdminForm from "../ArtworkAdminForm";
+import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
+import { computeArtworkCompleteness } from "@/lib/artwork-completeness";
 
 export default async function AdminArtworkDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,10 +26,31 @@ export default async function AdminArtworkDetailPage({ params }: { params: Promi
       updatedAt: true,
       deletedAt: true,
       deletedReason: true,
+      featuredAssetId: true,
+      images: { select: { id: true } },
     },
   });
 
   if (!artwork) notFound();
+
+  const completeness = computeArtworkCompleteness({
+    title: artwork.title,
+    description: artwork.description,
+    medium: artwork.medium,
+    year: artwork.year,
+    featuredAssetId: artwork.featuredAssetId,
+  }, artwork.images.length);
+
+  const blockers = [...completeness.required.issues, ...completeness.recommended.issues].map((issue) => issue.label);
+  const derivedStatus = artwork.deletedAt
+    ? "ARCHIVED"
+    : artwork.isPublished
+      ? "PUBLISHED"
+      : artwork.deletedReason?.startsWith("Rejected:")
+        ? "REJECTED"
+        : artwork.deletedReason?.startsWith("Changes requested:")
+          ? "CHANGES_REQUESTED"
+          : "DRAFT";
 
   return (
     <main className="space-y-6">
@@ -42,6 +65,7 @@ export default async function AdminArtworkDetailPage({ params }: { params: Promi
           artistId: artwork.artistId,
         }}
       />
+      <ModerationPanel resource="artwork" id={artwork.id} status={derivedStatus} blockers={blockers} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
         <h2 className="text-base font-semibold">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">Archive or restore first. Permanent delete is irreversible.</p>
