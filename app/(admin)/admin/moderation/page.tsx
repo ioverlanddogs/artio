@@ -1,5 +1,70 @@
-import { redirect } from "next/navigation";
+import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
+import ModerationClient from "./moderation-client";
+import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
 
-export default function AdminModerationPage() {
-  redirect("/admin/submissions");
+const PAGE_SIZE = 30;
+
+export default async function AdminModerationPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireAdmin();
+  const params = await searchParams;
+  const tab = typeof params.tab === "string" ? params.tab : "needs-review";
+  const type = typeof params.type === "string" ? params.type : "all";
+  const publisher = typeof params.publisher === "string" ? params.publisher : "";
+  const submittedAfter = typeof params.submittedAfter === "string" ? params.submittedAfter : "";
+  const page = Math.max(1, Number(typeof params.page === "string" ? params.page : "1") || 1);
+
+  const statusByTab = tab === "published" ? "APPROVED" : tab === "rejected" ? "REJECTED" : "IN_REVIEW";
+  const where = {
+    status: statusByTab as "IN_REVIEW" | "APPROVED" | "REJECTED",
+    ...(type !== "all" ? { type: type.toUpperCase() as "EVENT" | "VENUE" | "ARTIST" } : {}),
+    ...(publisher ? { submitter: { email: { contains: publisher, mode: "insensitive" as const } } } : {}),
+    ...(submittedAfter ? { submittedAt: { gte: new Date(submittedAfter) } } : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    db.submission.count({ where }),
+    db.submission.findMany({
+      where,
+      orderBy: [{ submittedAt: "desc" }, { createdAt: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        submittedAt: true,
+        createdAt: true,
+        submitter: { select: { email: true, name: true } },
+        targetEvent: { select: { id: true, title: true, slug: true } },
+        targetVenue: { select: { id: true, name: true, slug: true } },
+        targetArtist: { select: { id: true, name: true, slug: true } },
+      },
+    }),
+  ]);
+
+  return (
+    <main className="space-y-6">
+      <AdminPageHeader title="Moderation" description="Review and action submissions quickly." />
+      <ModerationClient
+        initialItems={items.map((item) => ({
+          submissionId: item.id,
+          status: item.status,
+          entityType: item.type,
+          title: item.targetEvent?.title ?? item.targetVenue?.name ?? item.targetArtist?.name ?? "Untitled",
+          entityId: item.targetEvent?.id ?? item.targetVenue?.id ?? item.targetArtist?.id ?? "",
+          slug: item.targetEvent?.slug ?? item.targetVenue?.slug ?? item.targetArtist?.slug ?? null,
+          submittedAtISO: (item.submittedAt ?? item.createdAt).toISOString(),
+          publisher: item.submitter.name ?? item.submitter.email,
+        }))}
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        tab={tab}
+        typeFilter={type}
+        publisherFilter={publisher}
+        submittedAfterFilter={submittedAfter}
+      />
+    </main>
+  );
 }

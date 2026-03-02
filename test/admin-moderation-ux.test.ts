@@ -4,6 +4,7 @@ import test from "node:test";
 
 const submissionsSource = readFileSync("app/(admin)/admin/_components/SubmissionsModeration.tsx", "utf8");
 const moderationSource = readFileSync("app/(admin)/admin/moderation/moderation-client.tsx", "utf8");
+const moderationPage = readFileSync("app/(admin)/admin/moderation/page.tsx", "utf8");
 
 test("submissions moderation uses row-level loading and refreshes via router", () => {
   assert.match(submissionsSource, /const \[loadingId, setLoadingId\]/);
@@ -12,17 +13,14 @@ test("submissions moderation uses row-level loading and refreshes via router", (
   assert.match(submissionsSource, /enqueueToast\(/);
 });
 
-test("moderation queue actions use row-level loading and refreshes via router", () => {
-  assert.match(moderationSource, /const \[loadingSubmissionId, setLoadingSubmissionId\]/);
-  assert.match(moderationSource, /disabled=\{loadingSubmissionId === active\.submissionId\}/);
+test("moderation queue shows updated actions and refreshes via router", () => {
+  assert.match(moderationSource, /Approve & Publish/);
+  assert.match(moderationSource, /Request changes/);
   assert.match(moderationSource, /router\.refresh\(\)/);
-  assert.match(moderationSource, /enqueueToast\(/);
+  assert.match(moderationSource, /Bulk Approve & Publish/);
 });
 
-test("admin moderation route redirects to submissions and canonical page uses AdminPageHeader", () => {
-  const moderationPage = readFileSync("app/(admin)/admin/moderation/page.tsx", "utf8");
-  const submissionsPage = readFileSync("app/(admin)/admin/submissions/page.tsx", "utf8");
-
-  assert.match(moderationPage, /redirect\("\/admin\/submissions"\)/);
-  assert.match(submissionsPage, /<AdminPageHeader[\s\S]*title="Submissions"/);
+test("admin moderation page is canonical and uses AdminPageHeader", () => {
+  assert.match(moderationPage, /<AdminPageHeader[\s\S]*title="Moderation"/);
+  assert.doesNotMatch(moderationPage, /redirect\(/);
 });
