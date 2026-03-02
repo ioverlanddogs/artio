@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import AdminPageHeader from "../app/(admin)/admin/_components/AdminPageHeader";
+;(globalThis as any).React = React
 
 test("AdminPageHeader renders title", () => {
   const html = renderToStaticMarkup(<AdminPageHeader title="Events" />);

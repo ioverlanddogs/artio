@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MobileBottomNavInner } from "../components/navigation/mobile-bottom-nav";
+;(globalThis as any).React = React
 
 test("mobile nav renders safely for unauth users", () => {
   const html = renderToStaticMarkup(<MobileBottomNavInner isAuthenticated={false} pathname="/nearby" />);

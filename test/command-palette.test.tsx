@@ -1,7 +1,9 @@
+import React from "react";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CommandPaletteDialogPreview } from "../components/command-palette/command-palette";
+;(globalThis as any).React = React
 
 test("command palette preview toggles closed/open state and includes static commands", () => {
   const closedHtml = renderToStaticMarkup(<CommandPaletteDialogPreview isOpen={false} isAuthenticated={false} isAdmin={false} />);

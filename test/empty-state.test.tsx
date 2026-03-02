@@ -1,7 +1,9 @@
+import React from "react";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EmptyState } from "../components/ui/empty-state";
+;(globalThis as any).React = React
 
 test("EmptyState renders title and actions", () => {
   const html = renderToStaticMarkup(

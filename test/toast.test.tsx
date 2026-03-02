@@ -1,8 +1,10 @@
+import React from "react";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastCard, ToastViewport } from "../components/ui/toast";
 import { enqueueToast } from "../lib/toast";
+;(globalThis as any).React = React
 
 test("toast enqueue renders viewport", () => {
   enqueueToast({ title: "Saved" });

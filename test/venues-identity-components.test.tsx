@@ -1,8 +1,10 @@
+import React from "react";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RoleBadge } from "../components/venues/role-badge";
 import { UpcomingEventsPreview } from "../components/venues/upcoming-events-preview";
+;(globalThis as any).React = React
 
 test("RoleBadge renders readable labels", () => {
   const owner = renderToStaticMarkup(<RoleBadge role="OWNER" />);

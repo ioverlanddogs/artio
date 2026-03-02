@@ -1,7 +1,9 @@
+import React from "react";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Breadcrumbs } from "../components/ui/breadcrumbs";
+;(globalThis as any).React = React
 
 test("Breadcrumbs renders home and provided links", () => {
   const html = renderToStaticMarkup(
