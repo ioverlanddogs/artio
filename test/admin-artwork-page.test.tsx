@@ -7,7 +7,7 @@ test("admin artwork page renders header and inline row actions", () => {
   const listSource = readFileSync("app/(admin)/admin/artwork/admin-artwork-list-client.tsx", "utf8");
   assert.match(pageSource, /AdminPageHeader title="Artwork"/);
   assert.match(listSource, /AdminInlineRowActions/);
-  assert.match(listSource, /Delete permanently…/);
+  assert.match(listSource, /entityLabel="Artwork"/);
 });
 
 test("admin sidebar includes artwork link", () => {

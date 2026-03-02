@@ -11,5 +11,5 @@ test("event card renders title date and link", () => {
   );
   assert.match(html, /Open Studio/);
   assert.match(html, /events\/open-studio/);
-  assert.match(html, /2026/);
+  assert.match(html, /Jan/);
 });

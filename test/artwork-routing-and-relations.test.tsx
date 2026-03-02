@@ -24,9 +24,9 @@ test("artwork route key helpers support id and slug routing behavior", () => {
 });
 
 test("published artwork relation where-builders enforce published-only filters", () => {
-  assert.deepEqual(publishedArtworksByArtistWhere("artist-1"), { artistId: "artist-1", isPublished: true });
-  assert.deepEqual(publishedArtworksByVenueWhere("venue-1"), { isPublished: true, venues: { some: { venueId: "venue-1" } } });
-  assert.deepEqual(publishedArtworksByEventWhere("event-1"), { isPublished: true, events: { some: { eventId: "event-1" } } });
+  assert.deepEqual(publishedArtworksByArtistWhere("artist-1"), { artistId: "artist-1", isPublished: true, deletedAt: null });
+  assert.deepEqual(publishedArtworksByVenueWhere("venue-1"), { isPublished: true, deletedAt: null, venues: { some: { venueId: "venue-1" } } });
+  assert.deepEqual(publishedArtworksByEventWhere("event-1"), { isPublished: true, deletedAt: null, events: { some: { eventId: "event-1" } } });
 });
 
 test("getArtworkPublicHref prefers slug while keeping id compatibility", () => {
