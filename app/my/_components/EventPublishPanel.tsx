@@ -50,7 +50,7 @@ export default function EventPublishPanel({
             eventId={event.id}
             isReady={checks.readyToSubmit}
             blocking={checks.missing.map((item) => ({ id: item, label: item }))}
-            initialStatus={event.status}
+            initialStatus={event.status as "DRAFT" | "IN_REVIEW" | "CHANGES_REQUESTED" | "PUBLISHED" | "ARCHIVED" | null}
           />
         )}
       </CardContent>
