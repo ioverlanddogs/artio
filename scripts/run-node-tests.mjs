@@ -53,10 +53,7 @@ for (const arg of process.argv.slice(2)) {
   process.exit(1)
 }
 
-const nodeArgs = ['--import', 'tsx', '--test', ...files]
-if (reporter) {
-  nodeArgs.push(`--test-reporter=${reporter}`)
-}
+const nodeArgs = ['--import', 'tsx', '--test', `--test-reporter=${reporter ?? 'spec'}`, ...files]
 
 const child = spawn(process.execPath, nodeArgs, { stdio: 'inherit' })
 child.on('exit', (code, signal) => {
