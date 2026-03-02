@@ -8,17 +8,12 @@ import { NotificationsEmptyState } from "../components/notifications/notificatio
 
 test("saved searches empty state snapshot", () => {
   const html = renderToStaticMarkup(<SavedSearchesEmptyState />);
-  assert.match(html, /Save searches to get weekly digests/);
+  assert.match(html, /Build your personal event radar/);
   assert.match(html, /href="\/search"/);
-  assert.match(html, /href="\/nearby"/);
-  assert.match(html, /Learn how/);
-  assert.match(html, /href="\/saved-searches"/);
 });
 
 test("notifications empty state snapshot", () => {
   const html = renderToStaticMarkup(<NotificationsEmptyState />);
   assert.match(html, /No notifications yet/);
-  assert.match(html, /href="\/following"/);
-  assert.match(html, /href="\/saved-searches"/);
-  assert.match(html, /href="\/for-you"/);
+  assert.match(html, /href="\/events"/);
 });
