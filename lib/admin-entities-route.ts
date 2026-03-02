@@ -1,4 +1,4 @@
-import type { Artist, Event, Prisma, Venue } from "@prisma/client";
+import type { Artist, ContentStatus, Event, Prisma, Venue } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
@@ -269,7 +269,7 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
     const skip = (page - 1) * PAGE_SIZE;
 
     if (entity === "venues") {
-      const where = { ...deletedFilter, ...(status ? { status } : {}), ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { city: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
+      const where = { ...deletedFilter, ...(status ? { status: status as ContentStatus } : {}), ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { city: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
       const [total, rows, grouped] = await Promise.all([
         deps.appDb.venue.count({ where }),
         deps.appDb.venue.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.venues.map((k) => [k, true])) as never }),
@@ -283,7 +283,7 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
     }
 
     if (entity === "events") {
-      const where = { ...deletedFilter, ...(status ? { status } : {}), ...(query ? { OR: [{ title: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
+      const where = { ...deletedFilter, ...(status ? { status: status as ContentStatus } : {}), ...(query ? { OR: [{ title: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
       const [total, rows, grouped] = await Promise.all([
         deps.appDb.event.count({ where }),
         deps.appDb.event.findMany({
@@ -373,7 +373,8 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         const before = await tx.venue.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const payload = parsedBody.data as z.infer<typeof venuePatchSchema>;
-        const patch: Prisma.VenueUpdateInput = { ...payload };
+        const { status: payloadStatus, ...payloadWithoutStatus } = payload;
+        const patch: Prisma.VenueUpdateInput = { ...payloadWithoutStatus, ...(payloadStatus ? { status: payloadStatus as ContentStatus } : {}) };
         const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
         if (wantsPublish) {
           validateTransitionForActor(before.status, "PUBLISHED");
@@ -383,13 +384,13 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         if (wantsPublish) {
           const blockers = computeVenuePublishBlockers(before);
           if (blockers.length > 0) throw new PublishBlockedError(blockers);
-          patch.status = "PUBLISHED";
+          patch.status = "PUBLISHED" as ContentStatus;
           patch.isPublished = true;
         } else if (payload.status === "CHANGES_REQUESTED") {
-          patch.status = "CHANGES_REQUESTED";
+          patch.status = "CHANGES_REQUESTED" as ContentStatus;
           patch.isPublished = false;
         } else if (payload.isPublished === false) {
-          patch.status = payload.status ?? "PUBLISHED";
+          patch.status = (payload.status ?? "PUBLISHED") as ContentStatus;
           patch.isPublished = false;
         }
         const row = await tx.venue.update({ where: { id: entityId }, data: patch });
@@ -400,7 +401,8 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         const before = await tx.event.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const payload = parsedBody.data as z.infer<typeof eventPatchSchema>;
-        const patch: Prisma.EventUpdateInput = { ...payload, ...(payload.startAt ? { startAt: new Date(payload.startAt) } : {}), ...(payload.endAt !== undefined ? { endAt: payload.endAt ? new Date(payload.endAt) : null } : {}) };
+        const { status: payloadStatus, ...payloadWithoutStatus } = payload;
+        const patch: Prisma.EventUpdateInput = { ...payloadWithoutStatus, ...(payloadStatus ? { status: payloadStatus as ContentStatus } : {}), ...(payload.startAt ? { startAt: new Date(payload.startAt) } : {}), ...(payload.endAt !== undefined ? { endAt: payload.endAt ? new Date(payload.endAt) : null } : {}) };
         const venue = before.venueId ? await tx.venue.findUnique({ where: { id: before.venueId }, select: { status: true, isPublished: true } }) : null;
         const wantsPublish = payload.status === "PUBLISHED" || payload.isPublished === true;
         if (wantsPublish) {
@@ -411,15 +413,15 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         if (wantsPublish) {
           const blockers = computeEventPublishBlockers({ startAt: before.startAt, timezone: before.timezone, venue });
           if (blockers.length > 0) throw new PublishBlockedError(blockers);
-          patch.status = "PUBLISHED";
+          patch.status = "PUBLISHED" as ContentStatus;
           patch.isPublished = true;
           patch.publishedAt = new Date();
         } else if (payload.status === "CHANGES_REQUESTED") {
-          patch.status = "CHANGES_REQUESTED";
+          patch.status = "CHANGES_REQUESTED" as ContentStatus;
           patch.isPublished = false;
           patch.publishedAt = null;
         } else if (payload.isPublished === false) {
-          patch.status = payload.status ?? "PUBLISHED";
+          patch.status = (payload.status ?? "PUBLISHED") as ContentStatus;
           patch.isPublished = false;
           patch.publishedAt = null;
         }
