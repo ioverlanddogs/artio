@@ -13,21 +13,40 @@ function hasVercelCrons() {
   }
 }
 
+function parseMode(argv) {
+  const modeArg = argv.find((entry) => entry.startsWith("--mode="));
+  if (!modeArg) return "auto";
+  return modeArg.split("=")[1] || "auto";
+}
+
+const mode = parseMode(process.argv.slice(2));
 const isDeployContext = process.env.VERCEL === "1" || process.env.CI === "true";
+const shouldEnforce = mode === "vercel-build" || mode === "deploy" || (mode === "auto" && isDeployContext);
 
-const requiredInDeploy = ["AUTH_SECRET", "DATABASE_URL"];
-const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-
-if (process.env.DIRECT_URL !== undefined) requiredInDeploy.push("DIRECT_URL");
-if (hasVercelCrons()) requiredInDeploy.push("CRON_SECRET");
-
-if (!isDeployContext) {
+if (!shouldEnforce) {
   console.log("[check-env] non-deploy context detected; skipping strict checks");
   process.exit(0);
 }
 
-const missing = requiredInDeploy.filter((key) => !process.env[key] || String(process.env[key]).trim().length === 0);
+const requiredInDeploy = ["AUTH_SECRET", "DATABASE_URL"];
+const optional = ["DIRECT_URL"];
+
+if (hasVercelCrons()) {
+  requiredInDeploy.push("CRON_SECRET");
+}
+
+const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+const mapboxNames = ["NEXT_PUBLIC_MAPBOX_TOKEN", "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN"];
+
+const statusEntries = [...requiredInDeploy, ...optional].map((key) => ({
+  key,
+  set: Boolean(process.env[key] && String(process.env[key]).trim().length > 0),
+}));
+
+let missing = statusEntries
+  .filter((entry) => requiredInDeploy.includes(entry.key) && !entry.set)
+  .map((entry) => entry.key);
 
 if ((mapboxToken !== undefined || mapboxAccessToken !== undefined)
   && (!mapboxToken || String(mapboxToken).trim().length === 0)
@@ -35,9 +54,20 @@ if ((mapboxToken !== undefined || mapboxAccessToken !== undefined)
   missing.push("NEXT_PUBLIC_MAPBOX_TOKEN|NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN");
 }
 
+const mapboxEnabled = mapboxToken !== undefined || mapboxAccessToken !== undefined;
+const mapboxSummary = mapboxNames
+  .map((key) => `${key}=${Boolean(process.env[key] && String(process.env[key]).trim().length > 0)}`)
+  .join(" ");
+const summary = statusEntries.map(({ key, set }) => `${key}=${set}`).join(" ");
+
+console.log(`[check-env] mode=${mode} ${summary}`);
+if (mapboxEnabled) {
+  console.log(`[check-env] mapbox ${mapboxSummary}`);
+}
+
 if (missing.length) {
   console.error(`[check-env] Missing required env vars for deploy context: ${missing.join(", ")}`);
   process.exit(1);
 }
 
-console.log(`[check-env] OK (${requiredInDeploy.join(", ")})`);
+console.log("[check-env] OK");

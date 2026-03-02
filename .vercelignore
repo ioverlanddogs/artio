@@ -1,0 +1,23 @@
+# Keep deployment upload minimal
+.git
+.github
+.vscode
+.idea
+
+# Local/dev artifacts
+node_modules
+.next
+coverage
+*.log
+
+# Environment files
+.env*
+
+# Test and docs (not needed by runtime build output upload)
+test
+PRD.md
+API_SPEC.md
+UI_UX.md
+MIGRATIONS.md
+STACK.md
+MANIFEST.json

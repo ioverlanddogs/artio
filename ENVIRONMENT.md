@@ -76,6 +76,17 @@ Optional:
 
 ---
 
+
+## Build-time deploy checks (Preview + Production)
+
+- Vercel Preview and Production both run the same commands from `vercel.json`:
+  - `pnpm run vercel:install`
+  - `pnpm run vercel:build`
+- `vercel:build` runs `scripts/check-env.mjs --mode=vercel-build` before `next build`.
+- The check prints only variable names with set status (`true` / `false`), never secret values.
+- Required at build/deploy time: `AUTH_SECRET`, `DATABASE_URL`, and `CRON_SECRET` (when cron jobs are configured in `vercel.json`).
+- Optional at build/deploy time: `DIRECT_URL` (reported for parity visibility, not required).
+
 ## 3. OAuth Configuration Notes
 
 Google redirect URI:
