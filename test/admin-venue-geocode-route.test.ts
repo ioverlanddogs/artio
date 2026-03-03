@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleAdminVenueGeocode } from "../lib/admin-venue-geocode";
-import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { ForwardGeocodeError } from "@/lib/geocode/forward";
 
 const venueId = "11111111-1111-4111-8111-111111111111";
 
@@ -79,7 +79,7 @@ test("admin venue geocode maps rate_limited error to explicit message", async ()
       },
     } as never,
     geocodeAddress: async () => {
-      throw new MapboxForwardGeocodeError("rate_limited", "limited", 429);
+      throw new ForwardGeocodeError("rate_limited", "limited", 429);
     },
   });
 
@@ -109,7 +109,7 @@ test("admin venue geocode maps provider_error to explicit message", async () => 
       },
     } as never,
     geocodeAddress: async () => {
-      throw new MapboxForwardGeocodeError("provider_error", "failed", 500);
+      throw new ForwardGeocodeError("provider_error", "failed", 500);
     },
   });
 

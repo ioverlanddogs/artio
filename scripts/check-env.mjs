@@ -35,6 +35,10 @@ if (hasVercelCrons()) {
   requiredInDeploy.push("CRON_SECRET");
 }
 
+const geocoderProvider = process.env.GEOCODER_PROVIDER?.trim().toLowerCase() || "mapbox";
+const isGoogleGeocoder = geocoderProvider === "google";
+const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+
 const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const mapboxNames = ["NEXT_PUBLIC_MAPBOX_TOKEN", "NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN"];
@@ -48,6 +52,10 @@ let missing = statusEntries
   .filter((entry) => requiredInDeploy.includes(entry.key) && !entry.set)
   .map((entry) => entry.key);
 
+if (isGoogleGeocoder && (!googleMapsApiKey || String(googleMapsApiKey).trim().length === 0)) {
+  missing.push("GOOGLE_MAPS_API_KEY");
+}
+
 if ((mapboxToken !== undefined || mapboxAccessToken !== undefined)
   && (!mapboxToken || String(mapboxToken).trim().length === 0)
   && (!mapboxAccessToken || String(mapboxAccessToken).trim().length === 0)) {
@@ -60,7 +68,10 @@ const mapboxSummary = mapboxNames
   .join(" ");
 const summary = statusEntries.map(({ key, set }) => `${key}=${set}`).join(" ");
 
-console.log(`[check-env] mode=${mode} ${summary}`);
+console.log(`[check-env] mode=${mode} geocoder=${geocoderProvider} ${summary}`);
+if (isGoogleGeocoder) {
+  console.log(`[check-env] google GOOGLE_MAPS_API_KEY=${Boolean(googleMapsApiKey && String(googleMapsApiKey).trim().length > 0)}`);
+}
 if (mapboxEnabled) {
   console.log(`[check-env] mapbox ${mapboxSummary}`);
 }

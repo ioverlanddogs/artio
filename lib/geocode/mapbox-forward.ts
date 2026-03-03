@@ -1,10 +1,12 @@
-export class MapboxForwardGeocodeError extends Error {
+import { ForwardGeocodeError, type ForwardGeocodeArgs } from "@/lib/geocode/forward-types";
+
+export class MapboxForwardGeocodeError extends ForwardGeocodeError {
   constructor(
-    public readonly code: "not_configured" | "provider_error" | "provider_timeout" | "rate_limited",
+    code: "not_configured" | "provider_error" | "provider_timeout" | "rate_limited",
     message: string,
-    public readonly status?: number,
+    status?: number,
   ) {
-    super(message);
+    super(code, message, status);
     this.name = "MapboxForwardGeocodeError";
   }
 }
@@ -28,11 +30,7 @@ function isAddressTextValid(addressText: string) {
   return trimmed.length >= 3;
 }
 
-export async function geocodeVenueAddressToLatLng(args: {
-  addressText?: string;
-  queryTexts?: string[];
-  countryCode?: string;
-}): Promise<{ lat: number; lng: number } | null> {
+export async function geocodeVenueAddressToLatLng(args: ForwardGeocodeArgs): Promise<{ lat: number; lng: number } | null> {
   const REQUEST_TIMEOUT_MS = 8000;
   const queryTexts = (args.queryTexts ?? [args.addressText ?? ""]).map((query) => query.trim()).filter((query) => isAddressTextValid(query));
   if (queryTexts.length === 0) return null;

@@ -88,6 +88,8 @@ If missing in production-like environments, auth boot will fail fast with a clea
    - `CRON_SECRET`
    - `AUTH_GOOGLE_ID`
    - `AUTH_GOOGLE_SECRET`
+   - `GEOCODER_PROVIDER` (`mapbox` default, set to `google` to use Google server-side geocoding)
+   - `GOOGLE_MAPS_API_KEY` (required when `GEOCODER_PROVIDER=google`; server-side only, never `NEXT_PUBLIC_*`)
    - Optional: `NEXT_PUBLIC_MAPBOX_TOKEN` (canonical; `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` also works and enables `/nearby` map view)
 3. Ensure the production database is reachable from Vercel.
 4. Run migrations on deploy (`pnpm prisma:deploy`) before serving traffic.

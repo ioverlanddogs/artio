@@ -28,6 +28,10 @@ ADMIN_EMAIL_DOMAINS=example.org
 # Optional admin image accessibility policy
 ADMIN_IMAGE_ALT_REQUIRED=false
 
+# Server-side venue geocoding (optional; defaults to mapbox provider)
+GEOCODER_PROVIDER=mapbox
+GOOGLE_MAPS_API_KEY=
+
 # Maps (optional, enables Nearby map view)
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=
 
@@ -68,6 +72,8 @@ Optional:
 - `AI_INGEST_CRON_CIRCUIT_BREAKER_WINDOW_HOURS` (default `6`)
 - `AI_INGEST_CRON_CIRCUIT_BREAKER_MIN_RUNS` (default `5`)
 - `AI_INGEST_CRON_CIRCUIT_BREAKER_FAIL_RATE` (default `0.6`)
+- `GEOCODER_PROVIDER` (`mapbox` default; set to `google` to use Google Geocoding API server-side)
+- `GOOGLE_MAPS_API_KEY` (required only when `GEOCODER_PROVIDER=google`; server-side only)
 - `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (enables `/nearby` map view)
 - `BLOB_READ_WRITE_TOKEN` (required for Blob image uploads)
 - `RATE_LIMIT_VENUE_IMAGES_WRITE_PER_MINUTE` (defaults to `60`)
@@ -85,6 +91,7 @@ Optional:
 - `vercel:build` runs `scripts/check-env.mjs --mode=vercel-build` before `next build`.
 - The check prints only variable names with set status (`true` / `false`), never secret values.
 - Required at build/deploy time: `AUTH_SECRET`, `DATABASE_URL`, and `CRON_SECRET` (when cron jobs are configured in `vercel.json`).
+- Also required at build/deploy time when `GEOCODER_PROVIDER=google`: `GOOGLE_MAPS_API_KEY`.
 - Optional at build/deploy time: `DIRECT_URL` (reported for parity visibility, not required).
 
 ## 3. OAuth Configuration Notes

@@ -5,7 +5,7 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
 import { handlePostMyVenue, VenueLimitReachedError } from "@/lib/my-venue-create-route";
 import { logAdminAction } from "@/lib/admin-audit";
-import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { ForwardGeocodeError } from "@/lib/geocode/forward";
 import { geocodeForVenueCreate } from "@/lib/venues/venue-geocode-flow";
 
 export const runtime = "nodejs";
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         effectiveLat = geocoded.lat;
         effectiveLng = geocoded.lng;
       } catch (error) {
-        if (!(error instanceof MapboxForwardGeocodeError && error.code === "not_configured")) {
+        if (!(error instanceof ForwardGeocodeError && error.code === "not_configured")) {
           console.warn(`my_venue_geocode_failed venueId=pending city=${data.city ?? ""} postcode=${data.postcode ?? ""}`);
         }
       }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { ForwardGeocodeError } from "@/lib/geocode/forward";
 import { geocodeForVenueUpdate, geocodeForVenueUpdateBestEffort } from "@/lib/venues/venue-geocode-flow";
 
 test("update geocode flow refreshes coordinates when address changes", async () => {
@@ -24,7 +24,7 @@ test("best-effort update geocode never throws when provider fails", async () => 
   const result = await geocodeForVenueUpdateBestEffort({
     existing: { id: "ven_1", addressLine1: "1 Old", city: "Old city", postcode: "OLD", country: "UK", lat: 33, lng: 44 },
     patch: { city: "Bath" },
-  }, async () => { throw new MapboxForwardGeocodeError("provider_error", "down"); }, (message) => {
+  }, async () => { throw new ForwardGeocodeError("provider_error", "down"); }, (message) => {
     warned = message;
   });
 

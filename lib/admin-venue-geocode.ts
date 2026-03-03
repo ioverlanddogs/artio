@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { requireAdmin, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { geocodeVenueAddressToLatLng, MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
+import { forwardGeocodeVenueAddressToLatLng, ForwardGeocodeError } from "@/lib/geocode/forward";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { computeReadiness } from "@/lib/publish-blockers";
@@ -12,7 +12,7 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 type GeocodeDeps = {
   requireAdminUser: typeof requireAdmin;
   appDb: typeof db;
-  geocodeAddress: typeof geocodeVenueAddressToLatLng;
+  geocodeAddress: typeof forwardGeocodeVenueAddressToLatLng;
 };
 
 function getMissingAddressFields(venue: { city: string | null; postcode: string | null; country: string | null }) {
@@ -67,16 +67,16 @@ export async function handleAdminVenueGeocode(params: Promise<{ id: string }>, d
   } catch (error) {
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
-    if (error instanceof MapboxForwardGeocodeError && error.code === "provider_timeout") {
+    if (error instanceof ForwardGeocodeError && error.code === "provider_timeout") {
       return NextResponse.json({ ok: false, message: "Geocoding provider timed out. Please retry in a moment." }, { headers: NO_STORE_HEADERS });
     }
-    if (error instanceof MapboxForwardGeocodeError && error.code === "not_configured") {
+    if (error instanceof ForwardGeocodeError && error.code === "not_configured") {
       return NextResponse.json({ ok: false, message: "Geocoding provider is not configured. Please retry after provider setup." }, { headers: NO_STORE_HEADERS });
     }
-    if (error instanceof MapboxForwardGeocodeError && error.code === "rate_limited") {
+    if (error instanceof ForwardGeocodeError && error.code === "rate_limited") {
       return NextResponse.json({ ok: false, message: "Geocoding provider rate limited. Please retry shortly." }, { headers: NO_STORE_HEADERS });
     }
-    if (error instanceof MapboxForwardGeocodeError) {
+    if (error instanceof ForwardGeocodeError) {
       return NextResponse.json({ ok: false, message: "Geocoding provider failed (network/rate limit). Please retry." }, { headers: NO_STORE_HEADERS });
     }
     return NextResponse.json({ ok: false, message: "Unexpected server error" }, { headers: NO_STORE_HEADERS });
@@ -86,5 +86,5 @@ export async function handleAdminVenueGeocode(params: Promise<{ id: string }>, d
 export const adminVenueGeocodeDeps: GeocodeDeps = {
   requireAdminUser: requireAdmin,
   appDb: db,
-  geocodeAddress: geocodeVenueAddressToLatLng,
+  geocodeAddress: forwardGeocodeVenueAddressToLatLng,
 };

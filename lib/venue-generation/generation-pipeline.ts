@@ -1,6 +1,6 @@
 import { type Prisma } from "@prisma/client";
 import { ZodError } from "zod";
-import { geocodeVenueAddressToLatLng } from "@/lib/geocode/mapbox-forward";
+import { forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
 
@@ -117,7 +117,7 @@ export async function runVenueGenerationPipeline(args: {
   triggeredById: string;
   db: PipelineDb;
   openai: OpenAIClient;
-  geocode?: typeof geocodeVenueAddressToLatLng;
+  geocode?: typeof forwardGeocodeVenueAddressToLatLng;
   model?: string;
 }) {
   const existing = await args.db.venue.findMany({ select: { name: true, city: true } });
@@ -174,7 +174,7 @@ export async function runVenueGenerationPipeline(args: {
     }
     throw error;
   }
-  const geocodeFn = args.geocode ?? geocodeVenueAddressToLatLng;
+  const geocodeFn = args.geocode ?? forwardGeocodeVenueAddressToLatLng;
 
   let totalCreated = 0;
   let totalSkipped = 0;

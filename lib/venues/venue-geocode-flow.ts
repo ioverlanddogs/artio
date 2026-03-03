@@ -1,11 +1,11 @@
-import { geocodeVenueAddressToLatLng } from "@/lib/geocode/mapbox-forward";
+import { forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
 import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode, type VenueAddressFields } from "@/lib/venues/format-venue-address";
 
 type LatLng = { lat: number; lng: number };
 
 export type VenueGeocodeFields = VenueAddressFields & { lat?: number | null; lng?: number | null };
 
-export async function geocodeForVenueCreate(input: VenueGeocodeFields, geocodeFn = geocodeVenueAddressToLatLng) {
+export async function geocodeForVenueCreate(input: VenueGeocodeFields, geocodeFn = forwardGeocodeVenueAddressToLatLng) {
   if (input.lat != null || input.lng != null) return { lat: input.lat ?? null, lng: input.lng ?? null };
   if (!isVenueAddressGeocodeable(input)) return { lat: null, lng: null };
 
@@ -24,7 +24,7 @@ export async function geocodeForVenueCreate(input: VenueGeocodeFields, geocodeFn
 export async function geocodeForVenueUpdate(args: {
   existing: VenueGeocodeFields;
   patch: Partial<VenueGeocodeFields>;
-}, geocodeFn = geocodeVenueAddressToLatLng): Promise<LatLng | null> {
+}, geocodeFn = forwardGeocodeVenueAddressToLatLng): Promise<LatLng | null> {
   const hasAddressChange = ["addressLine1", "addressLine2", "city", "region", "postcode", "country"].some((field) => Object.prototype.hasOwnProperty.call(args.patch, field));
   const hasManualLatLng = Object.prototype.hasOwnProperty.call(args.patch, "lat") || Object.prototype.hasOwnProperty.call(args.patch, "lng");
 
@@ -52,7 +52,7 @@ export async function geocodeForVenueUpdate(args: {
 export async function geocodeForVenueUpdateBestEffort(args: {
   existing: VenueGeocodeFields;
   patch: Partial<VenueGeocodeFields>;
-}, geocodeFn = geocodeVenueAddressToLatLng, log: (message: string) => void = console.warn): Promise<LatLng | null> {
+}, geocodeFn = forwardGeocodeVenueAddressToLatLng, log: (message: string) => void = console.warn): Promise<LatLng | null> {
   try {
     return await geocodeForVenueUpdate(args, geocodeFn);
   } catch {
