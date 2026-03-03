@@ -15,22 +15,13 @@ export default async function MySettingsPage() {
       <section className="space-y-3 rounded border p-4">
         <div>
           <h2 className="text-lg font-medium">Notifications</h2>
-          <p className="text-sm text-muted-foreground">Choose which updates we send to your inbox.</p>
+          <p className="text-sm text-muted-foreground">Coming soon.</p>
         </div>
-        <div className="space-y-2 text-sm">
-          <label className="flex items-start gap-2">
-            <input type="checkbox" checked readOnly className="mt-1" />
-            <span>Email me when submissions are approved or rejected</span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" checked readOnly className="mt-1" />
-            <span>Email me when I receive team invites</span>
-          </label>
-          <label className="flex items-start gap-2">
-            <input type="checkbox" readOnly className="mt-1" />
-            <span>Send me a weekly publisher digest</span>
-          </label>
-        </div>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>Email alerts for submission approvals or rejections</li>
+          <li>Email alerts for team invites</li>
+          <li>Weekly publisher digest</li>
+        </ul>
       </section>
 
       <section className="space-y-2 rounded border p-4">
