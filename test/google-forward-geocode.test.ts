@@ -70,6 +70,26 @@ test("google geocode throws not_configured when key is missing", async () => {
   );
 });
 
+
+test("google geocode throws provider_error on REQUEST_DENIED", async () => {
+  process.env.GOOGLE_MAPS_API_KEY = "google-test-key";
+
+  const originalFetch = global.fetch;
+  global.fetch = (async () => new Response(JSON.stringify({
+    status: "REQUEST_DENIED",
+    error_message: "API keys with referer restrictions cannot be used with this API.",
+  }), { status: 200 })) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      geocodeVenueAddressToLatLng({ addressText: "London" }),
+      (error: unknown) => error instanceof ForwardGeocodeError && error.code === "provider_error",
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test("google geocode throws rate_limited on OVER_QUERY_LIMIT", async () => {
   process.env.GOOGLE_MAPS_API_KEY = "google-test-key";
 
@@ -112,6 +132,23 @@ test("google geocode throws provider_error on invalid JSON", async () => {
     await assert.rejects(
       geocodeVenueAddressToLatLng({ addressText: "London" }),
       (error: unknown) => error instanceof ForwardGeocodeError && error.code === "provider_error",
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+
+test("google geocode throws provider_timeout on aborted fetch", async () => {
+  process.env.GOOGLE_MAPS_API_KEY = "google-test-key";
+
+  const originalFetch = global.fetch;
+  global.fetch = (async () => { throw new DOMException("signal", "AbortError"); }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      geocodeVenueAddressToLatLng({ addressText: "London" }),
+      (error: unknown) => error instanceof ForwardGeocodeError && error.code === "provider_timeout",
     );
   } finally {
     global.fetch = originalFetch;
