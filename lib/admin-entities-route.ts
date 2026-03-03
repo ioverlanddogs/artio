@@ -5,6 +5,7 @@ import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { computeEventPublishBlockers, computeReadiness, computeVenuePublishBlockers } from "@/lib/publish-blockers";
 import { allowedTransitions, validateModerationTransition } from "@/lib/moderation-decision-service";
+import { idParamSchema, zodDetails } from "@/lib/validators";
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -455,6 +456,29 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
     if (error instanceof Error && "status" in error && "code" in error && (error as { code?: string }).code === "invalid_transition") {
       return apiError(400, "invalid_transition", error.message);
     }
+    return apiError(401, "unauthorized", "Authentication required");
+  }
+}
+
+export async function handleAdminEntityGet(_req: NextRequest, entity: EntityName, params: { id: string }, deps: AdminEntitiesDeps) {
+  try {
+    await deps.requireAdminUser();
+    const parsedId = idParamSchema.safeParse(params);
+    if (!parsedId.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedId.error));
+
+    const where = { id: parsedId.data.id };
+    const item = entity === "venues"
+      ? await deps.appDb.venue.findUnique({ where })
+      : entity === "events"
+        ? await deps.appDb.event.findUnique({ where })
+        : entity === "artists"
+          ? await deps.appDb.artist.findUnique({ where })
+          : await deps.appDb.artwork.findUnique({ where });
+
+    if (!item) return apiError(404, "not_found", "Entity not found");
+    return NextResponse.json({ item });
+  } catch (error) {
+    if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
     return apiError(401, "unauthorized", "Authentication required");
   }
 }

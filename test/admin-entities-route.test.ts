@@ -6,6 +6,7 @@ import {
   handleAdminEntityImportApply,
   handleAdminEntityImportPreview,
   handleAdminEntityArchive,
+  handleAdminEntityGet,
   handleAdminEntityList,
   handleAdminEntityPatch,
   handleAdminEntityRestore,
@@ -73,6 +74,35 @@ test("admin entity list returns 403 for non-admin", async () => {
   const req = new NextRequest("http://localhost/api/admin/venues");
   const res = await handleAdminEntityList(req, "venues", { requireAdminUser: async () => { throw new Error("forbidden"); }, appDb: appDb as never });
   assert.equal(res.status, 403);
+});
+
+test("admin entity get returns 200 for a valid UUID with an existing venue", async () => {
+  const { appDb } = buildVenueDeps();
+  const req = new NextRequest("http://localhost/api/admin/venues/11111111-1111-4111-8111-111111111111");
+
+  const res = await handleAdminEntityGet(req, "venues", { id: "11111111-1111-4111-8111-111111111111" }, { requireAdminUser: adminUser, appDb: appDb as never });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.item.id, "11111111-1111-4111-8111-111111111111");
+});
+
+test("admin entity get returns 400 for an invalid UUID", async () => {
+  const { appDb } = buildVenueDeps();
+  const req = new NextRequest("http://localhost/api/admin/venues/not-a-uuid");
+
+  const res = await handleAdminEntityGet(req, "venues", { id: "not-a-uuid" }, { requireAdminUser: adminUser, appDb: appDb as never });
+
+  assert.equal(res.status, 400);
+});
+
+test("admin entity get returns 404 when venue does not exist", async () => {
+  const { appDb } = buildVenueDeps();
+  const req = new NextRequest("http://localhost/api/admin/venues/33333333-3333-4333-8333-333333333333");
+
+  const res = await handleAdminEntityGet(req, "venues", { id: "33333333-3333-4333-8333-333333333333" }, { requireAdminUser: adminUser, appDb: appDb as never });
+
+  assert.equal(res.status, 404);
 });
 
 test("inline patch rejects unknown fields", async () => {
