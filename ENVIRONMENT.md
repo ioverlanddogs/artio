@@ -165,3 +165,18 @@ Recommended scripts:
   - `AI_INGEST_CRON_CIRCUIT_BREAKER_WINDOW_HOURS`
   - `AI_INGEST_CRON_CIRCUIT_BREAKER_MIN_RUNS`
   - `AI_INGEST_CRON_CIRCUIT_BREAKER_FAIL_RATE`
+
+## Venue timezone backfill
+
+Populate missing `Venue.timezone` values from existing coordinates:
+
+```bash
+pnpm backfill:venue-timezones
+```
+
+Optional batch size override:
+
+```bash
+BATCH_SIZE=1000 pnpm backfill:venue-timezones
+```
+

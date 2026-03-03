@@ -16,6 +16,7 @@ type RunItem = {
   venueId: string | null;
   geocodeStatus: string;
   geocodeErrorCode: string | null;
+  timezoneWarning: string | null;
   createdAt: string | Date;
 };
 
@@ -140,7 +141,7 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
                 <div>
                   <h3 className="font-medium">Created ({created.length})</h3>
                   <ul className="list-disc pl-5">
-                    {created.map((item) => <li key={item.id}>{item.venueId ? <Link className="underline" href={`/admin/venues/${item.venueId}`}>{item.name}</Link> : item.name} — geocode: {item.geocodeStatus}{item.geocodeErrorCode ? ` (${item.geocodeErrorCode})` : ""}</li>)}
+                    {created.map((item) => <li key={item.id}>{item.venueId ? <Link className="underline" href={`/admin/venues/${item.venueId}`}>{item.name}</Link> : item.name} — geocode: {item.geocodeStatus}{item.geocodeErrorCode ? ` (${item.geocodeErrorCode})` : ""}{item.timezoneWarning ? `, timezone: ${item.timezoneWarning}` : ""}</li>)}
                   </ul>
                 </div>
                 <div>

@@ -1,6 +1,7 @@
 import { type Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { ForwardGeocodeError, type ForwardGeocodeErrorCode, forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
+import tzLookup from "tz-lookup";
 import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
@@ -86,6 +87,7 @@ type PipelineDb = {
         venueId?: string;
         geocodeStatus: string;
         geocodeErrorCode?: string;
+        timezoneWarning?: string;
       };
     }) => Promise<{ id: string }>;
   };
@@ -391,6 +393,16 @@ export async function runVenueGenerationPipeline(args: {
       if (geocodeResult.geocodeErrorCode) incrementBreakdown(geocodeFailureBreakdown, geocodeResult.geocodeErrorCode);
     }
 
+    let timezone: string | null = null;
+    let timezoneWarning: string | undefined;
+    if (typeof geocodeResult.geocoded?.lat === "number" && typeof geocodeResult.geocoded?.lng === "number") {
+      try {
+        timezone = tzLookup(geocodeResult.geocoded.lat, geocodeResult.geocoded.lng);
+      } catch {
+        timezoneWarning = "timezone_lookup_failed";
+      }
+    }
+
     const created = await args.db.venue.create({
       data: {
         name: venue.name,
@@ -408,6 +420,7 @@ export async function runVenueGenerationPipeline(args: {
         openingHours: toJsonOpeningHours(venue.openingHours),
         lat: geocodeResult.geocoded?.lat,
         lng: geocodeResult.geocoded?.lng,
+        timezone,
         isPublished: false,
         aiGenerated: true,
         aiGeneratedAt: new Date(),
@@ -426,6 +439,7 @@ export async function runVenueGenerationPipeline(args: {
         venueId: created.id,
         geocodeStatus: geocodeResult.status,
         geocodeErrorCode: geocodeResult.geocodeErrorCode,
+        timezoneWarning,
       },
     });
 

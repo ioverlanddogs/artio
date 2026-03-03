@@ -41,6 +41,7 @@ export async function GET() {
             venueId: true,
             geocodeStatus: true,
             geocodeErrorCode: true,
+            timezoneWarning: true,
             createdAt: true,
           },
         },

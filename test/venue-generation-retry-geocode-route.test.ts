@@ -36,6 +36,7 @@ test("retry geocode updates missing venue coordinates and run counters", async (
                 country: "ZA",
                 lat: null,
                 lng: null,
+                timezone: null,
               },
             },
           ]),
@@ -59,6 +60,7 @@ test("retry geocode updates missing venue coordinates and run counters", async (
   assert.equal(payload.ok, true);
   assert.equal(venueUpdates.length, 1);
   assert.equal(itemUpdates[0].geocodeStatus, "succeeded");
+  assert.equal(venueUpdates[0].timezone, "Africa/Johannesburg");
 });
 
 test("retry geocode stops early when provider is rate limited", async () => {
@@ -92,6 +94,7 @@ test("retry geocode stops early when provider is rate limited", async () => {
                 country: "ZA",
                 lat: null,
                 lng: null,
+                timezone: null,
               },
             },
           ]),

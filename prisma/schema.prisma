@@ -395,6 +395,7 @@ model VenueGenerationRunItem {
   venueId           String?            @db.Uuid
   geocodeStatus     String             @default("not_attempted")
   geocodeErrorCode  String?
+  timezoneWarning   String?
   createdAt         DateTime           @default(now())
   run               VenueGenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   venue             Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)

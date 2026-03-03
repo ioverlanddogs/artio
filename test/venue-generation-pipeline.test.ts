@@ -100,6 +100,8 @@ test("venue generation pipeline records geocode success/no-match/failure", async
   assert.equal((result.geocodeFailureBreakdown as Record<string, number>).provider_error, 1);
   assert.equal(state.createdItems.length, 3);
   assert.deepEqual(state.createdItems.map((item) => item.geocodeStatus), ["succeeded", "no_match", "failed"]);
+  assert.equal(state.createdVenues[1].timezone, null);
+  assert.equal(state.createdItems[1].timezoneWarning, undefined);
 });
 
 test("venue generation pipeline dedupe tiering uses postcode before city", async () => {
@@ -135,4 +137,51 @@ test("venue generation pipeline dedupe tiering uses postcode before city", async
   assert.equal((whereClauses[0].postcode as { equals?: string }).equals, "8001");
   assert.equal((whereClauses[1].city as { equals?: string }).equals, "Cape Town");
   assert.ok(!("city" in whereClauses[2]));
+});
+
+
+test("venue generation pipeline sets timezone from geocoded coordinates", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "United Kingdom", region: "England" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    openai: {
+      createResponse: async () => ({
+        output_parsed: {
+          venues: [
+            { ...openAiPayload.output_parsed.venues[0], name: "London Venue", city: "London", country: "United Kingdom" },
+          ],
+        },
+      }),
+    },
+    geocode: async () => ({ lat: 51.5074, lng: -0.1278 }),
+  });
+
+  assert.equal(state.createdVenues[0].timezone, "Europe/London");
+  assert.equal(state.createdItems[0].timezoneWarning, undefined);
+});
+
+test("venue generation pipeline records timezone warning when lookup fails", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "United Kingdom", region: "England" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    openai: {
+      createResponse: async () => ({
+        output_parsed: {
+          venues: [
+            { ...openAiPayload.output_parsed.venues[0], name: "Bad Coords Venue", city: "London", country: "United Kingdom" },
+          ],
+        },
+      }),
+    },
+    geocode: async () => ({ lat: 999, lng: -0.1278 }),
+  });
+
+  assert.equal(state.createdVenues[0].timezone, null);
+  assert.equal(state.createdItems[0].timezoneWarning, "timezone_lookup_failed");
 });

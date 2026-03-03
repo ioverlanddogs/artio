@@ -35,6 +35,7 @@ export default async function AdminVenueGenerationPage() {
           venueId: true,
           geocodeStatus: true,
           geocodeErrorCode: true,
+          timezoneWarning: true,
           createdAt: true,
         },
       },

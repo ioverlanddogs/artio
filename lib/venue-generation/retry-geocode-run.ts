@@ -3,6 +3,7 @@ import { apiError } from "@/lib/api";
 import { requireAdmin, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ForwardGeocodeError, forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
+import tzLookup from "tz-lookup";
 import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 
 type RetryDeps = {
@@ -34,7 +35,7 @@ export async function handleRetryVenueGenerationGeocode(_req: NextRequest, conte
       select: {
         id: true,
         venueId: true,
-        venue: { select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, region: true, postcode: true, country: true, lat: true, lng: true } },
+        venue: { select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, region: true, postcode: true, country: true, lat: true, lng: true, timezone: true } },
       },
     });
 
@@ -66,8 +67,19 @@ export async function handleRetryVenueGenerationGeocode(_req: NextRequest, conte
           continue;
         }
 
-        await dbClient.venue.update({ where: { id: venue.id }, data: { lat: geocoded.lat, lng: geocoded.lng } });
-        await dbClient.venueGenerationRunItem.update({ where: { id: item.id }, data: { geocodeStatus: "succeeded", geocodeErrorCode: null } });
+        let timezone: string | null | undefined;
+        let timezoneWarning: string | null = null;
+        if (typeof geocoded.lat === "number" && typeof geocoded.lng === "number") {
+          try {
+            timezone = tzLookup(geocoded.lat, geocoded.lng);
+          } catch {
+            timezone = null;
+            timezoneWarning = "timezone_lookup_failed";
+          }
+        }
+
+        await dbClient.venue.update({ where: { id: venue.id }, data: { lat: geocoded.lat, lng: geocoded.lng, timezone } });
+        await dbClient.venueGenerationRunItem.update({ where: { id: item.id }, data: { geocodeStatus: "succeeded", geocodeErrorCode: null, timezoneWarning } });
         succeeded += 1;
         updates.push({ itemId: item.id, venueId: venue.id, status: "succeeded" });
       } catch (error) {
