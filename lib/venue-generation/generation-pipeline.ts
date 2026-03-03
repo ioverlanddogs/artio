@@ -1,6 +1,7 @@
 import { type Prisma } from "@prisma/client";
 import { ZodError } from "zod";
-import { forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
+import { ForwardGeocodeError, type ForwardGeocodeErrorCode, forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
+import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
 
@@ -21,6 +22,8 @@ type OpenAIResponse = {
   output_text?: string;
 };
 
+
+
 export class VenueGenerationError extends Error {
   constructor(
     public code: "OPENAI_HTTP_ERROR" | "OPENAI_BAD_OUTPUT" | "OPENAI_SCHEMA_MISMATCH",
@@ -33,12 +36,58 @@ export class VenueGenerationError extends Error {
 
 type PipelineDb = {
   venue: {
-    findMany: (args: { select: { name: true; city: true } }) => Promise<Array<{ name: string; city: string | null }>>;
+    findFirst: (args: {
+      where: Prisma.VenueWhereInput;
+      select: { id: true };
+    }) => Promise<{ id: string } | null>;
     findUnique: (args: { where: { slug: string }; select: { id: true } }) => Promise<{ id: string } | null>;
     create: (args: { data: Prisma.VenueCreateInput }) => Promise<{ id: string }>;
   };
   venueGenerationRun: {
-    create: (args: { data: { country: string; region: string; totalReturned: number; totalCreated: number; totalSkipped: number; triggeredById: string } }) => Promise<{ id: string }>;
+    create: (args: {
+      data: {
+        country: string;
+        region: string;
+        totalReturned: number;
+        totalCreated: number;
+        totalSkipped: number;
+        totalFailed: number;
+        geocodeAttempted: number;
+        geocodeSucceeded: number;
+        geocodeFailed: number;
+        geocodeFailureBreakdown: Record<string, number>;
+        triggeredById: string;
+      };
+    }) => Promise<{ id: string }>;
+    update: (args: {
+      where: { id: string };
+      data: {
+        totalReturned: number;
+        totalCreated: number;
+        totalSkipped: number;
+        totalFailed: number;
+        geocodeAttempted: number;
+        geocodeSucceeded: number;
+        geocodeFailed: number;
+        geocodeFailureBreakdown: Record<string, number>;
+      };
+    }) => Promise<{ id: string }>;
+  };
+  venueGenerationRunItem: {
+    create: (args: {
+      data: {
+        runId: string;
+        name: string;
+        city: string | null;
+        postcode: string | null;
+        country: string;
+        status: string;
+        reason?: string;
+        venueId?: string;
+        geocodeStatus: string;
+        geocodeErrorCode?: string;
+      };
+    }) => Promise<{ id: string }>;
   };
 };
 
@@ -57,6 +106,82 @@ function toJsonOpeningHours(value: string | null): Prisma.InputJsonValue | undef
 
 function getOutputItems(raw: OpenAIResponse): ResponseOutputItem[] {
   return [...(raw.output ?? []), ...(raw.response?.output ?? [])];
+}
+
+function normalizeGeneratedVenue(venue: GeneratedVenue): GeneratedVenue {
+  return {
+    ...venue,
+    name: venue.name.trim(),
+    city: venue.city?.trim() || null,
+    region: venue.region?.trim() || null,
+    postcode: venue.postcode?.trim() || null,
+    country: venue.country.trim(),
+    addressLine1: venue.addressLine1?.trim() || null,
+    addressLine2: venue.addressLine2?.trim() || null,
+  };
+}
+
+function incrementBreakdown(map: Record<string, number>, code: ForwardGeocodeErrorCode) {
+  map[code] = (map[code] ?? 0) + 1;
+}
+
+function dedupeWhereForVenue(venue: GeneratedVenue): { where: Prisma.VenueWhereInput; reason: string } {
+  const name = venue.name.trim();
+  const country = venue.country.trim();
+  const postcode = venue.postcode?.trim();
+  const city = venue.city?.trim();
+
+  if (postcode) {
+    return {
+      where: {
+        name: { equals: name, mode: "insensitive" },
+        postcode: { equals: postcode, mode: "insensitive" },
+        country: { equals: country, mode: "insensitive" },
+      },
+      reason: "duplicate(postcode-tier)",
+    };
+  }
+
+  if (city) {
+    return {
+      where: {
+        name: { equals: name, mode: "insensitive" },
+        city: { equals: city, mode: "insensitive" },
+        country: { equals: country, mode: "insensitive" },
+      },
+      reason: "duplicate(city-tier)",
+    };
+  }
+
+  return {
+    where: {
+      name: { equals: name, mode: "insensitive" },
+      country: { equals: country, mode: "insensitive" },
+    },
+    reason: "duplicate(name-country-tier)",
+  };
+}
+
+async function geocodeVenue(venue: GeneratedVenue, geocodeFn: typeof forwardGeocodeVenueAddressToLatLng) {
+  const queryTexts = buildVenueGeocodeQueries(venue);
+  if (queryTexts.length === 0) {
+    return { status: "not_attempted" as const, geocoded: null, geocodeErrorCode: undefined };
+  }
+
+  try {
+    const geocoded = await geocodeFn({
+      queryTexts,
+      countryCode: normalizeCountryCode(venue.country),
+    });
+
+    if (!geocoded) return { status: "no_match" as const, geocoded: null, geocodeErrorCode: undefined };
+    return { status: "succeeded" as const, geocoded, geocodeErrorCode: undefined };
+  } catch (error) {
+    if (error instanceof ForwardGeocodeError) {
+      return { status: "failed" as const, geocoded: null, geocodeErrorCode: error.code };
+    }
+    throw error;
+  }
 }
 
 export function getStructuredPayloadFromResponses(raw: OpenAIResponse): unknown {
@@ -120,8 +245,21 @@ export async function runVenueGenerationPipeline(args: {
   geocode?: typeof forwardGeocodeVenueAddressToLatLng;
   model?: string;
 }) {
-  const existing = await args.db.venue.findMany({ select: { name: true, city: true } });
-  const seen = new Set(existing.map((venue) => `${normalize(venue.name)}|${normalize(venue.city)}`));
+  const run = await args.db.venueGenerationRun.create({
+    data: {
+      country: args.input.country,
+      region: args.input.region,
+      totalReturned: 0,
+      totalCreated: 0,
+      totalSkipped: 0,
+      totalFailed: 0,
+      geocodeAttempted: 0,
+      geocodeSucceeded: 0,
+      geocodeFailed: 0,
+      geocodeFailureBreakdown: {},
+      triggeredById: args.triggeredById,
+    },
+  });
 
   const response = await args.openai.createResponse({
     model: args.model?.trim() || process.env.VENUE_GENERATION_MODEL?.trim() || "gpt-4o-mini",
@@ -178,49 +316,98 @@ export async function runVenueGenerationPipeline(args: {
 
   let totalCreated = 0;
   let totalSkipped = 0;
+  let totalFailed = 0;
+  let geocodeAttempted = 0;
+  let geocodeSucceeded = 0;
+  let geocodeFailed = 0;
+  const geocodeFailureBreakdown: Record<string, number> = {};
 
-  for (const venue of parsed.venues) {
-    const key = `${normalize(venue.name)}|${normalize(venue.city)}`;
-    if (seen.has(key)) {
+  const seen = new Set<string>();
+
+  for (const rawVenue of parsed.venues) {
+    const venue = normalizeGeneratedVenue(rawVenue);
+    const memoryDedupeKey = `${normalize(venue.name)}|${normalize(venue.postcode)}|${normalize(venue.city)}|${normalize(venue.country)}`;
+    if (seen.has(memoryDedupeKey)) {
       totalSkipped += 1;
+      await args.db.venueGenerationRunItem.create({
+        data: {
+          runId: run.id,
+          name: venue.name,
+          city: venue.city,
+          postcode: venue.postcode,
+          country: venue.country,
+          status: "skipped",
+          reason: "duplicate(in-run)",
+          geocodeStatus: "not_attempted",
+        },
+      });
+      continue;
+    }
+
+    const dedupe = dedupeWhereForVenue(venue);
+    const duplicate = await args.db.venue.findFirst({ where: dedupe.where, select: { id: true } });
+    if (duplicate) {
+      totalSkipped += 1;
+      seen.add(memoryDedupeKey);
+      await args.db.venueGenerationRunItem.create({
+        data: {
+          runId: run.id,
+          name: venue.name,
+          city: venue.city,
+          postcode: venue.postcode,
+          country: venue.country,
+          status: "skipped",
+          reason: dedupe.reason,
+          geocodeStatus: "not_attempted",
+        },
+      });
       continue;
     }
 
     const slugBase = slugifyVenueName(venue.name);
     const slug = await ensureUniqueVenueSlugWithDeps({ findBySlug: (candidate) => args.db.venue.findUnique({ where: { slug: candidate }, select: { id: true } }) }, slugBase);
     if (!slug) {
-      totalSkipped += 1;
+      totalFailed += 1;
+      await args.db.venueGenerationRunItem.create({
+        data: {
+          runId: run.id,
+          name: venue.name,
+          city: venue.city,
+          postcode: venue.postcode,
+          country: venue.country,
+          status: "failed",
+          reason: "slug_generation_failed",
+          geocodeStatus: "not_attempted",
+        },
+      });
       continue;
     }
 
-    const geocodeQuery = [venue.addressLine1, venue.city, venue.region, venue.country].filter(Boolean).join(", ");
-    const geocoded = geocodeQuery ? await geocodeFn({ addressText: geocodeQuery }).catch(() => null) : null;
+    const geocodeResult = await geocodeVenue(venue, geocodeFn);
+    if (geocodeResult.status !== "not_attempted") geocodeAttempted += 1;
+    if (geocodeResult.status === "succeeded") geocodeSucceeded += 1;
+    if (geocodeResult.status === "failed") {
+      geocodeFailed += 1;
+      if (geocodeResult.geocodeErrorCode) incrementBreakdown(geocodeFailureBreakdown, geocodeResult.geocodeErrorCode);
+    }
 
-    const normalizedVenue: GeneratedVenue = {
-      ...venue,
-      name: venue.name.trim(),
-      city: venue.city?.trim() || null,
-      region: venue.region?.trim() || null,
-      country: venue.country.trim(),
-    };
-
-    await args.db.venue.create({
+    const created = await args.db.venue.create({
       data: {
-        name: normalizedVenue.name,
+        name: venue.name,
         slug,
-        addressLine1: normalizedVenue.addressLine1,
-        addressLine2: normalizedVenue.addressLine2,
-        city: normalizedVenue.city,
-        region: normalizedVenue.region,
-        postcode: normalizedVenue.postcode,
-        country: normalizedVenue.country,
-        contactEmail: normalizedVenue.contactEmail,
-        contactPhone: normalizedVenue.contactPhone,
-        websiteUrl: normalizedVenue.websiteUrl,
-        instagramUrl: normalizedVenue.instagramUrl,
-        openingHours: toJsonOpeningHours(normalizedVenue.openingHours),
-        lat: geocoded?.lat,
-        lng: geocoded?.lng,
+        addressLine1: venue.addressLine1,
+        addressLine2: venue.addressLine2,
+        city: venue.city,
+        region: venue.region,
+        postcode: venue.postcode,
+        country: venue.country,
+        contactEmail: venue.contactEmail,
+        contactPhone: venue.contactPhone,
+        websiteUrl: venue.websiteUrl,
+        instagramUrl: venue.instagramUrl,
+        openingHours: toJsonOpeningHours(venue.openingHours),
+        lat: geocodeResult.geocoded?.lat,
+        lng: geocodeResult.geocoded?.lng,
         isPublished: false,
         aiGenerated: true,
         aiGeneratedAt: new Date(),
@@ -228,18 +415,35 @@ export async function runVenueGenerationPipeline(args: {
       },
     });
 
-    seen.add(key);
+    await args.db.venueGenerationRunItem.create({
+      data: {
+        runId: run.id,
+        name: venue.name,
+        city: venue.city,
+        postcode: venue.postcode,
+        country: venue.country,
+        status: "created",
+        venueId: created.id,
+        geocodeStatus: geocodeResult.status,
+        geocodeErrorCode: geocodeResult.geocodeErrorCode,
+      },
+    });
+
+    seen.add(memoryDedupeKey);
     totalCreated += 1;
   }
 
-  const run = await args.db.venueGenerationRun.create({
+  await args.db.venueGenerationRun.update({
+    where: { id: run.id },
     data: {
-      country: args.input.country,
-      region: args.input.region,
       totalReturned: parsed.venues.length,
       totalCreated,
       totalSkipped,
-      triggeredById: args.triggeredById,
+      totalFailed,
+      geocodeAttempted,
+      geocodeSucceeded,
+      geocodeFailed,
+      geocodeFailureBreakdown,
     },
   });
 
@@ -248,6 +452,11 @@ export async function runVenueGenerationPipeline(args: {
     totalReturned: parsed.venues.length,
     totalCreated,
     totalSkipped,
+    totalFailed,
+    geocodeAttempted,
+    geocodeSucceeded,
+    geocodeFailed,
+    geocodeFailureBreakdown,
   };
 }
 

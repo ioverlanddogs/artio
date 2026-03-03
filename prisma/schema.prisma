@@ -354,6 +354,7 @@ model Venue {
   ingestRuns         IngestRun[]
   ingestExtractedEvents IngestExtractedEvent[]
   claimRequests      VenueClaimRequest[]
+  generationRunItems VenueGenerationRunItem[]
 
   @@index([isPublished])
   @@index([status])
@@ -363,16 +364,44 @@ model Venue {
 }
 
 model VenueGenerationRun {
-  id            String   @id @default(uuid()) @db.Uuid
-  country       String
-  region        String
-  totalReturned Int
-  totalCreated  Int
-  totalSkipped  Int
-  triggeredById String   @db.Uuid
-  createdAt     DateTime @default(now())
-  triggeredBy   User     @relation(fields: [triggeredById], references: [id], onDelete: Restrict)
+  id                      String                   @id @default(uuid()) @db.Uuid
+  country                 String
+  region                  String
+  totalReturned           Int
+  totalCreated            Int
+  totalSkipped            Int
+  totalFailed             Int                      @default(0)
+  geocodeAttempted        Int                      @default(0)
+  geocodeSucceeded        Int                      @default(0)
+  geocodeFailed           Int                      @default(0)
+  geocodeFailureBreakdown Json?
+  triggeredById           String                   @db.Uuid
+  createdAt               DateTime                 @default(now())
+  triggeredBy             User                     @relation(fields: [triggeredById], references: [id], onDelete: Restrict)
+  items                   VenueGenerationRunItem[]
 
+  @@index([createdAt])
+}
+
+model VenueGenerationRunItem {
+  id               String             @id @default(uuid()) @db.Uuid
+  runId             String             @db.Uuid
+  name              String
+  city              String?
+  postcode          String?
+  country           String
+  status            String
+  reason            String?
+  venueId           String?            @db.Uuid
+  geocodeStatus     String             @default("not_attempted")
+  geocodeErrorCode  String?
+  createdAt         DateTime           @default(now())
+  run               VenueGenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  venue             Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  @@index([runId, status])
+  @@index([runId, geocodeStatus])
+  @@index([venueId])
   @@index([createdAt])
 }
 

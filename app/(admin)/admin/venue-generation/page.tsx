@@ -8,7 +8,37 @@ export default async function AdminVenueGenerationPage() {
   const runs = await db.venueGenerationRun.findMany({
     orderBy: { createdAt: "desc" },
     take: 10,
-    select: { id: true, country: true, region: true, totalReturned: true, totalCreated: true, totalSkipped: true, createdAt: true },
+    select: {
+      id: true,
+      country: true,
+      region: true,
+      totalReturned: true,
+      totalCreated: true,
+      totalSkipped: true,
+      totalFailed: true,
+      geocodeAttempted: true,
+      geocodeSucceeded: true,
+      geocodeFailed: true,
+      geocodeFailureBreakdown: true,
+      createdAt: true,
+      items: {
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          postcode: true,
+          country: true,
+          status: true,
+          reason: true,
+          venueId: true,
+          geocodeStatus: true,
+          geocodeErrorCode: true,
+          createdAt: true,
+        },
+      },
+    },
   });
 
   return (
