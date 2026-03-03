@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { geocodeVenueAddressToLatLng, MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { venueIdParamSchema, zodDetails } from "@/lib/validators";
-import { formatVenueAddress, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
+import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 
 export const runtime = "nodejs";
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const venue = await db.venue.findUnique({
       where: { id: parsedParams.data.id },
-      select: { id: true, addressLine1: true, addressLine2: true, city: true, region: true, postcode: true, country: true },
+      select: { id: true, name: true, addressLine1: true, addressLine2: true, city: true, region: true, postcode: true, country: true },
     });
     if (!venue) return apiError(404, "not_found", "Venue not found");
 
@@ -33,11 +33,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ code: "no_match", message: "Location missing" }, { status: 422, headers: NO_STORE_HEADERS });
     }
 
-    const addressText = formatVenueAddress(venue);
-    if (!addressText) return NextResponse.json({ code: "no_match", message: "Location missing" }, { status: 422, headers: NO_STORE_HEADERS });
+    const queryTexts = buildVenueGeocodeQueries(venue);
+    if (queryTexts.length === 0) return NextResponse.json({ code: "no_match", message: "Location missing" }, { status: 422, headers: NO_STORE_HEADERS });
 
     const result = await geocodeVenueAddressToLatLng({
-      addressText,
+      queryTexts,
       countryCode: normalizeCountryCode(venue.country),
     });
 

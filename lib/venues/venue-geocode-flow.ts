@@ -1,5 +1,5 @@
 import { geocodeVenueAddressToLatLng } from "@/lib/geocode/mapbox-forward";
-import { formatVenueAddress, isVenueAddressGeocodeable, normalizeCountryCode, type VenueAddressFields } from "@/lib/venues/format-venue-address";
+import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode, type VenueAddressFields } from "@/lib/venues/format-venue-address";
 
 type LatLng = { lat: number; lng: number };
 
@@ -9,11 +9,11 @@ export async function geocodeForVenueCreate(input: VenueGeocodeFields, geocodeFn
   if (input.lat != null || input.lng != null) return { lat: input.lat ?? null, lng: input.lng ?? null };
   if (!isVenueAddressGeocodeable(input)) return { lat: null, lng: null };
 
-  const addressText = formatVenueAddress(input);
-  if (!addressText) return { lat: null, lng: null };
+  const queryTexts = buildVenueGeocodeQueries(input);
+  if (queryTexts.length === 0) return { lat: null, lng: null };
 
   const result = await geocodeFn({
-    addressText,
+    queryTexts,
     countryCode: normalizeCountryCode(input.country),
   });
 
@@ -40,11 +40,11 @@ export async function geocodeForVenueUpdate(args: {
   };
 
   if (!isVenueAddressGeocodeable(merged)) return null;
-  const addressText = formatVenueAddress(merged);
-  if (!addressText) return null;
+  const queryTexts = buildVenueGeocodeQueries(merged);
+  if (queryTexts.length === 0) return null;
 
   return geocodeFn({
-    addressText,
+    queryTexts,
     countryCode: normalizeCountryCode(merged.country),
   });
 }

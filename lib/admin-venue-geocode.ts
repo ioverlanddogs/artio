@@ -4,7 +4,7 @@ import { requireAdmin, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { geocodeVenueAddressToLatLng, MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
 import { idParamSchema, zodDetails } from "@/lib/validators";
-import { formatVenueAddress, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
+import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { computeReadiness } from "@/lib/publish-blockers";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
@@ -47,13 +47,13 @@ export async function handleAdminVenueGeocode(params: Promise<{ id: string }>, d
       return NextResponse.json({ ok: false, message: `Address is incomplete for geocoding.${missingSuffix}`, item: withPublishState(venue) }, { headers: NO_STORE_HEADERS });
     }
 
-    const addressText = formatVenueAddress(venue);
-    if (!addressText) {
+    const queryTexts = buildVenueGeocodeQueries(venue);
+    if (queryTexts.length === 0) {
       return NextResponse.json({ ok: false, message: "Address is incomplete for geocoding. Add: country, city or postcode.", item: withPublishState(venue) }, { headers: NO_STORE_HEADERS });
     }
 
     const result = await deps.geocodeAddress({
-      addressText,
+      queryTexts,
       countryCode: normalizeCountryCode(venue.country),
     });
 
