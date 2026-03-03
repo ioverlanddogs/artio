@@ -9,6 +9,7 @@ import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filt
 import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
 import MyEventSubmitButton from "@/app/my/_components/MyEventSubmitButton";
 import MyEventCreateRevisionButton from "@/app/my/_components/MyEventCreateRevisionButton";
+import { VenueFilterSelect } from "@/app/my/events/_components/VenueFilterSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +83,10 @@ export default async function MyEventsPage({ searchParams }: { searchParams: Eve
     <main className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <form className="flex gap-2"><input className="h-9 rounded border px-2 text-sm" defaultValue={query} name="q" placeholder="Search events" /><Button size="sm">Search</Button></form>
-        <select name="venueId" defaultValue={venueId ?? ""} className="h-9 rounded border px-2 text-sm"><option value="">All venues</option>{memberships.map((m) => <option key={m.venueId} value={m.venueId}>{m.venue.name}</option>)}</select>
+        <VenueFilterSelect
+          memberships={memberships.map((m) => ({ venueId: m.venueId, name: m.venue.name }))}
+          currentVenueId={venueId}
+        />
         {(["Draft", "Submitted", "Published", "Rejected", "Archived"] as const).map((chip) => <Link key={chip} className="rounded border px-2 py-1 text-xs" href={`/my/events?status=${chip}${chip === "Archived" ? "&showArchived=1" : ""}`}>{chip}</Link>)}
         <Link className="rounded border px-2 py-1 text-xs" href="/my/events?sort=updated">Sort: Updated</Link>
         <Button asChild size="sm"><Link href="/my/events/new">+ Create event</Link></Button>
