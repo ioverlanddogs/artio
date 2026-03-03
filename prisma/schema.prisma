@@ -323,6 +323,7 @@ model Venue {
   timezone           String?
   websiteUrl         String?
   instagramUrl       String?
+  facebookUrl        String?
   contactEmail       String?
   contactPhone       String?
   openingHours       Json?
@@ -393,6 +394,11 @@ model VenueGenerationRunItem {
   status            String
   reason            String?
   venueId           String?            @db.Uuid
+  instagramUrl      String?
+  facebookUrl       String?
+  contactEmail      String?
+  featuredImageUrl  String?
+  socialWarning     String?
   geocodeStatus     String             @default("not_attempted")
   geocodeErrorCode  String?
   timezoneWarning   String?

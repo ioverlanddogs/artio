@@ -5,7 +5,7 @@ export const venueGenerationInputSchema = z.object({
   region: z.string().trim().min(1).max(120),
 });
 
-const urlSchema = z.url().max(500);
+const urlSchema = z.string().trim().max(500);
 
 export const generatedVenueSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -15,10 +15,12 @@ export const generatedVenueSchema = z.object({
   region: z.string().trim().max(120).nullable(),
   postcode: z.string().trim().max(40).nullable(),
   country: z.string().trim().min(2).max(120),
-  contactEmail: z.email().max(320).nullable(),
+  contactEmail: z.string().trim().max(320).nullable(),
   contactPhone: z.string().trim().max(80).nullable(),
   websiteUrl: urlSchema.nullable(),
   instagramUrl: urlSchema.nullable(),
+  facebookUrl: urlSchema.nullable(),
+  featuredImageUrl: urlSchema.nullable(),
   openingHours: z.string().trim().max(400).nullable(),
   venueType: z.enum(["GALLERY", "MUSEUM", "ART_CENTRE", "FOUNDATION", "OTHER"]),
 });
