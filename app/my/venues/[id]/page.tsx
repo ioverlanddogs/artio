@@ -159,7 +159,7 @@ export default async function MyVenueEditPage({
           <div id={`basic-section-${venue.id}`}>
             <VenueSetupSection title="Basic information" description="Name and description are required." complete={checks.basicInfo} defaultOpen={!isCreatedFirstVisit || firstRequired === "basic"}>
               <div className="space-y-4">
-                <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} />
+                <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} fields="basic" />
                 <div className="text-right">
                   <Link className="text-sm underline" href={`#location-section-${venue.id}`}>Next: Location</Link>
                 </div>
@@ -173,6 +173,7 @@ export default async function MyVenueEditPage({
                 <p className="text-sm text-muted-foreground">
                   Location is complete when city and country are set. Coordinates are generated automatically after address updates.
                 </p>
+                <VenueSelfServeForm venue={venue} submissionStatus={submission?.status ?? null} fields="location" />
                 <div className="text-right">
                   <Link className="text-sm underline" href={`#images-section-${venue.id}`}>Next: Images</Link>
                 </div>

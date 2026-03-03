@@ -22,8 +22,15 @@ type VenueRecord = {
   isPublished: boolean;
 };
 
-export default function VenueSelfServeForm({ venue, submissionStatus }: { venue: VenueRecord; submissionStatus: "DRAFT" | "IN_REVIEW" | "APPROVED" | "REJECTED" | null }) {
-  void submissionStatus;
+export default function VenueSelfServeForm({
+  venue,
+  submissionStatus,
+  fields = "basic",
+}: {
+  venue: VenueRecord;
+  submissionStatus: "DRAFT" | "IN_REVIEW" | "APPROVED" | "REJECTED" | null;
+  fields?: "basic" | "location";
+}) {
   const router = useRouter();
   const [form, setForm] = useState<Record<string, unknown>>({ ...venue });
   const [error, setError] = useState<string | null>(null);
@@ -69,23 +76,66 @@ export default function VenueSelfServeForm({ venue, submissionStatus }: { venue:
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 max-w-2xl">
-      <label className="block"><span className="text-sm">Name</span><input className="border rounded p-2 w-full" value={String(form.name ?? "")} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Description</span><textarea className="border rounded p-2 w-full" value={String(form.description ?? "")} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></label>
-      <p className="text-xs text-muted-foreground">Minimum 20 characters ({descriptionLength}/20)</p>
-      <label className="block"><span className="text-sm">Address line 1</span><input className="border rounded p-2 w-full" value={String(form.addressLine1 ?? "")} onChange={(e) => setForm((p) => ({ ...p, addressLine1: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Address line 2</span><input className="border rounded p-2 w-full" value={String(form.addressLine2 ?? "")} onChange={(e) => setForm((p) => ({ ...p, addressLine2: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">City</span><input className="border rounded p-2 w-full" value={String(form.city ?? "")} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Region</span><input className="border rounded p-2 w-full" value={String(form.region ?? "")} onChange={(e) => setForm((p) => ({ ...p, region: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Postcode</span><input className="border rounded p-2 w-full" value={String(form.postcode ?? "")} onChange={(e) => setForm((p) => ({ ...p, postcode: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Country</span><input className="border rounded p-2 w-full" value={String(form.country ?? "")} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Website</span><input className="border rounded p-2 w-full" value={String(form.websiteUrl ?? "")} onChange={(e) => setForm((p) => ({ ...p, websiteUrl: e.target.value }))} /></label>
-      <label className="block"><span className="text-sm">Instagram</span><input className="border rounded p-2 w-full" value={String(form.instagramUrl ?? "")} onChange={(e) => setForm((p) => ({ ...p, instagramUrl: e.target.value }))} /></label>
-      <ImageUploader
-        label="Upload featured image"
-        initialUrl={venue.featuredAsset?.url ?? venue.featuredImageUrl}
-        onUploaded={({ assetId }) => setForm((p) => ({ ...p, featuredAssetId: assetId, featuredImageUrl: null }))}
-        onRemove={removeFeaturedImage}
-      />
+
+      {/* ── Basic group ── */}
+      {(fields === "basic") && (
+        <>
+          <label className="block">
+            <span className="text-sm">Name</span>
+            <input className="border rounded p-2 w-full" value={String(form.name ?? "")} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Description</span>
+            <textarea className="border rounded p-2 w-full" value={String(form.description ?? "")} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
+          </label>
+          <p className="text-xs text-muted-foreground">Minimum 20 characters ({descriptionLength}/20)</p>
+          <label className="block">
+            <span className="text-sm">Website</span>
+            <input className="border rounded p-2 w-full" value={String(form.websiteUrl ?? "")} onChange={(e) => setForm((p) => ({ ...p, websiteUrl: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Instagram</span>
+            <input className="border rounded p-2 w-full" value={String(form.instagramUrl ?? "")} onChange={(e) => setForm((p) => ({ ...p, instagramUrl: e.target.value }))} />
+          </label>
+          <ImageUploader
+            label="Upload featured image"
+            initialUrl={venue.featuredAsset?.url ?? venue.featuredImageUrl}
+            onUploaded={({ assetId }) => setForm((p) => ({ ...p, featuredAssetId: assetId, featuredImageUrl: null }))}
+            onRemove={removeFeaturedImage}
+          />
+        </>
+      )}
+
+      {/* ── Location group ── */}
+      {(fields === "location") && (
+        <>
+          <label className="block">
+            <span className="text-sm">Address line 1</span>
+            <input className="border rounded p-2 w-full" value={String(form.addressLine1 ?? "")} onChange={(e) => setForm((p) => ({ ...p, addressLine1: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Address line 2</span>
+            <input className="border rounded p-2 w-full" value={String(form.addressLine2 ?? "")} onChange={(e) => setForm((p) => ({ ...p, addressLine2: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">City</span>
+            <input className="border rounded p-2 w-full" value={String(form.city ?? "")} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Region</span>
+            <input className="border rounded p-2 w-full" value={String(form.region ?? "")} onChange={(e) => setForm((p) => ({ ...p, region: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Postcode</span>
+            <input className="border rounded p-2 w-full" value={String(form.postcode ?? "")} onChange={(e) => setForm((p) => ({ ...p, postcode: e.target.value }))} />
+          </label>
+          <label className="block">
+            <span className="text-sm">Country</span>
+            <input className="border rounded p-2 w-full" value={String(form.country ?? "")} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))} />
+          </label>
+        </>
+      )}
+
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button className="rounded border px-3 py-1">Save venue</button>
     </form>
