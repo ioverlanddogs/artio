@@ -73,8 +73,11 @@ export async function handleAdminVenueGeocode(params: Promise<{ id: string }>, d
     if (error instanceof MapboxForwardGeocodeError && error.code === "not_configured") {
       return NextResponse.json({ ok: false, message: "Geocoding provider is not configured. Please retry after provider setup." }, { headers: NO_STORE_HEADERS });
     }
+    if (error instanceof MapboxForwardGeocodeError && error.code === "rate_limited") {
+      return NextResponse.json({ ok: false, message: "Geocoding provider rate limited. Please retry shortly." }, { headers: NO_STORE_HEADERS });
+    }
     if (error instanceof MapboxForwardGeocodeError) {
-      return NextResponse.json({ ok: false, message: "Geocoding provider failed (rate limit/network). Please retry." }, { headers: NO_STORE_HEADERS });
+      return NextResponse.json({ ok: false, message: "Geocoding provider failed (network/rate limit). Please retry." }, { headers: NO_STORE_HEADERS });
     }
     return NextResponse.json({ ok: false, message: "Unexpected server error" }, { headers: NO_STORE_HEADERS });
   }

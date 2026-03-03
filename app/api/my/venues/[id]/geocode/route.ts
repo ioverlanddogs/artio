@@ -54,7 +54,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Venue membership required");
     if (error instanceof MapboxForwardGeocodeError && error.code === "provider_timeout") return apiError(504, "provider_timeout", "Geocoding provider request timed out");
     if (error instanceof MapboxForwardGeocodeError && error.code === "not_configured") return apiError(501, "not_configured", "Geocoding provider is not configured");
-    if (error instanceof MapboxForwardGeocodeError) return apiError(502, "provider_error", "Geocoding provider request failed");
+    if (error instanceof MapboxForwardGeocodeError && error.code === "rate_limited") return apiError(429, "rate_limited", "Geocoding provider rate limited. Please retry shortly.");
+    if (error instanceof MapboxForwardGeocodeError) return apiError(502, "provider_error", "Geocoding provider failed (network/rate limit). Please retry.");
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

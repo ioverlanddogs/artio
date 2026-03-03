@@ -60,7 +60,39 @@ test("geocodeVenueAddressToLatLng uses fallback queries until a feature is found
   }
 });
 
-test("geocodeVenueAddressToLatLng throws provider_timeout on timeout", async () => {
+test("geocodeVenueAddressToLatLng throws rate_limited on 429", async () => {
+  process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+
+  const originalFetch = global.fetch;
+  global.fetch = (async () => new Response("{}", { status: 429 })) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      geocodeVenueAddressToLatLng({ addressText: "10 Downing St, London, SW1A 2AA, UK", countryCode: "GB" }),
+      (error: unknown) => error instanceof MapboxForwardGeocodeError && error.code === "rate_limited" && error.status === 429,
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("geocodeVenueAddressToLatLng throws provider_error on 500", async () => {
+  process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+
+  const originalFetch = global.fetch;
+  global.fetch = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      geocodeVenueAddressToLatLng({ addressText: "10 Downing St, London, SW1A 2AA, UK", countryCode: "GB" }),
+      (error: unknown) => error instanceof MapboxForwardGeocodeError && error.code === "provider_error" && error.status === 500,
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("geocodeVenueAddressToLatLng throws provider_timeout on aborted fetch", async () => {
   process.env.MAPBOX_ACCESS_TOKEN = "test-token";
 
   const originalFetch = global.fetch;
@@ -71,6 +103,24 @@ test("geocodeVenueAddressToLatLng throws provider_timeout on timeout", async () 
       geocodeVenueAddressToLatLng({ addressText: "10 Downing St, London, SW1A 2AA, UK", countryCode: "GB" }),
       (error: unknown) => error instanceof MapboxForwardGeocodeError && error.code === "provider_timeout",
     );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("geocodeVenueAddressToLatLng returns null for ok response with empty features", async () => {
+  process.env.MAPBOX_ACCESS_TOKEN = "test-token";
+
+  const originalFetch = global.fetch;
+  global.fetch = (async () => new Response(JSON.stringify({ features: [] }), { status: 200 })) as typeof fetch;
+
+  try {
+    const result = await geocodeVenueAddressToLatLng({
+      addressText: "10 Downing St, London, SW1A 2AA, UK",
+      countryCode: "GB",
+    });
+
+    assert.equal(result, null);
   } finally {
     global.fetch = originalFetch;
   }

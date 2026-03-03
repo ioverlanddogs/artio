@@ -1,7 +1,9 @@
-import { FetchTimeoutError, fetchWithTimeout } from "@/lib/fetch-with-timeout";
-
 export class MapboxForwardGeocodeError extends Error {
-  constructor(public readonly code: "not_configured" | "provider_error" | "provider_timeout", message: string) {
+  constructor(
+    public readonly code: "not_configured" | "provider_error" | "provider_timeout" | "rate_limited",
+    message: string,
+    public readonly status?: number,
+  ) {
     super(message);
     this.name = "MapboxForwardGeocodeError";
   }
@@ -31,6 +33,7 @@ export async function geocodeVenueAddressToLatLng(args: {
   queryTexts?: string[];
   countryCode?: string;
 }): Promise<{ lat: number; lng: number } | null> {
+  const REQUEST_TIMEOUT_MS = 8000;
   const queryTexts = (args.queryTexts ?? [args.addressText ?? ""]).map((query) => query.trim()).filter((query) => isAddressTextValid(query));
   if (queryTexts.length === 0) return null;
 
@@ -46,11 +49,27 @@ export async function geocodeVenueAddressToLatLng(args: {
     if (args.countryCode) url.searchParams.set("country", args.countryCode);
     url.searchParams.set("access_token", token);
 
-    try {
-      const response = await fetchWithTimeout(url, { method: "GET", cache: "no-store" }, 5000);
-      if (!response.ok) throw new MapboxForwardGeocodeError("provider_error", "Mapbox forward geocode failed");
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS);
 
-      const json = (await response.json()) as MapboxForwardResponse;
+    try {
+      const response = await fetch(url, { method: "GET", cache: "no-store", signal: abortController.signal });
+      if (response.status === 429) throw new MapboxForwardGeocodeError("rate_limited", "Mapbox forward geocode rate limited", 429);
+      if (!response.ok) throw new MapboxForwardGeocodeError("provider_error", `Mapbox forward geocode failed with status ${response.status}`, response.status);
+
+      let json: MapboxForwardResponse;
+      try {
+        json = (await response.json()) as MapboxForwardResponse;
+      } catch {
+        throw new MapboxForwardGeocodeError("provider_error", "Mapbox forward geocode returned invalid JSON", response.status);
+      }
+
+      if (!Array.isArray(json.features)) {
+        throw new MapboxForwardGeocodeError("provider_error", "Mapbox forward geocode response missing features array", response.status);
+      }
+
+      if (json.features.length === 0) continue;
+
       const top = json.features?.[0];
       const coordinates = top?.geometry?.coordinates;
       const propsCoordinates = top?.properties?.coordinates;
@@ -61,10 +80,16 @@ export async function geocodeVenueAddressToLatLng(args: {
       if (typeof lat === "number" && typeof lng === "number") {
         return { lat, lng };
       }
+
+      throw new MapboxForwardGeocodeError("provider_error", "Mapbox forward geocode response missing coordinates", response.status);
     } catch (error) {
       if (error instanceof MapboxForwardGeocodeError) throw error;
-      if (error instanceof FetchTimeoutError) throw new MapboxForwardGeocodeError("provider_timeout", "Mapbox forward geocode timed out");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new MapboxForwardGeocodeError("provider_timeout", "Mapbox forward geocode timed out");
+      }
       throw new MapboxForwardGeocodeError("provider_error", "Mapbox forward geocode failed");
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

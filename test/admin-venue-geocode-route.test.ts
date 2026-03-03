@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleAdminVenueGeocode } from "../lib/admin-venue-geocode";
+import { MapboxForwardGeocodeError } from "@/lib/geocode/mapbox-forward";
 
 const venueId = "11111111-1111-4111-8111-111111111111";
 
@@ -53,4 +54,65 @@ test("admin venue geocode success updates lat/lng", async () => {
   const body = await res.json();
   assert.equal(body.ok, true);
   assert.equal(body.item.publishBlockers.some((x: string) => x.includes("Coordinates are required")), false);
+});
+
+
+test("admin venue geocode maps rate_limited error to explicit message", async () => {
+  const res = await handleAdminVenueGeocode(Promise.resolve({ id: venueId }), {
+    requireAdminUser: async () => ({ id: "admin", email: "admin@example.com", role: "ADMIN" }),
+    appDb: {
+      venue: {
+        findUnique: async () => ({
+          id: venueId,
+          name: "Venue",
+          status: "APPROVED",
+          addressLine1: "1 Main Street",
+          addressLine2: null,
+          city: "London",
+          region: null,
+          postcode: "E1 6AN",
+          country: "GB",
+          lat: null,
+          lng: null,
+        }),
+        update: async () => null,
+      },
+    } as never,
+    geocodeAddress: async () => {
+      throw new MapboxForwardGeocodeError("rate_limited", "limited", 429);
+    },
+  });
+
+  const body = await res.json();
+  assert.equal(body.message, "Geocoding provider rate limited. Please retry shortly.");
+});
+
+test("admin venue geocode maps provider_error to explicit message", async () => {
+  const res = await handleAdminVenueGeocode(Promise.resolve({ id: venueId }), {
+    requireAdminUser: async () => ({ id: "admin", email: "admin@example.com", role: "ADMIN" }),
+    appDb: {
+      venue: {
+        findUnique: async () => ({
+          id: venueId,
+          name: "Venue",
+          status: "APPROVED",
+          addressLine1: "1 Main Street",
+          addressLine2: null,
+          city: "London",
+          region: null,
+          postcode: "E1 6AN",
+          country: "GB",
+          lat: null,
+          lng: null,
+        }),
+        update: async () => null,
+      },
+    } as never,
+    geocodeAddress: async () => {
+      throw new MapboxForwardGeocodeError("provider_error", "failed", 500);
+    },
+  });
+
+  const body = await res.json();
+  assert.equal(body.message, "Geocoding provider failed (network/rate limit). Please retry.");
 });
