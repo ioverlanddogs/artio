@@ -5,6 +5,7 @@ import tzLookup from "tz-lookup";
 import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
+import { normalizeEmail, normalizeFacebookUrl, normalizeHttpsImageUrl, normalizeInstagramUrl } from "@/lib/venues/normalize-social";
 
 type ResponseOutputContentItem = {
   type?: string;
@@ -39,10 +40,11 @@ type PipelineDb = {
   venue: {
     findFirst: (args: {
       where: Prisma.VenueWhereInput;
-      select: { id: true };
-    }) => Promise<{ id: string } | null>;
+      select: { id: true; instagramUrl: true; facebookUrl: true; contactEmail: true; featuredImageUrl: true };
+    }) => Promise<{ id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; featuredImageUrl: string | null } | null>;
     findUnique: (args: { where: { slug: string }; select: { id: true } }) => Promise<{ id: string } | null>;
     create: (args: { data: Prisma.VenueCreateInput }) => Promise<{ id: string }>;
+    update: (args: { where: { id: string }; data: Prisma.VenueUpdateInput }) => Promise<{ id: string }>;
   };
   venueGenerationRun: {
     create: (args: {
@@ -85,6 +87,11 @@ type PipelineDb = {
         status: string;
         reason?: string;
         venueId?: string;
+        instagramUrl?: string | null;
+        facebookUrl?: string | null;
+        contactEmail?: string | null;
+        featuredImageUrl?: string | null;
+        socialWarning?: string;
         geocodeStatus: string;
         geocodeErrorCode?: string;
         timezoneWarning?: string;
@@ -120,6 +127,30 @@ function normalizeGeneratedVenue(venue: GeneratedVenue): GeneratedVenue {
     country: venue.country.trim(),
     addressLine1: venue.addressLine1?.trim() || null,
     addressLine2: venue.addressLine2?.trim() || null,
+    contactEmail: venue.contactEmail?.trim() || null,
+    instagramUrl: venue.instagramUrl?.trim() || null,
+    facebookUrl: venue.facebookUrl?.trim() || null,
+    featuredImageUrl: venue.featuredImageUrl?.trim() || null,
+  };
+}
+
+function normalizeSocialsAndEmail(venue: GeneratedVenue) {
+  const warnings: string[] = [];
+  const instagram = normalizeInstagramUrl(venue.instagramUrl);
+  const facebook = normalizeFacebookUrl(venue.facebookUrl);
+  const email = normalizeEmail(venue.contactEmail);
+  const image = normalizeHttpsImageUrl(venue.featuredImageUrl);
+
+  for (const warning of [instagram.warning, facebook.warning, email.warning, image.warning]) {
+    if (warning) warnings.push(warning);
+  }
+
+  return {
+    instagramUrl: instagram.value,
+    facebookUrl: facebook.value,
+    contactEmail: email.value,
+    featuredImageUrl: image.value,
+    warnings,
   };
 }
 
@@ -233,6 +264,11 @@ function venuePrompt(input: VenueGenerationInput) {
   return [
     "Return a comprehensive list of real visual-art venues for the specified geography.",
     "Include galleries, museums, art centres, artist-run spaces, sculpture parks, and foundations.",
+    "Only return official venue social profiles.",
+    "Instagram/Facebook must be full URLs beginning with https://.",
+    "If not confident in any social URL, email, or image URL, return null and do not invent values.",
+    "contactEmail must be a real email address; otherwise null.",
+    "featuredImageUrl should only be an actual venue image URL (not a homepage URL); if unsure return null.",
     "Output ONLY JSON matching schema.",
     `Country: ${input.country}`,
     `Region: ${input.region}`,
@@ -279,7 +315,7 @@ export async function runVenueGenerationPipeline(args: {
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["name", "addressLine1", "addressLine2", "city", "region", "postcode", "country", "contactEmail", "contactPhone", "websiteUrl", "instagramUrl", "openingHours", "venueType"],
+            required: ["name", "addressLine1", "addressLine2", "city", "region", "postcode", "country", "contactEmail", "contactPhone", "websiteUrl", "instagramUrl", "facebookUrl", "featuredImageUrl", "openingHours", "venueType"],
             properties: {
               name: { type: "string" },
               addressLine1: { type: ["string", "null"] },
@@ -292,6 +328,8 @@ export async function runVenueGenerationPipeline(args: {
               contactPhone: { type: ["string", "null"] },
               websiteUrl: { type: ["string", "null"] },
               instagramUrl: { type: ["string", "null"] },
+              facebookUrl: { type: ["string", "null"] },
+              featuredImageUrl: { type: ["string", "null"] },
               openingHours: { type: ["string", "null"] },
               venueType: { type: "string", enum: ["GALLERY", "MUSEUM", "ART_CENTRE", "FOUNDATION", "OTHER"] },
             },
@@ -328,6 +366,8 @@ export async function runVenueGenerationPipeline(args: {
 
   for (const rawVenue of parsed.venues) {
     const venue = normalizeGeneratedVenue(rawVenue);
+    const normalizedSocials = normalizeSocialsAndEmail(venue);
+    const socialWarning = normalizedSocials.warnings.length > 0 ? normalizedSocials.warnings.join(",") : undefined;
     const memoryDedupeKey = `${normalize(venue.name)}|${normalize(venue.postcode)}|${normalize(venue.city)}|${normalize(venue.country)}`;
     if (seen.has(memoryDedupeKey)) {
       totalSkipped += 1;
@@ -338,6 +378,11 @@ export async function runVenueGenerationPipeline(args: {
           city: venue.city,
           postcode: venue.postcode,
           country: venue.country,
+          instagramUrl: venue.instagramUrl,
+          facebookUrl: venue.facebookUrl,
+          contactEmail: venue.contactEmail,
+          featuredImageUrl: venue.featuredImageUrl,
+          socialWarning,
           status: "skipped",
           reason: "duplicate(in-run)",
           geocodeStatus: "not_attempted",
@@ -347,10 +392,24 @@ export async function runVenueGenerationPipeline(args: {
     }
 
     const dedupe = dedupeWhereForVenue(venue);
-    const duplicate = await args.db.venue.findFirst({ where: dedupe.where, select: { id: true } });
+    const duplicate = await args.db.venue.findFirst({
+      where: dedupe.where,
+      select: { id: true, instagramUrl: true, facebookUrl: true, contactEmail: true, featuredImageUrl: true },
+    });
     if (duplicate) {
       totalSkipped += 1;
       seen.add(memoryDedupeKey);
+
+      await args.db.venue.update({
+        where: { id: duplicate.id },
+        data: {
+          instagramUrl: duplicate.instagramUrl ? undefined : normalizedSocials.instagramUrl,
+          facebookUrl: duplicate.facebookUrl ? undefined : normalizedSocials.facebookUrl,
+          contactEmail: duplicate.contactEmail ? undefined : normalizedSocials.contactEmail,
+          featuredImageUrl: duplicate.featuredImageUrl ? undefined : normalizedSocials.featuredImageUrl,
+        },
+      });
+
       await args.db.venueGenerationRunItem.create({
         data: {
           runId: run.id,
@@ -358,8 +417,14 @@ export async function runVenueGenerationPipeline(args: {
           city: venue.city,
           postcode: venue.postcode,
           country: venue.country,
+          instagramUrl: venue.instagramUrl,
+          facebookUrl: venue.facebookUrl,
+          contactEmail: venue.contactEmail,
+          featuredImageUrl: venue.featuredImageUrl,
+          socialWarning,
           status: "skipped",
           reason: dedupe.reason,
+          venueId: duplicate.id,
           geocodeStatus: "not_attempted",
         },
       });
@@ -377,6 +442,11 @@ export async function runVenueGenerationPipeline(args: {
           city: venue.city,
           postcode: venue.postcode,
           country: venue.country,
+          instagramUrl: venue.instagramUrl,
+          facebookUrl: venue.facebookUrl,
+          contactEmail: venue.contactEmail,
+          featuredImageUrl: venue.featuredImageUrl,
+          socialWarning,
           status: "failed",
           reason: "slug_generation_failed",
           geocodeStatus: "not_attempted",
@@ -413,10 +483,12 @@ export async function runVenueGenerationPipeline(args: {
         region: venue.region,
         postcode: venue.postcode,
         country: venue.country,
-        contactEmail: venue.contactEmail,
+        contactEmail: normalizedSocials.contactEmail,
         contactPhone: venue.contactPhone,
         websiteUrl: venue.websiteUrl,
-        instagramUrl: venue.instagramUrl,
+        instagramUrl: normalizedSocials.instagramUrl,
+        facebookUrl: normalizedSocials.facebookUrl,
+        featuredImageUrl: normalizedSocials.featuredImageUrl,
         openingHours: toJsonOpeningHours(venue.openingHours),
         lat: geocodeResult.geocoded?.lat,
         lng: geocodeResult.geocoded?.lng,
@@ -435,6 +507,11 @@ export async function runVenueGenerationPipeline(args: {
         city: venue.city,
         postcode: venue.postcode,
         country: venue.country,
+        instagramUrl: venue.instagramUrl,
+        facebookUrl: venue.facebookUrl,
+        contactEmail: venue.contactEmail,
+        featuredImageUrl: venue.featuredImageUrl,
+        socialWarning,
         status: "created",
         venueId: created.id,
         geocodeStatus: geocodeResult.status,

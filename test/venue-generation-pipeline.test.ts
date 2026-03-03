@@ -20,6 +20,7 @@ function baseDb() {
           createdVenues.push(data);
           return { id: `venue-${createdVenues.length}` };
         },
+        update: async () => ({ id: "venue-updated" }),
       },
       venueGenerationRun: {
         create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -56,6 +57,8 @@ const openAiPayload = {
         contactPhone: null,
         websiteUrl: null,
         instagramUrl: null,
+        facebookUrl: null,
+        featuredImageUrl: null,
         openingHours: null,
         venueType: "MUSEUM",
       },
@@ -184,4 +187,88 @@ test("venue generation pipeline records timezone warning when lookup fails", asy
 
   assert.equal(state.createdVenues[0].timezone, null);
   assert.equal(state.createdItems[0].timezoneWarning, "timezone_lookup_failed");
+});
+
+
+test("venue generation pipeline normalizes and persists social fields", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "United Kingdom", region: "England" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    openai: {
+      createResponse: async () => ({
+        output_parsed: {
+          venues: [
+            {
+              ...openAiPayload.output_parsed.venues[0],
+              name: "Social Venue",
+              country: "United Kingdom",
+              instagramUrl: "https://instagram.com/socialvenue/?hl=en",
+              facebookUrl: "https://www.facebook.com/socialvenue/posts/1?ref=foo",
+              contactEmail: "hello@socialvenue.com",
+              featuredImageUrl: "https://cdn.example.com/images/venue-cover",
+            },
+          ],
+        },
+      }),
+    },
+    geocode: async () => null,
+  });
+
+  assert.equal(state.createdVenues[0].instagramUrl, "https://www.instagram.com/socialvenue");
+  assert.equal(state.createdVenues[0].facebookUrl, "https://www.facebook.com/socialvenue");
+  assert.equal(state.createdVenues[0].contactEmail, "hello@socialvenue.com");
+  assert.equal(state.createdVenues[0].featuredImageUrl, "https://cdn.example.com/images/venue-cover");
+  assert.equal(state.createdItems[0].socialWarning, undefined);
+});
+
+test("venue generation pipeline records warnings and preserves existing social fields on duplicates", async () => {
+  const state = baseDb();
+  const updates: Array<Record<string, unknown>> = [];
+
+  state.db.venue.findFirst = async () => ({
+    id: "venue-existing",
+    instagramUrl: "https://www.instagram.com/existing",
+    facebookUrl: null,
+    contactEmail: null,
+    featuredImageUrl: "https://cdn.example.com/existing.jpg",
+  });
+  state.db.venue.update = async ({ data }: { data: Record<string, unknown> }) => {
+    updates.push(data);
+    return { id: "venue-existing" };
+  };
+
+  await runVenueGenerationPipeline({
+    input: { country: "United Kingdom", region: "England" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    openai: {
+      createResponse: async () => ({
+        output_parsed: {
+          venues: [
+            {
+              ...openAiPayload.output_parsed.venues[0],
+              name: "Existing Venue",
+              country: "United Kingdom",
+              instagramUrl: "https://bad.example/social",
+              facebookUrl: "https://facebook.com/newpage",
+              contactEmail: "not-an-email",
+              featuredImageUrl: "http://example.com/not-https.jpg",
+            },
+          ],
+        },
+      }),
+    },
+    geocode: async () => null,
+  });
+
+  assert.equal(state.createdVenues.length, 0);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].instagramUrl, undefined);
+  assert.equal(updates[0].facebookUrl, "https://www.facebook.com/newpage");
+  assert.equal(updates[0].contactEmail, null);
+  assert.equal(updates[0].featuredImageUrl, undefined);
+  assert.equal(state.createdItems[0].socialWarning, "invalid_instagram_url,invalid_contact_email,invalid_featured_image_url");
 });

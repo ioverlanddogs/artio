@@ -14,6 +14,11 @@ type RunItem = {
   status: string;
   reason: string | null;
   venueId: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  contactEmail: string | null;
+  featuredImageUrl: string | null;
+  socialWarning: string | null;
   geocodeStatus: string;
   geocodeErrorCode: string | null;
   timezoneWarning: string | null;
@@ -140,8 +145,19 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
 
                 <div>
                   <h3 className="font-medium">Created ({created.length})</h3>
-                  <ul className="list-disc pl-5">
-                    {created.map((item) => <li key={item.id}>{item.venueId ? <Link className="underline" href={`/admin/venues/${item.venueId}`}>{item.name}</Link> : item.name} — geocode: {item.geocodeStatus}{item.geocodeErrorCode ? ` (${item.geocodeErrorCode})` : ""}{item.timezoneWarning ? `, timezone: ${item.timezoneWarning}` : ""}</li>)}
+                  <ul className="list-disc space-y-2 pl-5">
+                    {created.map((item) => (
+                      <li key={item.id}>
+                        <div>{item.venueId ? <Link className="underline" href={`/admin/venues/${item.venueId}`}>{item.name}</Link> : item.name} — geocode: {item.geocodeStatus}{item.geocodeErrorCode ? ` (${item.geocodeErrorCode})` : ""}{item.timezoneWarning ? `, timezone: ${item.timezoneWarning}` : ""}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.instagramUrl ? <><a className="underline" href={item.instagramUrl} target="_blank" rel="noreferrer">Instagram</a> <span>(normalized)</span> · </> : null}
+                          {item.facebookUrl ? <><a className="underline" href={item.facebookUrl} target="_blank" rel="noreferrer">Facebook</a> <span>(normalized)</span> · </> : null}
+                          {item.contactEmail ? <><a className="underline" href={`mailto:${item.contactEmail}`}>Email</a> · </> : null}
+                          {item.featuredImageUrl ? <><a className="underline" href={item.featuredImageUrl} target="_blank" rel="noreferrer">Featured image</a> · </> : null}
+                          {item.socialWarning ? <span>Warnings: {item.socialWarning}</span> : null}
+                        </div>
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div>
