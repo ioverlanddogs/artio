@@ -231,7 +231,13 @@ export async function runCronIngestVenues(
       }));
 
       const eligibleVenues = venueState
-        .filter((item) => typeof item.venue.websiteUrl === "string" && item.venue.websiteUrl.trim().length > 0 && (!item.lastRunAt || item.lastRunAt < minLastRunAt))
+        .filter((item) =>
+          (
+            (typeof item.venue.eventsPageUrl === "string" && item.venue.eventsPageUrl.trim().length > 0)
+            || (typeof item.venue.websiteUrl === "string" && item.venue.websiteUrl.trim().length > 0)
+          )
+          && (!item.lastRunAt || item.lastRunAt < minLastRunAt)
+        )
         .sort((a, b) => {
           if (!a.lastRunAt && !b.lastRunAt) return 0;
           if (!a.lastRunAt) return -1;
@@ -265,15 +271,20 @@ export async function runCronIngestVenues(
         }
 
         try {
-          // Phase 2 follow-up: this path now prefers eventsPageUrl first for sourceUrl selection.
-          const result = await runExtraction({
-            venueId: item.venue.id,
-            sourceUrl: item.venue.eventsPageUrl ?? (item.venue.websiteUrl as string),
-          });
+          const sourceUrl = (item.venue.eventsPageUrl?.trim() || item.venue.websiteUrl) as string;
+          const result = await runExtraction({ venueId: item.venue.id, sourceUrl });
           succeeded += 1;
           createdCandidates += result.createdCount;
           dedupedCandidates += result.dedupedCount;
-          venueResults.push({ venueId: item.venue.id, runId: result.runId, status: "succeeded", createdCount: result.createdCount, dedupedCount: result.dedupedCount });
+          venueResults.push({
+            venueId: item.venue.id,
+            runId: result.runId,
+            status: "succeeded",
+            sourceUrl,
+            usedEventsPageUrl: Boolean(item.venue.eventsPageUrl?.trim()),
+            createdCount: result.createdCount,
+            dedupedCount: result.dedupedCount,
+          });
         } catch (error) {
           failed += 1;
           const errorCode = error && typeof error === "object" && "code" in error ? String(error.code) : "INGEST_FAILED";
