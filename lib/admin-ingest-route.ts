@@ -358,7 +358,19 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
     const approved = await resolved.appDb.$transaction(async (tx) => {
       const candidate = await tx.ingestExtractedEvent.findUnique({
         where: { id: parsedParams.data.id },
-        include: {
+        select: {
+          id: true,
+          runId: true,
+          venueId: true,
+          sourceUrl: true,
+          title: true,
+          description: true,
+          startAt: true,
+          endAt: true,
+          timezone: true,
+          locationText: true,
+          createdEventId: true,
+          artistNames: true,
           run: { select: { id: true, venueId: true, sourceUrl: true, errorDetail: true } },
           venue: { select: { id: true, timezone: true, lat: true, lng: true, websiteUrl: true } },
         },
@@ -432,6 +444,28 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
         select: { id: true },
       });
 
+      let matchedArtists: Array<{ id: string; name: string }> = [];
+      if (candidate.artistNames && candidate.artistNames.length > 0) {
+        matchedArtists = await tx.artist.findMany({
+          where: {
+            name: { in: candidate.artistNames, mode: "insensitive" },
+            isPublished: true,
+            deletedAt: null,
+          },
+          select: { id: true, name: true },
+        });
+
+        if (matchedArtists.length > 0) {
+          await tx.eventArtist.createMany({
+            data: matchedArtists.map((artist) => ({
+              eventId: createdEvent.id,
+              artistId: artist.id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
       await tx.submission.create({
         data: {
           type: "EVENT",
@@ -466,6 +500,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
       return {
         candidate: updated,
         createdEventId: createdEvent.id,
+        linkedArtistCount: matchedArtists.length,
         imageContext: {
           runId: candidate.runId,
           venueId: candidate.venueId,
@@ -512,6 +547,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
         runId: approved.candidate.runId,
         venueId: approved.candidate.venueId,
         createdEventId: approved.createdEventId,
+        linkedArtistCount: approved.linkedArtistCount ?? 0,
         imageAttached: imageImport.attached,
         imageWarning,
       } satisfies Prisma.InputJsonValue,
