@@ -178,7 +178,7 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
   } | undefined;
   const eventItems = schema?.properties?.events?.items;
   assert.ok(Array.isArray(eventItems?.required));
-  assert.deepEqual(eventItems?.required, ["title", "startAt", "endAt", "timezone", "locationText", "description", "sourceUrl"]);
+  assert.deepEqual(eventItems?.required, ["title", "startAt", "endAt", "timezone", "locationText", "description", "sourceUrl", "artistNames", "imageUrl"]);
   const startAtType = eventItems?.properties?.startAt?.type;
   assert.ok(Array.isArray(startAtType));
   assert.deepEqual(startAtType, ["string", "null"]);
