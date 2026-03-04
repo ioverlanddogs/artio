@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import EventSetupHeader from "@/app/my/_components/EventSetupHeader";
 import EventSetupSection from "@/app/my/_components/EventSetupSection";
 import { PublishPanel } from "@/components/my/PublishPanel";
+import EventAnalyticsSummary from "@/components/my/events/EventAnalyticsSummary";
 import { EventEditorForm } from "@/app/my/events/[eventId]/page-client";
 import { getEventReadiness } from "@/lib/events/getEventReadiness";
 import { ReadinessChecklist } from "@/components/publishing/ReadinessChecklist";
@@ -99,6 +100,8 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
             <p className="mt-1 text-muted-foreground">{canPublishDirectly ? "If your checklist is complete, use admin moderation controls to publish directly." : "If your checklist is complete, publish your event."}</p>
             <Link className="mt-2 inline-block underline" href="#publish-panel">{canPublishDirectly ? "Open moderation controls" : "Publish"}</Link>
           </div>
+
+          {event.isPublished ? <EventAnalyticsSummary eventId={event.id} /> : null}
         </section>
 
         <aside className="order-1 lg:order-2 lg:col-span-1">
