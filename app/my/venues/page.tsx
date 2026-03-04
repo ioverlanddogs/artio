@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
@@ -11,6 +12,21 @@ export const dynamic = "force-dynamic";
 
 type VenuesSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
 
+function buildVenueStatusWhere(status: string | undefined): Prisma.VenueWhereInput {
+  if (!status) return {};
+  const s = status.toLowerCase();
+  if (s === "published") return { isPublished: true };
+  if (s === "submitted") return { isPublished: false, targetSubmissions: { some: { type: "VENUE", status: "IN_REVIEW" } } };
+  if (s === "rejected") return { isPublished: false, targetSubmissions: { some: { type: "VENUE", status: "REJECTED" } } };
+  if (s === "draft") {
+    return {
+      isPublished: false,
+      NOT: { targetSubmissions: { some: { type: "VENUE", status: { in: ["IN_REVIEW", "REJECTED"] } } } },
+    };
+  }
+  return {};
+}
+
 export default async function MyVenuesPage({ searchParams }: { searchParams: VenuesSearchParams }) {
   const user = await getSessionUser();
   if (!user) redirectToLogin("/my/venues");
@@ -21,20 +37,38 @@ export default async function MyVenuesPage({ searchParams }: { searchParams: Ven
   const sort = params.sort ?? "updated";
 
   const memberships = await db.venueMembership.findMany({
-    where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: showArchived ? { not: null } : null } },
-    include: { venue: { include: { targetSubmissions: { where: { type: "VENUE" }, orderBy: { updatedAt: "desc" }, take: 1 } } } },
+    where: {
+      userId: user.id,
+      role: { in: ["OWNER", "EDITOR"] },
+      venue: {
+        deletedAt: showArchived ? { not: null } : null,
+        ...(query ? { name: { contains: query, mode: "insensitive" } } : {}),
+        ...buildVenueStatusWhere(status),
+      },
+    },
+    select: {
+      id: true,
+      venueId: true,
+      venue: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          isPublished: true,
+          deletedAt: true,
+          targetSubmissions: {
+            where: { type: "VENUE" },
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+            select: { status: true },
+          },
+        },
+      },
+    },
     orderBy: sort === "name" ? { venue: { name: "asc" } } : { venue: { updatedAt: "desc" } },
   });
 
-  const rows = memberships.filter((m) => {
-    const s = m.venue.targetSubmissions[0]?.status;
-    if (status === "Draft" || status === "draft") return !m.venue.isPublished && s !== "IN_REVIEW" && s !== "REJECTED";
-    if (status === "Submitted" || status === "submitted") return s === "IN_REVIEW";
-    if (status === "Rejected" || status === "rejected") return s === "REJECTED";
-    if (status === "Published" || status === "published") return m.venue.isPublished;
-    if (status === "Archived" || status === "archived") return !!m.venue.deletedAt;
-    return true;
-  }).filter((m) => m.venue.name.toLowerCase().includes(query.toLowerCase()));
+  const rows = memberships;
 
   const pills: FilterPill[] = [];
   if (status) {

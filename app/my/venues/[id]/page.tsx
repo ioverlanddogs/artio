@@ -6,7 +6,6 @@ import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import VenueSelfServeForm from "@/app/my/_components/VenueSelfServeForm";
 import VenueMembersManager from "@/app/my/_components/VenueMembersManager";
-import { PageHeader } from "@/components/ui/page-header";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { VenueGalleryManager } from "@/components/venues/venue-gallery-manager";
 import { resolveImageUrl } from "@/lib/assets";
@@ -35,7 +34,22 @@ export default async function MyVenueEditPage({
   if (!hasDatabaseUrl()) {
     return (
       <main className="space-y-4 p-6">
-        <PageHeader title="Venue Setup" subtitle="Complete your venue profile and submit for review." />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Venue Setup</h1>
+            <p className="text-sm text-muted-foreground">
+              Complete your venue profile and submit for review.
+            </p>
+          </div>
+          <div className="flex flex-col items-start gap-1 md:items-end">
+            <Button asChild>
+              <Link href={`/my/events?venueId=${id}`}>View events</Link>
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              View and manage events for this venue
+            </p>
+          </div>
+        </div>
         <p>Set DATABASE_URL to manage venues locally.</p>
       </main>
     );
@@ -124,18 +138,22 @@ export default async function MyVenueEditPage({
 
   return (
     <main className="space-y-6 p-6">
-      <PageHeader
-        title="Venue Setup"
-        subtitle="Complete your venue profile and submit for review."
-        actions={(
-          <div className="flex flex-col items-start gap-1 md:items-end">
-            <Button asChild>
-              <Link href={`/my/events?venueId=${venue.id}`}>View events</Link>
-            </Button>
-            <p className="text-xs text-muted-foreground">View and manage events for this venue</p>
-          </div>
-        )}
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Venue Setup</h1>
+          <p className="text-sm text-muted-foreground">
+            Complete your venue profile and submit for review.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-1 md:items-end">
+          <Button asChild>
+            <Link href={`/my/events?venueId=${venue.id}`}>View events</Link>
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            View and manage events for this venue
+          </p>
+        </div>
+      </div>
 
       <VenueSetupHeader venue={{ name: venue.name, isPublished: venue.isPublished, deletedAt: venue.deletedAt }} submissionStatus={venue.status ?? submission?.status ?? null} />
 

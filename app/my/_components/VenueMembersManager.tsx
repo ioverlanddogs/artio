@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { enqueueToast } from "@/lib/toast";
 
 type Member = {
   id: string;
@@ -12,58 +13,72 @@ type Member = {
 export default function VenueMembersManager({ venueId, members }: { venueId: string; members: Member[] }) {
   const router = useRouter();
   const [form, setForm] = useState({ email: "", role: "EDITOR" as "OWNER" | "EDITOR" });
-  const [message, setMessage] = useState<string | null>(null);
+  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
-    setMessage(null);
-    const res = await fetch(`/api/my/venues/${venueId}/members`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/my/venues/${venueId}/members`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setMessage(body?.error?.message || "Failed to add member");
-      return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        enqueueToast({ title: body?.error?.message || "Failed to add member", variant: "error" });
+        return;
+      }
+
+      setForm((prev) => ({ ...prev, email: "" }));
+      enqueueToast({ title: "Member added", variant: "success" });
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-
-    setForm((prev) => ({ ...prev, email: "" }));
-    setMessage("Member saved.");
-    router.refresh();
   }
 
   async function updateRole(memberId: string, role: "OWNER" | "EDITOR") {
-    setMessage(null);
-    const res = await fetch(`/api/my/venues/${venueId}/members/${memberId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/my/venues/${venueId}/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setMessage(body?.error?.message || "Failed to update role");
-      return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        enqueueToast({ title: body?.error?.message || "Failed to update role", variant: "error" });
+        return;
+      }
+
+      enqueueToast({ title: "Role updated", variant: "success" });
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-
-    setMessage("Role updated.");
-    router.refresh();
   }
 
   async function removeMember(memberId: string) {
-    setMessage(null);
-    const res = await fetch(`/api/my/venues/${venueId}/members/${memberId}`, { method: "DELETE" });
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/my/venues/${venueId}/members/${memberId}`, { method: "DELETE" });
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setMessage(body?.error?.message || "Failed to remove member");
-      return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        enqueueToast({ title: body?.error?.message || "Failed to remove member", variant: "error" });
+        return;
+      }
+
+      enqueueToast({ title: "Member removed", variant: "success" });
+      setRemoveTargetId(null);
+      router.refresh();
+    } finally {
+      setBusy(false);
     }
-
-    setMessage("Member removed.");
-    router.refresh();
   }
 
   return (
@@ -79,12 +94,31 @@ export default function VenueMembersManager({ venueId, members }: { venueId: str
             <select
               className="border rounded p-1"
               value={member.role}
-              onChange={(e) => updateRole(member.id, e.target.value as "OWNER" | "EDITOR")}
+              disabled={busy}
+              onChange={(e) => void updateRole(member.id, e.target.value as "OWNER" | "EDITOR")}
             >
               <option value="OWNER">OWNER</option>
               <option value="EDITOR">EDITOR</option>
             </select>
-            <button className="rounded border px-2 py-1 text-sm" onClick={() => removeMember(member.id)}>Remove</button>
+            {removeTargetId === member.id ? (
+              <>
+                <span className="text-sm text-destructive">Remove?</span>
+                <button
+                  className="rounded border px-2 py-1 text-sm text-destructive"
+                  disabled={busy}
+                  onClick={() => void removeMember(member.id)}
+                >
+                  Yes
+                </button>
+                <button className="rounded border px-2 py-1 text-sm" onClick={() => setRemoveTargetId(null)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button className="rounded border px-2 py-1 text-sm" disabled={busy} onClick={() => setRemoveTargetId(member.id)}>
+                Remove
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -96,18 +130,18 @@ export default function VenueMembersManager({ venueId, members }: { venueId: str
           placeholder="Email"
           type="email"
           required
+          disabled={busy}
           value={form.email}
           onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
         />
-        <select className="border rounded p-2" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as "OWNER" | "EDITOR" }))}>
+        <select className="border rounded p-2" disabled={busy} value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as "OWNER" | "EDITOR" }))}>
           <option value="EDITOR">EDITOR</option>
           <option value="OWNER">OWNER</option>
         </select>
         <div>
-          <button className="rounded border px-3 py-1">Add member</button>
+          <button className="rounded border px-3 py-1" disabled={busy}>{busy ? "Saving…" : "Add member"}</button>
         </div>
       </form>
-      {message ? <p className="text-sm">{message}</p> : null}
     </section>
   );
 }
