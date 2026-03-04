@@ -1,10 +1,21 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
+import { ArtworkRelatedSection } from "@/components/artwork/artwork-related-section";
+import { EntityHeader } from "@/components/entities/entity-header";
+import { EventGalleryLightbox } from "@/components/events/event-gallery-lightbox";
+import { Badge } from "@/components/ui/badge";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageShell } from "@/components/ui/page-shell";
 import { resolveImageUrl } from "@/lib/assets";
 import { isArtworkIdKey, shouldRedirectArtworkIdKey } from "@/lib/artwork-route";
-import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
+import { listPublishedArtworksByEvent, listPublishedArtworksByVenue, type PublishedArtworkListItem } from "@/lib/artworks";
+import { db } from "@/lib/db";
+
+function SaveArtworkButton() {
+  return <button type="button" className="inline-flex rounded-md border px-3 py-1 text-sm">Save artwork</button>;
+}
 
 export default async function ArtworkDetailPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
@@ -19,6 +30,51 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
   if (shouldRedirectArtworkIdKey(key, artwork.slug)) permanentRedirect(`/artwork/${artwork.slug}`);
 
   const cover = resolveImageUrl(artwork.featuredAsset?.url, artwork.images[0]?.asset?.url);
+  const metadataChips = [artwork.year ? String(artwork.year) : null, artwork.medium, artwork.dimensions].filter(Boolean) as string[];
+  const galleryImages = artwork.images
+    .filter((image) => Boolean(image.asset?.url))
+    .map((image) => ({ id: image.id, src: image.asset.url ?? "", alt: image.alt ?? artwork.title }));
 
-  return <main className="space-y-4 p-6"><EntityPageViewTracker entityType="ARTWORK" entityId={artwork.id} /><h1 className="text-2xl font-semibold">{artwork.title}</h1><p className="text-sm text-muted-foreground">by <Link className="underline" href={`/artists/${artwork.artist.slug}`}>{artwork.artist.name}</Link></p>{cover ? <div className="relative h-80 w-full overflow-hidden rounded border"><Image src={cover} alt={artwork.title} fill className="object-cover" /></div> : null}<p>{artwork.description}</p><p className="text-sm">{artwork.year ?? ""} {artwork.medium ?? ""} {artwork.dimensions ?? ""}</p><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{artwork.images.map((image) => <div key={image.id} className="relative h-32 overflow-hidden rounded border"><Image src={image.asset.url} alt={image.alt ?? artwork.title} fill className="object-cover" /></div>)}</div><div className="text-sm">Venues: {artwork.venues.map((v) => v.venue.name).join(", ") || "None"}</div><div className="text-sm">Events: {artwork.events.map((e) => e.event.title).join(", ") || "None"}</div></main>;
+  const venueIds = Array.from(new Set(artwork.venues.map((entry) => entry.venueId)));
+  const eventIds = Array.from(new Set(artwork.events.map((entry) => entry.eventId)));
+
+  const [venueRelatedArtworksByVenue, eventRelatedArtworksByEvent] = await Promise.all([
+    Promise.all(venueIds.slice(0, 2).map((venueId) => listPublishedArtworksByVenue(venueId, 6))),
+    Promise.all(eventIds.slice(0, 2).map((eventId) => listPublishedArtworksByEvent(eventId, 6))),
+  ]);
+
+  const dedupeRelated = (items: PublishedArtworkListItem[]) => Array.from(new Map(items.filter((item) => item.id !== artwork.id).map((item) => [item.id, item])).values());
+  const venueRelatedArtworks = dedupeRelated(venueRelatedArtworksByVenue.flat()).slice(0, 6);
+  const eventRelatedArtworks = dedupeRelated(eventRelatedArtworksByEvent.flat()).slice(0, 6);
+
+  return (
+    <PageShell className="page-stack">
+      <EntityPageViewTracker entityType="ARTWORK" entityId={artwork.id} />
+      <Breadcrumbs items={[{ label: "Artworks", href: "/artwork" }, { label: artwork.title, href: `/artwork/${artwork.slug ?? artwork.id}` }]} />
+      <EntityHeader
+        title={artwork.title}
+        subtitle={<span>by <Link className="underline" href={`/artists/${artwork.artist.slug}`}>{artwork.artist.name}</Link></span>}
+        imageUrl={cover}
+        coverUrl={cover}
+        primaryAction={<SaveArtworkButton />}
+        meta={<div className="flex flex-wrap gap-2">{metadataChips.map((chip) => <Badge key={chip} variant="secondary">{chip}</Badge>)}</div>}
+      />
+
+      {artwork.description ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Description</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-foreground/90">{artwork.description}</div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {galleryImages.length > 0 ? <EventGalleryLightbox images={galleryImages} /> : null}
+
+      <ArtworkRelatedSection title="Artworks shown at related venues" subtitle="Other published works seen at venues where this artwork appeared." items={venueRelatedArtworks} viewAllHref={artwork.venues[0] ? `/artwork?venueId=${artwork.venues[0].venueId}` : undefined} showArtistName />
+      <ArtworkRelatedSection title="Artworks from related events" subtitle="Other published works linked to events featuring this artwork." items={eventRelatedArtworks} viewAllHref={artwork.events[0] ? `/artwork?eventId=${artwork.events[0].eventId}` : undefined} showArtistName />
+    </PageShell>
+  );
 }

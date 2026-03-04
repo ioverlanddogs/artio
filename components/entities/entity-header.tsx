@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 type EntityHeaderProps = {
   title: string;
-  subtitle?: string | null;
+  subtitle?: ReactNode;
   imageUrl?: string | null;
   coverUrl?: string | null;
   tags?: string[];
