@@ -29,6 +29,7 @@ export function isAuthError(err: unknown): err is AuthError {
 const googleClientId = process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
 const isProdLikeEnv = process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+const isProductionBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
 let hasWarnedAboutMissingAuthSecret = false;
 let hasWarnedAboutSecretMismatch = false;
@@ -37,7 +38,7 @@ export function getAuthSecret(): string {
   const nextAuthSecret = process.env.NEXTAUTH_SECRET;
   const authSecret = process.env.AUTH_SECRET;
 
-  if (isProdLikeEnv && !nextAuthSecret && !authSecret) {
+  if (isProdLikeEnv && !isProductionBuildPhase && !nextAuthSecret && !authSecret) {
     throw new Error("NEXTAUTH_SECRET (or AUTH_SECRET) is required in production/preview (set a secure random value, e.g. `openssl rand -base64 32`).");
   }
 

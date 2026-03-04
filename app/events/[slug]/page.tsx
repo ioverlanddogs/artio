@@ -114,13 +114,9 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
-      {event.images.length >= 2 ? (
+      {event.images.filter((image) => image.asset).length >= 2 ? (
         <EventGalleryLightbox
-          images={event.images.map((image) => ({
-            id: image.id,
-            src: image.asset.url,
-            alt: image.altText ?? event.title,
-          }))}
+          images={event.images.flatMap((image) => (image.asset ? [{ id: image.id, src: image.asset.url, alt: image.alt ?? event.title }] : []))}
         />
       ) : null}
 
