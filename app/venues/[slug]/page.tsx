@@ -19,8 +19,7 @@ import { buildVenueJsonLd, getDetailUrl } from "@/lib/seo.public-profiles";
 import { getVenueDescriptionExcerpt } from "@/lib/venues";
 import { resolveEntityPrimaryImage } from "@/lib/public-images";
 import { ArtworkCountBadge } from "@/components/artwork/artwork-count-badge";
-import { VenueUpcomingMap } from "@/components/venues/venue-upcoming-map";
-import { Button } from "@/components/ui/button";
+
 import Link from "next/link";
 import { countPublishedArtworksByVenue, listPublishedArtworksByVenue } from "@/lib/artworks";
 
@@ -170,9 +169,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
               </div>
             ) : null}
             {events.length === 0 ? <EmptyState title="No upcoming events" description="Follow this venue and check back soon." /> : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {events.map((event) => <EventCard key={event.id} href={`/events/${event.slug}`} title={event.title} startAt={event.startAt} endAt={event.endAt} venueName={venue.name} venueSlug={venue.slug} imageUrl={event.imageUrl} imageAlt={event.imageAlt} tags={event.tags} />)}
-              </div>
+              <VenueEventsGrid events={events} venueName={venue.name} />
             )}
           </section>
         )}
