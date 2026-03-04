@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
 import { ArtworkRelatedSection } from "@/components/artwork/artwork-related-section";
+import { SaveArtworkButton } from "@/components/artwork/save-artwork-button";
 import { EntityHeader } from "@/components/entities/entity-header";
 import { EventGalleryLightbox } from "@/components/events/event-gallery-lightbox";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +12,8 @@ import { PageShell } from "@/components/ui/page-shell";
 import { resolveImageUrl } from "@/lib/assets";
 import { isArtworkIdKey, shouldRedirectArtworkIdKey } from "@/lib/artwork-route";
 import { listPublishedArtworksByEvent, listPublishedArtworksByVenue, type PublishedArtworkListItem } from "@/lib/artworks";
+import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-
-function SaveArtworkButton() {
-  return <button type="button" className="inline-flex rounded-md border px-3 py-1 text-sm">Save artwork</button>;
-}
 
 export default async function ArtworkDetailPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
@@ -28,6 +26,16 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
 
   if (!artwork || !artwork.isPublished) notFound();
   if (shouldRedirectArtworkIdKey(key, artwork.slug)) permanentRedirect(`/artwork/${artwork.slug}`);
+
+  const user = await getSessionUser();
+  const initialSaved = user
+    ? Boolean(await db.favorite.findUnique({
+      where: {
+        userId_targetType_targetId: { userId: user.id, targetType: "ARTWORK", targetId: artwork.id },
+      },
+      select: { id: true },
+    }))
+    : false;
 
   const cover = resolveImageUrl(artwork.featuredAsset?.url, artwork.images[0]?.asset?.url);
   const metadataChips = [artwork.year ? String(artwork.year) : null, artwork.medium, artwork.dimensions].filter(Boolean) as string[];
@@ -56,7 +64,7 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
         subtitle={<span>by <Link className="underline" href={`/artists/${artwork.artist.slug}`}>{artwork.artist.name}</Link></span>}
         imageUrl={cover}
         coverUrl={cover}
-        primaryAction={<SaveArtworkButton />}
+        primaryAction={<SaveArtworkButton artworkId={artwork.id} initialSaved={initialSaved} signedIn={Boolean(user)} />}
         meta={<div className="flex flex-wrap gap-2">{metadataChips.map((chip) => <Badge key={chip} variant="secondary">{chip}</Badge>)}</div>}
       />
 

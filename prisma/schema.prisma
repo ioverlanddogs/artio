@@ -134,6 +134,7 @@ enum FavoriteTargetType {
   EVENT
   VENUE
   ARTIST
+  ARTWORK
 }
 
 enum FollowTargetType {

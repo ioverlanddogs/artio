@@ -297,7 +297,7 @@ export const adminEntityImageReorderSchema = z.object({
 });
 
 export const favoriteBodySchema = z.object({
-  targetType: z.enum(["EVENT", "VENUE", "ARTIST"]),
+  targetType: z.enum(["EVENT", "VENUE", "ARTIST", "ARTWORK"]),
   targetId: z.string().uuid(),
 });
 

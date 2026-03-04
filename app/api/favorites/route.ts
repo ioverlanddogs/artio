@@ -42,3 +42,20 @@ export async function POST(req: NextRequest) {
     return apiError(500, "internal_error", "Failed to save favorite");
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const user = await guardUser();
+  if (user instanceof NextResponse) return user;
+  try {
+    const parsed = favoriteBodySchema.safeParse(await parseBody(req));
+    if (!parsed.success) return apiError(400, "invalid_request", "Invalid favorite payload", zodDetails(parsed.error));
+
+    await db.favorite.deleteMany({
+      where: { userId: user.id, targetType: parsed.data.targetType, targetId: parsed.data.targetId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return apiError(500, "internal_error", "Failed to remove favorite");
+  }
+}

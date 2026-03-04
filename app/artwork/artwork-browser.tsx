@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Bookmark } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,6 +31,7 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
   const [frequency, setFrequency] = useState<"WEEKLY" | "OFF">("WEEKLY");
   const [message, setMessage] = useState<string | null>(null);
   const [queryDraft, setQueryDraft] = useState(sp?.get("query") ?? "");
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const isViewsSort = (sp?.get("sort") ?? "RECENT") === "VIEWS_30D_DESC";
 
   const queryString = sp?.toString() ?? "";
@@ -65,6 +67,45 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
       })
       .finally(() => active && setLoading(false));
   }, [queryString]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    fetch("/api/favorites")
+      .then((res) => res.json())
+      .then((data) => {
+        const ids = (data?.items ?? [])
+          .filter((item: { targetType?: string; targetId?: string }) => item.targetType === "ARTWORK" && typeof item.targetId === "string")
+          .map((item: { targetId: string }) => item.targetId);
+        setFavoriteIds(new Set(ids));
+      })
+      .catch(() => {
+        setFavoriteIds(new Set());
+      });
+  }, [signedIn]);
+
+  const toggleFavorite = async (artworkId: string) => {
+    const isSaved = favoriteIds.has(artworkId);
+    const next = new Set(favoriteIds);
+    if (isSaved) next.delete(artworkId); else next.add(artworkId);
+    setFavoriteIds(next);
+
+    try {
+      const response = await fetch("/api/favorites", {
+        method: isSaved ? "DELETE" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ targetType: "ARTWORK", targetId: artworkId }),
+      });
+      if (!response.ok) {
+        const revert = new Set(next);
+        if (isSaved) revert.add(artworkId); else revert.delete(artworkId);
+        setFavoriteIds(revert);
+      }
+    } catch {
+      const revert = new Set(next);
+      if (isSaved) revert.add(artworkId); else revert.delete(artworkId);
+      setFavoriteIds(revert);
+    }
+  };
 
   const hasFilters = useMemo(() => (sp?.toString() ?? "").length > 0, [sp]);
 
@@ -116,7 +157,7 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
         {message ? <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-sm">{message} <Link className="underline" href="/saved-searches">Manage saved searches</Link></div> : null}
         {loading ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded border bg-muted" />)}</div> : null}
         {!loading && items.length === 0 ? <div className="rounded border p-6 text-sm">No artworks found. <button className="underline" onClick={() => router.replace(pathname)}>Clear filters</button></div> : null}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <Link key={item.id} href={`/artwork/${item.slug ?? item.id}`} className="rounded border p-3 hover:bg-muted/40"><div className="relative mb-2 h-48 overflow-hidden rounded bg-muted">{item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill className="object-cover" /> : null}</div><div className="font-medium">{item.title}</div><div className="text-sm text-muted-foreground">{item.artist.name}</div><div className="text-xs text-muted-foreground">{item.year ?? ""} {item.medium ?? ""}</div>{item.priceAmount != null ? <div className="text-xs">{item.currency} {item.priceAmount}</div> : null}{isViewsSort ? <div className="text-xs text-muted-foreground">{item.views30 ?? 0} views (30d)</div> : null}</Link>)}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <article key={item.id} className="relative rounded border p-3 hover:bg-muted/40"><Link href={`/artwork/${item.slug ?? item.id}`} className="block"><div className="relative mb-2 h-48 overflow-hidden rounded bg-muted">{item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill className="object-cover" /> : null}</div><div className="font-medium">{item.title}</div><div className="text-sm text-muted-foreground">{item.artist.name}</div><div className="text-xs text-muted-foreground">{item.year ?? ""} {item.medium ?? ""}</div>{item.priceAmount != null ? <div className="text-xs">{item.currency} {item.priceAmount}</div> : null}{isViewsSort ? <div className="text-xs text-muted-foreground">{item.views30 ?? 0} views (30d)</div> : null}</Link>{signedIn ? <button type="button" aria-label={favoriteIds.has(item.id) ? "Unsave artwork" : "Save artwork"} aria-pressed={favoriteIds.has(item.id)} onClick={() => void toggleFavorite(item.id)} className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-sm ui-trans hover:bg-muted"><Bookmark className={`h-4 w-4 ${favoriteIds.has(item.id) ? "fill-current" : ""}`} /></button> : null}</article>)}</div>
         <div className="flex items-center justify-between text-sm"><span>{total} results</span><div className="space-x-2"><button disabled={page <= 1} className="rounded border px-2 py-1 disabled:opacity-50" onClick={() => setParam({ page: String(page - 1) })}>Prev</button><button disabled={page * pageSize >= total} className="rounded border px-2 py-1 disabled:opacity-50" onClick={() => setParam({ page: String(page + 1) })}>Next</button></div></div>
       </section>
     </div>
