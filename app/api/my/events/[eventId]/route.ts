@@ -58,8 +58,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
               },
             }
           : {}),
-        isPublished: false,
-        publishedAt: null,
       },
     }),
     updateSubmissionVenue: (submissionId, venueId) => db.submission.update({ where: { id: submissionId }, data: { venueId } }).then(() => undefined),

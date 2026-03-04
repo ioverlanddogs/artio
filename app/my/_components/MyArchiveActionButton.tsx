@@ -7,26 +7,52 @@ import { enqueueToast } from "@/lib/toast";
 export function MyArchiveActionButton({ entityLabel, endpointBase, archived }: { entityLabel: string; endpointBase: string; archived: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   async function run() {
     const action = archived ? "restore" : "archive";
-    const confirmed = window.confirm(archived ? `Restore this ${entityLabel}?` : `Archive this ${entityLabel}? You can restore it later.`);
-    if (!confirmed) return;
     setBusy(true);
-    const res = await fetch(`${endpointBase}/${action}`, { method: "POST" });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      enqueueToast({ title: body?.message ?? body?.error ?? `Failed to ${action} ${entityLabel}`, variant: "error" });
+    setConfirming(false);
+    try {
+      const res = await fetch(`${endpointBase}/${action}`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        enqueueToast({ title: body?.message ?? body?.error ?? `Failed to ${action} ${entityLabel}`, variant: "error" });
+        return;
+      }
+      enqueueToast({ title: archived ? `${entityLabel} restored` : `${entityLabel} archived`, variant: "success" });
+      router.refresh();
+    } finally {
       setBusy(false);
-      return;
     }
-    enqueueToast({ title: archived ? `${entityLabel} restored` : `${entityLabel} archived`, variant: "success" });
-    router.refresh();
-    setBusy(false);
   }
 
-  return (
-    <button type="button" className="underline disabled:opacity-60" onClick={() => void run()} disabled={busy}>
+  return confirming ? (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-sm">{archived ? "Restore?" : "Archive?"}</span>
+      <button
+        type="button"
+        className="underline text-sm disabled:opacity-60"
+        disabled={busy}
+        onClick={() => void run()}
+      >
+        Yes
+      </button>
+      <button
+        type="button"
+        className="underline text-sm"
+        onClick={() => setConfirming(false)}
+      >
+        Cancel
+      </button>
+    </span>
+  ) : (
+    <button
+      type="button"
+      className="underline disabled:opacity-60"
+      disabled={busy}
+      onClick={() => setConfirming(true)}
+    >
       {busy ? "Working..." : archived ? "Restore" : "Archive"}
     </button>
   );
