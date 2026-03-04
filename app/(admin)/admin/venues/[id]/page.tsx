@@ -40,6 +40,7 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
           { name: "lng", label: "Longitude" },
           { name: "timezone", label: "Timezone (IANA)" },
           { name: "websiteUrl", label: "Website URL" },
+          { name: "eventsPageUrl", label: "Events Page URL (overrides website URL for ingest)" },
           { name: "instagramUrl", label: "Instagram URL" },
           { name: "contactEmail", label: "Contact Email" },
           { name: "featuredImageUrl", label: "Featured Image URL" },

@@ -1,6 +1,6 @@
 import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import ModerationClient from "./moderation-client";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
 
 const PAGE_SIZE = 30;

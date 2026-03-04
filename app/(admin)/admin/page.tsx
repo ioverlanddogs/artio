@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AdminPageHeader from "./_components/AdminPageHeader";
 import { db } from "@/lib/db";
 
@@ -24,6 +25,19 @@ async function getCounts() {
   }
 }
 
+
+async function getPendingCounts() {
+  try {
+    const [moderationQueue, ingestQueue] = await Promise.all([
+      db.submission.count({ where: { status: "IN_REVIEW" } }),
+      db.ingestExtractedEvent.count({ where: { status: "PENDING", duplicateOfId: null } }),
+    ]);
+    return { moderationQueue, ingestQueue };
+  } catch {
+    return { moderationQueue: null, ingestQueue: null };
+  }
+}
+
 function StatCard({ label, value }: { label: string; value: number | string | null }) {
   return (
     <article className="rounded-lg border bg-background p-4">
@@ -34,17 +48,27 @@ function StatCard({ label, value }: { label: string; value: number | string | nu
 }
 
 export default async function AdminHomePage() {
-  const [dbHealth, counts] = await Promise.all([getDbHealth(), getCounts()]);
+  const [dbHealth, counts, pending] = await Promise.all([
+    getDbHealth(),
+    getCounts(),
+    getPendingCounts(),
+  ]);
 
   return (
     <main className="space-y-6">
       <AdminPageHeader title="Dashboard" description="Operational overview for administrators." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
         <StatCard label="DB health" value={dbHealth} />
         <StatCard label="Users" value={counts.users} />
         <StatCard label="Artists" value={counts.artists} />
         <StatCard label="Venues" value={counts.venues} />
         <StatCard label="Events" value={counts.events} />
+        <Link href="/admin/moderation">
+          <StatCard label="Moderation queue" value={pending.moderationQueue} />
+        </Link>
+        <Link href="/admin/ingest/events">
+          <StatCard label="Ingest pending" value={pending.ingestQueue} />
+        </Link>
       </div>
     </main>
   );

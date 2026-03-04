@@ -20,6 +20,14 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     await requireAdmin();
     const parsedId = idParamSchema.safeParse(await params);
     if (!parsedId.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedId.error));
+    const venue = await db.venue.findUnique({
+      where: { id: parsedId.data.id },
+      select: { deletedAt: true },
+    });
+    if (!venue) return apiError(404, "not_found", "Venue not found");
+    if (!venue.deletedAt) {
+      return apiError(409, "invalid_state", "Venue must be archived before it can be permanently deleted");
+    }
     await db.venue.delete({ where: { id: parsedId.data.id } });
     return Response.json({ ok: true });
   } catch (error) {

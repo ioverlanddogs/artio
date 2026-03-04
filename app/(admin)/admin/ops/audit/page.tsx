@@ -76,12 +76,13 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
               <th className="px-3 py-2">Action</th>
               <th className="px-3 py-2">Target Type</th>
               <th className="px-3 py-2">Target ID</th>
+              <th className="px-3 py-2">Details</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={5}>No audit entries found.</td>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={6}>No audit entries found.</td>
               </tr>
             ) : (
               items.map((item) => (
@@ -91,6 +92,16 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
                   <td className="px-3 py-2">{item.action}</td>
                   <td className="px-3 py-2">{item.targetType}</td>
                   <td className="px-3 py-2">{item.targetId ?? "—"}</td>
+                  <td className="px-3 py-2 max-w-xs">
+                    {item.metadata ? (
+                      <details>
+                        <summary className="cursor-pointer text-xs text-muted-foreground">View</summary>
+                        <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-2 text-xs">
+                          {JSON.stringify(item.metadata, null, 2)}
+                        </pre>
+                      </details>
+                    ) : "—"}
+                  </td>
                 </tr>
               ))
             )}

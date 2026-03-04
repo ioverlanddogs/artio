@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
 import AnalyticsAdminClient from "@/app/(admin)/admin/analytics/analytics-admin-client";
+import { requireAdmin } from "@/lib/admin";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminAnalyticsPage() {
-  const user = await getSessionUser();
-  if (!user || user.role !== "ADMIN") redirect("/admin");
+  await requireAdmin();
 
   return (
     <main className="space-y-4 p-6">

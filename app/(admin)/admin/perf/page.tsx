@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import PerfAdminClient from "@/app/(admin)/admin/perf/perf-admin-client";
+import { requireAdmin } from "@/lib/admin";
 
 export default async function AdminPerfPage() {
-  const user = await getSessionUser();
-  if (!user || user.role !== "ADMIN") redirect("/admin");
+  await requireAdmin();
 
   return (
     <main className="p-6 space-y-4">

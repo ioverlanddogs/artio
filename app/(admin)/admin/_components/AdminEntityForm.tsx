@@ -31,15 +31,25 @@ export default function AdminEntityForm({
   const [form, setForm] = useState<Record<string, unknown>>(initial);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    if (dirty.size === 0) {
+      router.push(redirectPath);
+      return;
+    }
+
+    const payload = Object.fromEntries(
+      [...dirty].map((key) => [key, form[key]])
+    );
+
     const res = await fetch(endpoint, {
       method,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -81,7 +91,10 @@ export default function AdminEntityForm({
             <input
               type={field.type || "text"}
               value={String(form[field.name] ?? "")}
-              onChange={(ev) => setForm((prev) => ({ ...prev, [field.name]: ev.target.value }))}
+              onChange={(ev) => {
+                setForm((prev) => ({ ...prev, [field.name]: ev.target.value }));
+                setDirty((prev) => new Set(prev).add(field.name));
+              }}
               className="border p-2 rounded w-full"
             />
             {fieldErrors[field.name] ? <p className="text-xs text-red-500 mt-0.5">{fieldErrors[field.name]}</p> : null}
@@ -91,7 +104,10 @@ export default function AdminEntityForm({
           <input
             type="checkbox"
             checked={Boolean(form.isPublished)}
-            onChange={(ev) => setForm((prev) => ({ ...prev, isPublished: ev.target.checked }))}
+            onChange={(ev) => {
+              setForm((prev) => ({ ...prev, isPublished: ev.target.checked }));
+              setDirty((prev) => new Set(prev).add("isPublished"));
+            }}
             className="mr-2"
           />
           Published

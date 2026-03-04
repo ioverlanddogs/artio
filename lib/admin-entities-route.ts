@@ -58,6 +58,7 @@ const venuePatchSchema = z.object({
   lng: z.coerce.number().nullable().optional(),
   timezone: z.string().trim().max(80).nullable().optional(),
   websiteUrl: z.string().trim().url().nullable().optional(),
+  eventsPageUrl: z.string().trim().url().nullable().optional(),
   isPublished: z.boolean().optional(),
   status: z.enum(["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "CHANGES_REQUESTED", "ARCHIVED"]).optional(),
   description: z.string().trim().max(5000).nullable().optional(),
@@ -105,7 +106,7 @@ const importPreviewBodySchema = z.object({
 });
 
 const defaultFields = {
-  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "lat", "lng", "timezone", "websiteUrl", "isPublished", "status", "description", "featuredAssetId", "deletedAt"] as const,
+  venues: ["id", "name", "slug", "addressLine1", "addressLine2", "city", "postcode", "country", "lat", "lng", "timezone", "websiteUrl", "eventsPageUrl", "isPublished", "status", "description", "featuredAssetId", "deletedAt"] as const,
   events: ["id", "title", "startAt", "endAt", "timezone", "venueId", "ticketUrl", "isPublished", "status", "deletedAt"] as const,
   artists: ["id", "name", "websiteUrl", "bio", "featuredAssetId", "isPublished", "deletedAt"] as const,
   artwork: ["id", "title", "slug", "artistId", "isPublished", "deletedAt"] as const,
