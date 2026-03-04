@@ -78,7 +78,7 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
 
   if (!artist) notFound();
 
-  const [followersCount, existingFollow, artworks, artworkCount, featuredArtworks, showcaseResult, forSaleCount] = await Promise.all([
+  const [followersCount, existingFollow, artworks, artworkCount, featuredArtworks, showcaseResult, forSaleCount, pastEventArtists] = await Promise.all([
     db.follow.count({ where: { targetType: "ARTIST", targetId: artist.id } }),
     user ? db.follow.findUnique({ where: { userId_targetType_targetId: { userId: user.id, targetType: "ARTIST", targetId: artist.id } }, select: { id: true } }) : Promise.resolve(null),
     listPublishedArtworksByArtist(artist.id, 6),
@@ -86,6 +86,25 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
     listFeaturedArtworksByArtist(artist.id, 6),
     getArtistArtworks(slug, { limit: 24, sort: "newest" }),
     db.artwork.count({ where: { artistId: artist.id, isPublished: true, deletedAt: null, priceAmount: { not: null } } }),
+    db.eventArtist.findMany({
+      where: { artistId: artist.id, event: { isPublished: true, deletedAt: null, endAt: { lt: now } } },
+      orderBy: { event: { startAt: "desc" } },
+      take: 24,
+      select: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            startAt: true,
+            endAt: true,
+            venue: { select: { name: true, slug: true } },
+            images: { take: 4, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
+            eventTags: { select: { tag: { select: { slug: true } } } },
+          },
+        },
+      },
+    }),
   ]);
 
   const initialArtworks = showcaseResult.artworks;
@@ -93,6 +112,19 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
 
   const imageUrl = resolveEntityPrimaryImage(artist)?.url ?? null;
   const events = artist.eventArtists.map((row) => ({
+    id: row.event.id,
+    title: row.event.title,
+    slug: row.event.slug,
+    startAt: row.event.startAt,
+    endAt: row.event.endAt,
+    venueName: row.event.venue?.name,
+    venueSlug: row.event.venue?.slug,
+    imageUrl: resolveEntityPrimaryImage(row.event)?.url ?? null,
+    imageAlt: resolveEntityPrimaryImage(row.event)?.alt ?? row.event.title,
+    tags: row.event.eventTags.map(({ tag }) => tag.slug),
+  }));
+
+  const pastEvents = pastEventArtists.map((row) => ({
     id: row.event.id,
     title: row.event.title,
     slug: row.event.slug,
@@ -135,6 +167,16 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
             {events.length === 0 ? <EmptyState title="No upcoming events" description="Follow this artist and we’ll keep you posted." /> : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {events.map((event) => <EventCard key={event.id} href={`/events/${event.slug}`} title={event.title} startAt={event.startAt} endAt={event.endAt} venueName={event.venueName} venueSlug={event.venueSlug} imageUrl={event.imageUrl} imageAlt={event.imageAlt} tags={event.tags} />)}
+              </div>
+            )}
+          </section>
+        )}
+        past={(
+          <section className="space-y-3">
+            <SectionHeader title="Past events" subtitle="Explore this artist's previous exhibitions and shows." />
+            {pastEvents.length === 0 ? <EmptyState title="No past events" description="Past events featuring this artist will appear here." /> : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {pastEvents.map((event) => <EventCard key={event.id} href={`/events/${event.slug}`} title={event.title} startAt={event.startAt} endAt={event.endAt} venueName={event.venueName} venueSlug={event.venueSlug} imageUrl={event.imageUrl} imageAlt={event.imageAlt} tags={event.tags} />)}
               </div>
             )}
           </section>
