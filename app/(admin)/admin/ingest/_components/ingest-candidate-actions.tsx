@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { InlineBanner } from "@/components/ui/inline-banner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type CandidateStatus = "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
+
+const QUICK_REJECT_REASONS = [
+  "Not a real event",
+  "Navigation noise",
+  "Duplicate content",
+  "Missing date or venue",
+  "Wrong venue",
+] as const;
 
 function extractMissingFields(details?: unknown): string[] {
   if (!details || typeof details !== "object" || !Array.isArray((details as { missingFields?: unknown }).missingFields)) return [];
@@ -54,6 +62,12 @@ export default function IngestCandidateActions({
   const [missingTimezone, setMissingTimezone] = useState(false);
   const [linkedArtistCount, setLinkedArtistCount] = useState<number | null>(null);
   const [imageWarning, setImageWarning] = useState<string | null>(null);
+  const rejectReasonRef = useRef<HTMLTextAreaElement>(null);
+
+  function closeRejectModal() {
+    setOpenRejectModal(false);
+    setRejectReason("");
+  }
 
   async function approve() {
     if (loadingAction || status !== "PENDING") return;
@@ -102,8 +116,7 @@ export default function IngestCandidateActions({
         setError(getActionError(res.status, body?.error?.details));
         return;
       }
-      setOpenRejectModal(false);
-      setRejectReason("");
+      closeRejectModal();
       router.refresh();
     } catch {
       setError("Action failed. Please try again.");
@@ -153,7 +166,7 @@ export default function IngestCandidateActions({
         </p>
       ) : null}
 
-      <Dialog open={openRejectModal} onOpenChange={setOpenRejectModal}>
+      <Dialog open={openRejectModal} onOpenChange={(open) => (open ? setOpenRejectModal(true) : closeRejectModal())}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reject extracted candidate?</DialogTitle>
@@ -163,6 +176,7 @@ export default function IngestCandidateActions({
             <label className="text-sm font-medium">
               Rejection reason
               <textarea
+                ref={rejectReasonRef}
                 className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                 rows={4}
                 value={rejectReason}
@@ -171,8 +185,28 @@ export default function IngestCandidateActions({
                 disabled={loadingAction !== null}
               />
             </label>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Quick reasons:</p>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_REJECT_REASONS.map((reason) => (
+                  <Button
+                    key={reason}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRejectReason(reason);
+                      rejectReasonRef.current?.focus();
+                    }}
+                    disabled={loadingAction !== null}
+                  >
+                    {reason}
+                  </Button>
+                ))}
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setOpenRejectModal(false)} disabled={loadingAction !== null}>Cancel</Button>
+              <Button variant="ghost" onClick={closeRejectModal} disabled={loadingAction !== null}>Cancel</Button>
               <Button variant="outline" onClick={reject} disabled={loadingAction !== null || !rejectReason.trim()}>
                 Confirm Reject
               </Button>

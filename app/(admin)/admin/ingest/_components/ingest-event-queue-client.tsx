@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import IngestCandidateActions from "@/app/(admin)/admin/ingest/_components/ingest-candidate-actions";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
 
@@ -31,11 +32,19 @@ function getConfidenceReasons(value: unknown): string[] | null {
   return reasons.length > 0 ? reasons : null;
 }
 export default function IngestEventQueueClient({ candidates }: { candidates: QueueCandidate[] }) {
+  const [showReasons, setShowReasons] = useState(false);
+
   return (
     <section className="rounded-lg border bg-background p-4">
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
         <h2 className="text-base font-semibold">Pending Candidates</h2>
         <p className="text-sm text-muted-foreground">Showing up to 100 primary pending candidates from all venues.</p>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={showReasons} onChange={(event) => setShowReasons(event.target.checked)} />
+          Show confidence reasons
+        </label>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1120px] text-sm">
@@ -58,6 +67,7 @@ export default function IngestEventQueueClient({ candidates }: { candidates: Que
                     score={candidate.confidenceScore}
                     band={getConfidenceBand(candidate.confidenceBand)}
                     reasons={getConfidenceReasons(candidate.confidenceReasons)}
+                    showReasons={showReasons}
                   />
                 </td>
                 <td className="px-3 py-2 font-medium">{candidate.title}</td>

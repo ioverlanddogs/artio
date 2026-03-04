@@ -34,8 +34,16 @@ function inLane(candidate: Candidate, lane: Lane): boolean {
 
 export default function IngestRunCandidates({ candidates, venueId }: { candidates: Candidate[]; venueId: string }) {
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [showReasons, setShowReasons] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [lane, setLane] = useState<Lane>("HIGH");
+
+  const laneCounts = useMemo(() => ({
+    HIGH: candidates.filter((c) => c.status !== "DUPLICATE" && c.confidenceBand === "HIGH").length,
+    NEEDS_REVIEW: candidates.filter((c) => c.status !== "DUPLICATE" && c.confidenceBand === "MEDIUM").length,
+    LOW: candidates.filter((c) => c.status !== "DUPLICATE" && c.confidenceBand === "LOW").length,
+    ALL: candidates.filter((c) => c.status !== "DUPLICATE").length,
+  }), [candidates]);
 
   const grouped = useMemo(() => {
     const primaryCandidates = candidates
@@ -60,23 +68,29 @@ export default function IngestRunCandidates({ candidates, venueId }: { candidate
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">Triage:</span>
-        {([
-          ["HIGH", "High"],
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">Triage:</span>
+          {([
+          ["HIGH", "Auto-approve"],
           ["NEEDS_REVIEW", "Needs review"],
-          ["LOW", "Low"],
+          ["LOW", "Likely noise"],
           ["ALL", "All"],
-        ] as Array<[Lane, string]>).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            className={`rounded border px-2 py-1 text-xs ${lane === value ? "bg-primary text-primary-foreground" : "bg-background"}`}
-            onClick={() => setLane(value)}
-          >
-            {label}
-          </button>
-        ))}
+          ] as Array<[Lane, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`rounded border px-2 py-1 text-xs ${lane === value ? "bg-primary text-primary-foreground" : "bg-background"}`}
+              onClick={() => setLane(value)}
+            >
+              {label} <span className="text-muted-foreground">{laneCounts[value]}</span>
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={showReasons} onChange={(event) => setShowReasons(event.target.checked)} />
+          Show confidence reasons
+        </label>
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={showDuplicates} onChange={(event) => setShowDuplicates(event.target.checked)} />
@@ -132,6 +146,7 @@ export default function IngestRunCandidates({ candidates, venueId }: { candidate
                         score={candidate.confidenceScore}
                         band={candidate.confidenceBand ?? "LOW"}
                         reasons={candidate.confidenceReasons}
+                        showReasons={showReasons}
                       />
                     </td>
                     <td className="px-3 py-2"><IngestStatusBadge status={candidate.status} /></td>
@@ -165,6 +180,7 @@ export default function IngestRunCandidates({ candidates, venueId }: { candidate
                           score={duplicate.confidenceScore}
                           band={duplicate.confidenceBand ?? "LOW"}
                           reasons={duplicate.confidenceReasons}
+                          showReasons={showReasons}
                         />
                       </td>
                       <td className="px-3 py-2"><IngestStatusBadge status={duplicate.status} /></td>
