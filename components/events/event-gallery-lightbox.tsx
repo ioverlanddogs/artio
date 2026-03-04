@@ -18,8 +18,18 @@ export function EventGalleryLightbox({ images }: { images: GalleryImage[] }) {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedIndex(null);
-      if (event.key === "ArrowRight") setSelectedIndex((i) => (i! + 1) % images.length);
-      if (event.key === "ArrowLeft") setSelectedIndex((i) => (i! - 1 + images.length) % images.length);
+
+      if (images.length <= 1) return;
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setSelectedIndex((i) => (i! + 1) % images.length);
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setSelectedIndex((i) => (i! - 1 + images.length) % images.length);
+      }
     };
 
     window.addEventListener("keydown", onKeyDown);
