@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { EventDetailActions } from "@/components/events/event-detail-actions";
+import { EventGalleryLightbox } from "@/components/events/event-gallery-lightbox";
 import { ArtworkRelatedSection } from "@/components/artwork/artwork-related-section";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Badge } from "@/components/ui/badge";
@@ -112,6 +113,16 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
           </div>
         </div>
       </section>
+
+      {event.images.length >= 2 ? (
+        <EventGalleryLightbox
+          images={event.images.map((image) => ({
+            id: image.id,
+            src: image.asset.url,
+            alt: image.altText ?? event.title,
+          }))}
+        />
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-[2fr_1fr] md:gap-6">
         <div className="section-stack">
