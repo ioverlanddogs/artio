@@ -9,6 +9,8 @@ const extractedEventSchema = z.object({
   locationText: z.string().trim().min(1).nullable().optional(),
   description: z.string().trim().min(1).nullable().optional(),
   sourceUrl: z.string().trim().url().nullable().optional(),
+  artistNames: z.array(z.string().trim().min(1)).optional().default([]),
+  imageUrl: z.string().trim().url().nullable().optional(),
 });
 
 const extractedEventArraySchema = z.array(extractedEventSchema);
@@ -21,6 +23,8 @@ export type NormalizedExtractedEvent = {
   locationText: string | null;
   description: string | null;
   sourceUrl: string | null;
+  artistNames: string[];
+  imageUrl: string | null;
 };
 
 function parseDateMaybe(value: string | null | undefined): Date | null {
@@ -45,5 +49,7 @@ export function parseExtractedEventsFromModel(raw: unknown): NormalizedExtracted
     locationText: item.locationText ?? null,
     description: item.description ?? null,
     sourceUrl: item.sourceUrl ?? null,
+    artistNames: item.artistNames ?? [],
+    imageUrl: item.imageUrl ?? null,
   }));
 }
