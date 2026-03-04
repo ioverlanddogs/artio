@@ -346,6 +346,7 @@ model Venue {
   deletedByAdminId   String?                  @db.Uuid
   deletedReason      String?
   events             Event[]
+  eventSeries        EventSeries[]
   images             VenueImage[]
   memberships        VenueMembership[]
   invites            VenueInvite[]
@@ -364,6 +365,20 @@ model Venue {
   @@index([featuredAssetId])
   @@index([deletedAt])
   @@index([timezone])
+}
+
+model EventSeries {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  slug        String    @unique
+  description String?
+  venueId     String?   @db.Uuid
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  venue       Venue?    @relation(fields: [venueId], references: [id])
+  events      Event[]
+
+  @@index([venueId])
 }
 
 model VenueGenerationRun {
@@ -502,6 +517,7 @@ model Event {
   isFree        Boolean?
   organizerName String?
   venueId       String?        @db.Uuid
+  seriesId      String?        @db.Uuid
   featuredAssetId String?      @db.Uuid
   lat           Float?
   lng           Float?
@@ -520,6 +536,7 @@ model Event {
   isAiExtracted  Boolean        @default(false)
   ingestSourceRunId String?     @db.Uuid
   venue         Venue?         @relation(fields: [venueId], references: [id])
+  series        EventSeries?   @relation(fields: [seriesId], references: [id])
   ingestSourceRun IngestRun?    @relation("EventIngestSourceRun", fields: [ingestSourceRunId], references: [id], onDelete: SetNull)
   featuredAsset Asset?         @relation("EventFeaturedAsset", fields: [featuredAssetId], references: [id], onDelete: SetNull)
   images        EventImage[]
@@ -538,6 +555,7 @@ model Event {
   @@index([isPublished, startAt])
   @@index([isPublished, startAt, id])
   @@index([venueId, startAt])
+  @@index([seriesId, startAt])
   @@index([publishedAt])
   @@index([deletedAt])
   @@index([ingestSourceRunId])

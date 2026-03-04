@@ -38,6 +38,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
             }
           : {}),
         ...(data.eventType !== undefined ? { eventType: data.eventType } : {}),
+        ...(data.seriesId !== undefined
+          ? {
+              series: data.seriesId
+                ? { connect: { id: data.seriesId } }
+                : { disconnect: true },
+            }
+          : {}),
         ...(data.images
           ? {
               images: {

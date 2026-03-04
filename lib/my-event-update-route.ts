@@ -24,6 +24,7 @@ type UpdateEventInput = {
   venueId?: string | null;
   featuredAssetId?: string | null;
   eventType?: EventTypeOption | null;
+  seriesId?: string | null;
   images?: Array<{ assetId?: string | null; url?: string | null; alt?: string | null; sortOrder: number }>;
 };
 
@@ -78,6 +79,7 @@ export async function handlePatchMyEvent(req: NextRequest, params: Promise<{ eve
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "venueId") ? { venueId: parsed.data.venueId ?? null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "featuredAssetId") ? { featuredAssetId: parsed.data.featuredAssetId ?? null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "eventType") ? { eventType: parsed.data.eventType ?? null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(parsed.data, "seriesId") ? { seriesId: parsed.data.seriesId ?? null } : {}),
       ...(images ? { images } : {}),
     };
 
