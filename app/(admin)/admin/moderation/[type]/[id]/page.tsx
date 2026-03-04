@@ -4,7 +4,7 @@ import { computeReadiness } from "@/lib/publish-blockers";
 import { db } from "@/lib/db";
 import ModerationDetailClient from "./moderation-detail-client";
 
-type Params = { type: "venue" | "event"; id: string };
+type Params = { type: "venue" | "event" | "artist"; id: string };
 
 function formatDuration(startAt: Date | null, endAt: Date | null) {
   if (!startAt || !endAt) return "—";
@@ -37,7 +37,7 @@ function formatLocalTime(value: Date | null, timezone: string | null) {
 
 export default async function ModerationDetailPage({ params }: { params: Promise<Params> }) {
   const { type, id } = await params;
-  if (type !== "venue" && type !== "event") notFound();
+  if (type !== "venue" && type !== "event" && type !== "artist") notFound();
 
   if (type === "venue") {
     const venue = await db.venue.findUnique({
@@ -81,6 +81,54 @@ export default async function ModerationDetailPage({ params }: { params: Promise
           </section>
 
           <ModerationDetailClient type="venue" id={venue.id} status={venue.status as never} blockers={readiness.blockers} />
+        </section>
+      </main>
+    );
+  }
+
+
+  if (type === "artist") {
+    const artist = await db.artist.findUnique({
+      where: { id },
+      include: {
+        targetSubmissions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: { submitter: { select: { id: true, email: true, name: true } } },
+        },
+      },
+    });
+    if (!artist) notFound();
+    const owner = artist.targetSubmissions[0]?.submitter;
+
+    return (
+      <main className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded border p-4 space-y-2">
+          <h1 className="text-xl font-semibold">{artist.name}</h1>
+          <p className="text-sm text-muted-foreground">/{artist.slug}</p>
+          <p className="text-sm">{artist.bio ?? "No bio"}</p>
+          {artist.websiteUrl ? (
+            <a href={artist.websiteUrl} className="text-sm underline" target="_blank" rel="noopener noreferrer">
+              {artist.websiteUrl}
+            </a>
+          ) : null}
+        </section>
+
+        <section className="space-y-4">
+          <section className="rounded border p-4 space-y-2">
+            <h2 className="font-semibold">Status Card</h2>
+            <p className="text-sm">Current status: <strong>{artist.isPublished ? "Published" : "Unpublished"}</strong></p>
+            <p className="text-sm">Created: {artist.createdAt.toISOString()}</p>
+            <p className="text-sm">Updated: {artist.updatedAt.toISOString()}</p>
+            <p className="text-sm">Owner: {owner?.name ?? owner?.email ?? "Unknown"}</p>
+          </section>
+
+          <ModerationDetailClient
+            type="artist"
+            id={artist.id}
+            status={"IN_REVIEW"}
+            blockers={[]}
+          />
         </section>
       </main>
     );
