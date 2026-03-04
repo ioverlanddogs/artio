@@ -74,11 +74,25 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
 
   if (!venue) notFound();
 
-  const [followersCount, existingFollow, artworks, artworkCount] = await Promise.all([
+  const [followersCount, existingFollow, artworks, artworkCount, pastEventsRaw] = await Promise.all([
     db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }),
     user ? db.follow.findUnique({ where: { userId_targetType_targetId: { userId: user.id, targetType: "VENUE", targetId: venue.id } }, select: { id: true } }) : Promise.resolve(null),
     listPublishedArtworksByVenue(venue.id, 6),
     countPublishedArtworksByVenue(venue.id),
+    db.event.findMany({
+      where: { venueId: venue.id, isPublished: true, deletedAt: null, endAt: { lt: now } },
+      orderBy: [{ startAt: "desc" }],
+      take: 24,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        startAt: true,
+        endAt: true,
+        images: { take: 4, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
+        eventTags: { select: { tag: { select: { slug: true } } } },
+      },
+    }),
   ]);
 
   const cover = resolveEntityPrimaryImage(venue);
@@ -88,6 +102,17 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
   const mapHref = address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
 
   const events = venue.events.map((event) => ({
+    id: event.id,
+    title: event.title,
+    slug: event.slug,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    imageUrl: resolveEntityPrimaryImage(event)?.url ?? null,
+    imageAlt: resolveEntityPrimaryImage(event)?.alt ?? event.title,
+    tags: event.eventTags.map(({ tag }) => tag.slug),
+  }));
+
+  const pastEvents = pastEventsRaw.map((event) => ({
     id: event.id,
     title: event.title,
     slug: event.slug,
@@ -130,6 +155,16 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
             {events.length === 0 ? <EmptyState title="No upcoming events" description="Follow this venue and check back soon." /> : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {events.map((event) => <EventCard key={event.id} href={`/events/${event.slug}`} title={event.title} startAt={event.startAt} endAt={event.endAt} venueName={venue.name} venueSlug={venue.slug} imageUrl={event.imageUrl} imageAlt={event.imageAlt} tags={event.tags} />)}
+              </div>
+            )}
+          </section>
+        )}
+        past={(
+          <section className="space-y-3">
+            <SectionHeader title="Past events" subtitle="What has happened at this venue." />
+            {pastEvents.length === 0 ? <EmptyState title="No past events" description="No past events to show." /> : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {pastEvents.map((event) => <EventCard key={event.id} href={`/events/${event.slug}`} title={event.title} startAt={event.startAt} endAt={event.endAt} venueName={venue.name} venueSlug={venue.slug} imageUrl={event.imageUrl} imageAlt={event.imageAlt} tags={event.tags} />)}
               </div>
             )}
           </section>
