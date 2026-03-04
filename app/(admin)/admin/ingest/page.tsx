@@ -51,7 +51,10 @@ export default async function AdminIngestPage() {
 
       <div className="flex items-center justify-between">
         <IngestTriggerClient venues={venues} />
-        <Link href="/admin/ingest/health" className="text-sm underline">View Ingest Health</Link>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/ingest/health" className="text-sm underline">View Ingest Health</Link>
+          <Link href="/admin/ingest/events" className="text-sm underline">View Event Queue</Link>
+        </div>
       </div>
 
       <section className="rounded-lg border bg-background p-4">
