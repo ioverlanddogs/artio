@@ -64,7 +64,7 @@ export function sanitizeReasons(reasons: string[]): string[] {
 
 export function computeConfidence(
   candidate: NormalizedExtractedEvent,
-  context: { status?: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE"; inherited?: boolean } = {},
+  context: { status?: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE"; inherited?: boolean; venueName?: string | null } = {},
 ): { score: number; band: ConfidenceBand; reasons: string[] } {
   let score = 40;
   const reasons: string[] = ["base score"];
@@ -113,6 +113,12 @@ export function computeConfidence(
   if (GENERIC_TITLES.has(title.toLowerCase())) {
     score -= 20;
     reasons.push("generic title");
+  }
+
+  const venueName = context.venueName?.trim().toLowerCase();
+  if (venueName && title.toLowerCase() === venueName) {
+    score -= 15;
+    reasons.push("title equals venue name");
   }
 
   if (!candidate.startAt && descLength < 40 && (candidate.locationText?.trim().length ?? 0) < 4) {

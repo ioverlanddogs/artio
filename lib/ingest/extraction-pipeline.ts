@@ -18,7 +18,7 @@ const CANDIDATE_CAP_STOP_REASON = "CANDIDATE_CAP_REACHED";
 
 type RunIngestParams = {
   venueId: string;
-  sourceUrl: string;
+  sourceUrl: string; // prefer venue.eventsPageUrl ?? venue.websiteUrl
   model?: string;
 };
 
@@ -192,10 +192,26 @@ export async function runVenueIngestExtraction(
       return { runId: run.id, createdCount: 0, dedupedCount: 0, createdDuplicateCount: 0 };
     }
 
-    const extracted = await extractWithOpenAI({ html: fetched.html, sourceUrl: fetched.finalUrl, model: params.model });
     const venue = await store.venue.findUnique({
       where: { id: params.venueId },
-      select: { country: true },
+      select: {
+        country: true,
+        name: true,
+        addressLine1: true,
+        city: true,
+        eventsPageUrl: true,
+      },
+    });
+    const extracted = await extractWithOpenAI({
+      html: fetched.html,
+      sourceUrl: fetched.finalUrl,
+      model: params.model,
+      venueContext: venue
+        ? {
+            name: venue.name,
+            address: [venue.addressLine1, venue.city].filter(Boolean).join(", ") || null,
+          }
+        : undefined,
     });
     const normalized = parseExtractedEventsFromModel(extracted.events).map((event) => normalizeSchedulingFields(event, {
       fallbackSourceUrl: fetched.finalUrl,
@@ -317,7 +333,10 @@ export async function runVenueIngestExtraction(
         sourceUrl: candidate.event.sourceUrl,
       };
 
-      const confidence = computeConfidence(candidate.event, { status: "PENDING" });
+      const confidence = computeConfidence(candidate.event, {
+        status: "PENDING",
+        venueName: venue?.name,
+      });
       confidenceByTempId.set(candidate.tempId, confidence);
 
       const created = await store.ingestExtractedEvent.create({
@@ -335,6 +354,8 @@ export async function runVenueIngestExtraction(
           timezone: candidate.event.timezone,
           locationText: candidate.event.locationText,
           description: candidate.event.description,
+          artistNames: candidate.event.artistNames ?? [],
+          imageUrl: candidate.event.imageUrl ?? null,
           confidenceScore: confidence.score,
           confidenceBand: confidence.band,
           confidenceReasons: sanitizeReasons(confidence.reasons),
@@ -369,7 +390,10 @@ export async function runVenueIngestExtraction(
       const inheritedConfidence = assignment?.duplicateOfId ? confidenceByTempId.get(assignment.duplicateOfId) : null;
       const confidence = inheritedConfidence
         ? { ...inheritedConfidence, reasons: sanitizeReasons([...inheritedConfidence.reasons, "duplicate inherited confidence"]) }
-        : computeConfidence(candidate.event, { status: "DUPLICATE" });
+        : computeConfidence(candidate.event, {
+          status: "DUPLICATE",
+          venueName: venue?.name,
+        });
 
       const rawJson: Prisma.JsonObject = {
         title: candidate.event.title,
@@ -398,6 +422,8 @@ export async function runVenueIngestExtraction(
           timezone: candidate.event.timezone,
           locationText: candidate.event.locationText,
           description: candidate.event.description,
+          artistNames: candidate.event.artistNames ?? [],
+          imageUrl: candidate.event.imageUrl ?? null,
           confidenceScore: confidence.score,
           confidenceBand: confidence.band,
           confidenceReasons: sanitizeReasons(confidence.reasons),

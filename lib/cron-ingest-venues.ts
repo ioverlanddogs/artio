@@ -31,8 +31,8 @@ type IngestVenueDb = {
       where: { websiteUrl: { not: null }; isPublished: true; deletedAt: null };
       orderBy: { updatedAt: "asc" };
       take: number;
-      select: { id: true; websiteUrl: true };
-    }) => Promise<Array<{ id: string; websiteUrl: string | null }>>;
+      select: { id: true; websiteUrl: true; eventsPageUrl: true };
+    }) => Promise<Array<{ id: string; websiteUrl: string | null; eventsPageUrl: string | null }>>;
   };
   ingestRun: {
     findFirst: (args: {
@@ -213,7 +213,7 @@ export async function runCronIngestVenues(
         },
         orderBy: { updatedAt: "asc" },
         take: Math.min(MAX_SCAN_VENUES, Math.max(enforcedLimit * 5, enforcedLimit)),
-        select: { id: true, websiteUrl: true },
+        select: { id: true, websiteUrl: true, eventsPageUrl: true },
       });
 
       const minLastRunAt = new Date(now() - parsed.data.minHoursSinceLastRun * 60 * 60 * 1000);
@@ -265,7 +265,11 @@ export async function runCronIngestVenues(
         }
 
         try {
-          const result = await runExtraction({ venueId: item.venue.id, sourceUrl: item.venue.websiteUrl as string });
+          // Phase 2 follow-up: this path now prefers eventsPageUrl first for sourceUrl selection.
+          const result = await runExtraction({
+            venueId: item.venue.id,
+            sourceUrl: item.venue.eventsPageUrl ?? (item.venue.websiteUrl as string),
+          });
           succeeded += 1;
           createdCandidates += result.createdCount;
           dedupedCandidates += result.dedupedCount;
