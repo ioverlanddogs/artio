@@ -27,6 +27,7 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [saveName, setSaveName] = useState("Artworks: Filtered search");
   const [frequency, setFrequency] = useState<"WEEKLY" | "OFF">("WEEKLY");
   const [message, setMessage] = useState<string | null>(null);
@@ -128,9 +129,9 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
   };
 
   return <div className="space-y-4">
-    <div className="md:hidden"><button className="rounded border px-3 py-1 text-sm" onClick={() => setSaveOpen((v) => !v)}>Filters</button></div>
+    <div className="md:hidden"><button className="rounded border px-3 py-1 text-sm" onClick={() => setFiltersOpen((v) => !v)}>{filtersOpen ? "Hide filters" : "Filters"}</button></div>
     <div className="grid gap-4 md:grid-cols-[280px_1fr]">
-      <aside className={`space-y-3 rounded border p-3 ${saveOpen ? "block" : "hidden md:block"}`}>
+      <aside className={`space-y-3 rounded border p-3 ${filtersOpen ? "block" : "hidden"} md:block`}>
         <input value={queryDraft} onChange={(e) => setQueryDraft(e.target.value)} placeholder="Search title or description" className="w-full rounded border p-2 text-sm" />
         <div>
           <p className="text-xs font-semibold uppercase">Medium</p>
