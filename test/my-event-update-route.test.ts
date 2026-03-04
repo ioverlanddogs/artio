@@ -153,3 +153,39 @@ test("PATCH my event updates eventType", async () => {
   assert.equal(res.status, 200);
   assert.equal(updatedEventType, "TALK");
 });
+
+
+test("PATCH my event assigns seriesId", async () => {
+  const seriesId = "44444444-4444-4444-8444-444444444444";
+  let updatedSeriesId: string | null | undefined;
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ seriesId }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedSeriesId = data.seriesId;
+      return { id: eventId, seriesId: data.seriesId ?? null };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedSeriesId, seriesId);
+  assert.equal(body.seriesId, seriesId);
+});

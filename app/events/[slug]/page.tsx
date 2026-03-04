@@ -21,6 +21,7 @@ import { resolveEntityPrimaryImage } from "@/lib/public-images";
 import { ArtworkCountBadge } from "@/components/artwork/artwork-count-badge";
 import { countPublishedArtworksByEvent, listPublishedArtworksByEvent } from "@/lib/artworks";
 import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
+import { listPublishedEventsInSeriesWithDeps } from "@/lib/series-events";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
       where: { slug, isPublished: true, deletedAt: null },
       include: {
         venue: true,
+        series: { select: { id: true, title: true } },
         eventTags: { include: { tag: true } },
         eventArtists: { include: { artist: { select: { id: true, slug: true, name: true } } } },
         images: { include: { asset: { select: { url: true } } }, orderBy: { sortOrder: "asc" } },
@@ -57,7 +59,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
   ]);
   if (!event) notFound();
 
-  const [artworks, artworkCount, similarEvents] = await Promise.all([
+  const [artworks, artworkCount, similarEvents, seriesEvents] = await Promise.all([
     listPublishedArtworksByEvent(event.id, 6),
     countPublishedArtworksByEvent(event.id),
     db.event.findMany({
@@ -66,6 +68,9 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
     orderBy: { startAt: "asc" },
     take: 4,
   }),
+    event.seriesId
+      ? listPublishedEventsInSeriesWithDeps({ findMany: (args) => db.event.findMany(args) }, { seriesId: event.seriesId, excludeEventId: event.id })
+      : Promise.resolve([]),
 ]);
 
   const isAuthenticated = Boolean(user);
@@ -139,6 +144,25 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
           {event.venue?.slug ? <Link href={`/venues/${event.venue.slug}`} className="text-sm underline">View details</Link> : null}
         </Card>
       </section>
+
+      {event.series && (seriesEvents.length > 0) ? (
+        <section className="section-stack">
+          <SectionHeader title={`Part of ${event.series.title}`} subtitle={`${seriesEvents.length + 1} events in this series`} />
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {seriesEvents.map((related) => (
+              <EventRailCard
+                key={related.id}
+                href={`/events/${related.slug}`}
+                title={related.title}
+                startAt={related.startAt}
+                venueName={related.venue?.name}
+                imageUrl={resolveEntityPrimaryImage(related)?.url ?? null}
+                imageAlt={resolveEntityPrimaryImage(related)?.alt}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {similarEvents.length ? (
         <section className="section-stack">

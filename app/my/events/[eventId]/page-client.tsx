@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { enqueueToast } from "@/lib/toast";
@@ -14,12 +14,14 @@ function toLocalDatetime(date: string) {
 }
 
 type VenueOption = { id: string; name: string };
+type SeriesOption = { id: string; title: string; slug: string };
 
 type EventEditorProps = {
   event: {
     id: string;
     title: string;
     venueId: string | null;
+    seriesId: string | null;
     startAt: string;
     endAt: string | null;
     ticketUrl: string | null;
@@ -35,6 +37,10 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
   const router = useRouter();
   const [title, setTitle] = useState(event.title);
   const [venueId, setVenueId] = useState(event.venueId ?? "");
+  const [seriesId, setSeriesId] = useState(event.seriesId ?? "");
+  const [seriesOptions, setSeriesOptions] = useState<SeriesOption[]>([]);
+  const [newSeriesTitle, setNewSeriesTitle] = useState("");
+  const [isCreatingSeries, setIsCreatingSeries] = useState(false);
   const [startAt, setStartAt] = useState(toLocalDatetime(event.startAt));
   const [endAt, setEndAt] = useState(event.endAt ? toLocalDatetime(event.endAt) : "");
   const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
@@ -42,6 +48,44 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
   const [eventType, setEventType] = useState<EventTypeOption>(event.eventType ?? "OTHER");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSeries() {
+      if (!venueId) {
+        setSeriesOptions([]);
+        setSeriesId("");
+        return;
+      }
+      const res = await fetch(`/api/my/venues/${venueId}/series`, { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSeriesOptions([]);
+        return;
+      }
+      setSeriesOptions(Array.isArray(body?.series) ? body.series : []);
+    }
+    void loadSeries();
+  }, [venueId]);
+
+  async function onCreateSeries() {
+    if (!venueId || !newSeriesTitle.trim()) return;
+    setIsCreatingSeries(true);
+    const res = await fetch("/api/my/series", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: newSeriesTitle, venueId }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      enqueueToast({ title: body?.error?.message ?? "Failed to create series", variant: "error" });
+      setIsCreatingSeries(false);
+      return;
+    }
+    setSeriesOptions((current) => [...current, body].sort((a, b) => a.title.localeCompare(b.title)));
+    setSeriesId(body.id);
+    setNewSeriesTitle("");
+    setIsCreatingSeries(false);
+  }
 
   async function onSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,6 +98,7 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
       body: JSON.stringify({
         title,
         venueId: venueId || null,
+        seriesId: seriesId || null,
         startAt: new Date(startAt).toISOString(),
         endAt: endAt ? new Date(endAt).toISOString() : null,
         ticketUrl: ticketUrl || null,
@@ -91,6 +136,28 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
             {venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
           </select>
         </label>
+        <div className="space-y-2">
+          <label className="block" id="seriesId">
+            <span className="text-sm">Part of a series (optional)</span>
+            <select className="w-full rounded border p-2" value={seriesId} onChange={(e) => setSeriesId(e.target.value)} disabled={!venueId}>
+              <option value="">Not part of a series</option>
+              {seriesOptions.map((series) => <option key={series.id} value={series.id}>{series.title}</option>)}
+            </select>
+          </label>
+          {venueId ? (
+            <div className="flex gap-2">
+              <input
+                className="w-full rounded border p-2"
+                value={newSeriesTitle}
+                onChange={(e) => setNewSeriesTitle(e.target.value)}
+                placeholder="Create new series title"
+              />
+              <Button type="button" variant="outline" onClick={() => void onCreateSeries()} disabled={isCreatingSeries || !newSeriesTitle.trim()}>
+                {isCreatingSeries ? "Creating..." : "Create"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="space-y-3 rounded border p-4">
