@@ -18,14 +18,13 @@ const actionsByStatus: Record<ModerationStatus, Array<{ label: string; nextStatu
   ARCHIVED: [{ label: "Restore", nextStatus: "APPROVED" }],
 };
 
-
 export default function ModerationDetailClient({
   type,
   id,
   status,
   blockers,
 }: {
-  type: "venue" | "event";
+  type: "venue" | "event" | "artist";
   id: string;
   status: ModerationStatus;
   blockers: string[];
@@ -41,7 +40,8 @@ export default function ModerationDetailClient({
     if (!pendingAction) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/${type}s/${id}`, {
+      const entitySegment = type === "venue" ? "venues" : type === "event" ? "events" : "artists";
+      const res = await fetch(`/api/admin/${entitySegment}/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -50,12 +50,28 @@ export default function ModerationDetailClient({
           ...(["APPROVED", "DRAFT", "IN_REVIEW", "REJECTED", "CHANGES_REQUESTED", "ARCHIVED"].includes(pendingAction.nextStatus) ? { isPublished: false } : {}),
         }),
       });
+
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        const message = body?.error?.message ?? "Action failed";
-        enqueueToast({ title: message, variant: "error" });
+        enqueueToast({ title: body?.error?.message ?? "Action failed", variant: "error" });
         return;
       }
+
+      const submissionStatuses: Record<string, string> = {
+        PUBLISHED: "APPROVED",
+        REJECTED: "REJECTED",
+        CHANGES_REQUESTED: "REJECTED",
+        ARCHIVED: "REJECTED",
+      };
+      const submissionStatus = submissionStatuses[pendingAction.nextStatus];
+      if (submissionStatus) {
+        await fetch(`/api/admin/${entitySegment}/${id}/resolve-submission`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ decision: submissionStatus }),
+        }).catch(() => null);
+      }
+
       setCurrentStatus(pendingAction.nextStatus);
       enqueueToast({ title: `${pendingAction.label} complete` });
       setConfirmOpen(false);

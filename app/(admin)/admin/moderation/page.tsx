@@ -35,6 +35,8 @@ export default async function AdminModerationPage({ searchParams }: { searchPara
         type: true,
         submittedAt: true,
         createdAt: true,
+        decisionReason: true,
+        decidedAt: true,
         submitter: { select: { email: true, name: true } },
         targetEvent: { select: { id: true, title: true, slug: true } },
         targetVenue: { select: { id: true, name: true, slug: true } },
@@ -55,6 +57,8 @@ export default async function AdminModerationPage({ searchParams }: { searchPara
           entityId: item.targetEvent?.id ?? item.targetVenue?.id ?? item.targetArtist?.id ?? "",
           slug: item.targetEvent?.slug ?? item.targetVenue?.slug ?? item.targetArtist?.slug ?? null,
           submittedAtISO: (item.submittedAt ?? item.createdAt).toISOString(),
+          decisionReason: item.decisionReason ?? null,
+          decidedAt: item.decidedAt?.toISOString() ?? null,
           publisher: item.submitter.name ?? item.submitter.email,
         }))}
         page={page}
