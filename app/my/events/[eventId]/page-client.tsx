@@ -7,10 +7,8 @@ import { enqueueToast } from "@/lib/toast";
 import { FeaturedEventImagePanel } from "@/app/my/events/_components/FeaturedEventImagePanel";
 import { EVENT_TYPE_OPTIONS, type EventTypeOption, getEventTypeLabel } from "@/lib/event-types";
 
-function toLocalDatetime(date: string) {
-  const parsed = new Date(date);
-  const offset = parsed.getTimezoneOffset() * 60_000;
-  return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
+function toUtcDatetimeLocal(isoString: string): string {
+  return isoString.slice(0, 16).replace("Z", "").split(".")[0]!.slice(0, 16);
 }
 
 type VenueOption = { id: string; name: string };
@@ -41,8 +39,8 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
   const [seriesOptions, setSeriesOptions] = useState<SeriesOption[]>([]);
   const [newSeriesTitle, setNewSeriesTitle] = useState("");
   const [isCreatingSeries, setIsCreatingSeries] = useState(false);
-  const [startAt, setStartAt] = useState(toLocalDatetime(event.startAt));
-  const [endAt, setEndAt] = useState(event.endAt ? toLocalDatetime(event.endAt) : "");
+  const [startAt, setStartAt] = useState(toUtcDatetimeLocal(event.startAt));
+  const [endAt, setEndAt] = useState(event.endAt ? toUtcDatetimeLocal(event.endAt) : "");
   const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
   const [description, setDescription] = useState(event.description ?? "");
   const [eventType, setEventType] = useState<EventTypeOption>(event.eventType ?? "OTHER");
@@ -56,13 +54,19 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
         setSeriesId("");
         return;
       }
-      const res = await fetch(`/api/my/venues/${venueId}/series`, { cache: "no-store" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      try {
+        const res = await fetch(`/api/my/venues/${venueId}/series`, { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setSeriesOptions([]);
+          enqueueToast({ title: "Could not load series for this venue.", variant: "error" });
+          return;
+        }
+        setSeriesOptions(Array.isArray(body?.series) ? body.series : []);
+      } catch {
         setSeriesOptions([]);
-        return;
+        enqueueToast({ title: "Could not load series for this venue.", variant: "error" });
       }
-      setSeriesOptions(Array.isArray(body?.series) ? body.series : []);
     }
     void loadSeries();
   }, [venueId]);
@@ -99,8 +103,8 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
         title,
         venueId: venueId || null,
         seriesId: seriesId || null,
-        startAt: new Date(startAt).toISOString(),
-        endAt: endAt ? new Date(endAt).toISOString() : null,
+        startAt: new Date(startAt + ":00Z").toISOString(),
+        endAt: endAt ? new Date(endAt + ":00Z").toISOString() : null,
         ticketUrl: ticketUrl || null,
         description: description || null,
         eventType,
@@ -161,8 +165,9 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
       </section>
 
       <section className="space-y-3 rounded border p-4">
-        <label className="block" id="startAt"><span className="text-sm">Start at</span><input className="w-full rounded border p-2" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></label>
-        <label className="block" id="endAt"><span className="text-sm">End at</span><input className="w-full rounded border p-2" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></label>
+        {/* Dates stored and displayed in UTC */}
+        <label className="block" id="startAt"><span className="text-sm">Start at (UTC)</span><input className="w-full rounded border p-2" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></label>
+        <label className="block" id="endAt"><span className="text-sm">End at (UTC, optional)</span><input className="w-full rounded border p-2" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></label>
       </section>
 
       <section className="space-y-3 rounded border p-4">

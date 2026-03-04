@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { canSelfPublish, getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
-import { PageHeader } from "@/components/ui/page-header";
 import EventSetupHeader from "@/app/my/_components/EventSetupHeader";
 import EventSetupSection from "@/app/my/_components/EventSetupSection";
 import { PublishPanel } from "@/components/my/PublishPanel";
@@ -57,10 +56,23 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
     select: { venueId: true, venue: { select: { name: true } } },
   });
   const managedVenues = managedVenueMemberships.map((membership) => ({ id: membership.venueId, name: membership.venue.name }));
+  const hasVenueMembership = event.venueId
+    ? managedVenues.some((v) => v.id === event.venueId)
+    : false;
+  const editableVenues = hasVenueMembership || !event.venueId
+    ? managedVenues
+    : [];
 
   return (
     <main className="space-y-6 p-6">
-      <PageHeader title="Event Setup" subtitle={canPublishDirectly ? "Complete your event details. As an admin, you can publish via moderation controls." : "Complete your event details and submit for review."} />
+      <div>
+        <h1 className="text-2xl font-semibold">Event Setup</h1>
+        <p className="text-sm text-muted-foreground">
+          {canPublishDirectly
+            ? "Complete your event details. As a trusted publisher, you can publish directly."
+            : "Complete your event details and submit for review."}
+        </p>
+      </div>
 
       <EventSetupHeader event={{ title: event.title, isPublished: event.isPublished, deletedAt: null }} submissionStatus={event.status} />
 
@@ -81,7 +93,7 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
                 featuredAssetId: event.featuredAssetId,
                 featuredAsset: event.featuredAsset,
               }}
-              venues={managedVenues}
+              venues={editableVenues}
             />
           </EventSetupSection>
 
