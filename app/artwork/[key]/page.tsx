@@ -14,6 +14,7 @@ import { isArtworkIdKey, shouldRedirectArtworkIdKey } from "@/lib/artwork-route"
 import { listPublishedArtworksByEvent, listPublishedArtworksByVenue, type PublishedArtworkListItem } from "@/lib/artworks";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { formatPrice } from "@/lib/format";
 
 export default async function ArtworkDetailPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
@@ -38,7 +39,14 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
     : false;
 
   const cover = resolveImageUrl(artwork.featuredAsset?.url, artwork.images[0]?.asset?.url);
-  const metadataChips = [artwork.year ? String(artwork.year) : null, artwork.medium, artwork.dimensions].filter(Boolean) as string[];
+  const metadataChips = [
+    artwork.year ? String(artwork.year) : null,
+    artwork.medium,
+    artwork.dimensions,
+    artwork.priceAmount != null && artwork.currency
+      ? formatPrice(artwork.priceAmount, artwork.currency)
+      : null,
+  ].filter(Boolean) as string[];
   const galleryImages = artwork.images
     .filter((image) => Boolean(image.asset?.url))
     .map((image) => ({ id: image.id, src: image.asset.url ?? "", alt: image.alt ?? artwork.title }));
