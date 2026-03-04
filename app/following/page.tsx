@@ -85,7 +85,11 @@ export default async function FollowingPage({ searchParams }: { searchParams: Se
 
       {followCount > 0 && result.items.length === 0 ? <ContextualNudgeSlot page="following" type="following_save_search" nudgeId="nudge_following_save_search" title="Make your feed work harder" body="Save your first search to get weekly digests matching your interests." destination="/search" /> : null}
 
-      <PersonalSection title="Your feed" description="Upcoming events from your followed artists and venues.">
+      <PersonalSection
+        title="Your feed"
+        description="Upcoming events from your followed artists and venues."
+        actions={<Link className="text-sm underline" href="/api/calendar-events/saved">Subscribe to your saved events calendar</Link>}
+      >
         <PersonalEventFeed items={result.items} selectedDays={String(days) as "7" | "30"} selectedType={type} hasNoFollows={hasNoFollows} />
       </PersonalSection>
 

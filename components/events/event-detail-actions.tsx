@@ -13,6 +13,7 @@ export function EventDetailActions({
   isAuthenticated,
   initialSaved,
   calendarLink,
+  subscribeFeedLink,
 }: {
   eventId: string;
   eventSlug: string;
@@ -20,18 +21,20 @@ export function EventDetailActions({
   isAuthenticated: boolean;
   initialSaved: boolean;
   calendarLink: string;
+  subscribeFeedLink?: string | null;
 }) {
   useEffect(() => {
     track("event_viewed", { eventSlug, source: "events" });
   }, [eventSlug]);
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <SaveEventButton eventId={eventId} initialSaved={initialSaved} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} />
       <Button asChild variant="secondary" size="sm">
         <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => track("event_add_to_calendar_clicked", { eventSlug })}>Add to Calendar</a>
       </Button>
       <ShareButton eventSlug={eventSlug} ui="detail" />
+      {subscribeFeedLink ? <a href={subscribeFeedLink} className="text-xs underline" onClick={() => track("event_calendar_feed_subscribe_clicked", { eventSlug })}>Subscribe to feed</a> : null}
     </div>
   );
 }

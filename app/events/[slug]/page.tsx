@@ -99,7 +99,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
               <ArtworkCountBadge count={artworkCount} href={`/artwork?eventId=${event.id}`} badgeClassName="border-white/40 bg-white/10 text-white" />
             </div>
             <p className="type-caption text-white/90">{formatEventDateRange(event.startAt, event.endAt)} · {event.venue?.name ?? "Venue TBA"}</p>
-            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} />
+            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} subscribeFeedLink={event.venue?.slug ? `/api/venues/${event.venue.slug}/calendar` : null} />
             {isAuthenticated && (event.venue?.slug || event.eventArtists[0]?.artist.slug) ? (
               <ContextualNudgeSlot
                 page="event_detail"

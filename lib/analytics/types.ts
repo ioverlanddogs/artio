@@ -5,6 +5,7 @@ export type AnalyticsEventName =
   | "event_saved_toggled"
   | "event_shared"
   | "event_add_to_calendar_clicked"
+  | "event_calendar_feed_subscribe_clicked"
   | "entity_viewed"
   | "entity_follow_toggled"
   | "entity_unfollowed"
