@@ -56,6 +56,8 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const [publishingRunId, setPublishingRunId] = useState<string | null>(null);
+  const [publishResults, setPublishResults] = useState<Record<string, { published: number; skipped: number }>>({});
   const submittingRef = useRef(false);
 
   const refreshRuns = async () => {
@@ -131,6 +133,31 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
               <div className="mt-3 space-y-3 text-sm">
                 <div className="flex flex-wrap items-center gap-3">
                   <span>Geocode: attempted {run.geocodeAttempted}, succeeded {run.geocodeSucceeded}, failed {run.geocodeFailed}</span>
+                  {run.status === "SUCCEEDED" && run.totalCreated > 0 ? (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={publishingRunId === run.id}
+                      onClick={async () => {
+                        setPublishingRunId(run.id);
+                        setError(null);
+                        setMessage(null);
+                        try {
+                          const response = await fetch(`/api/admin/venue-generation/runs/${run.id}/bulk-publish`, { method: "POST" });
+                          const body = await response.json();
+                          if (!response.ok) throw new Error(body?.error?.message ?? "Bulk publish failed");
+                          setPublishResults((prev) => ({ ...prev, [run.id]: { published: body.published ?? 0, skipped: body.skipped ?? 0 } }));
+                          await refreshRuns();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Bulk publish failed");
+                        } finally {
+                          setPublishingRunId(null);
+                        }
+                      }}
+                    >
+                      {publishingRunId === run.id ? "Publishing…" : "Publish all ready"}
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     variant="outline"
@@ -154,6 +181,11 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
                   >
                     {retryingRunId === run.id ? "Retrying…" : "Retry geocoding for this run"}
                   </Button>
+                  {publishResults[run.id] ? (
+                    <span className="text-xs text-muted-foreground">
+                      Published {publishResults[run.id].published}, skipped {publishResults[run.id].skipped}
+                    </span>
+                  ) : null}
                 </div>
 
                 {breakdown.length > 0 ? (
