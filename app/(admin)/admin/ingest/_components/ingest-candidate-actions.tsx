@@ -61,7 +61,6 @@ export default function IngestCandidateActions({
   const [error, setError] = useState<string | null>(null);
   const [missingTimezone, setMissingTimezone] = useState(false);
   const [linkedArtistCount, setLinkedArtistCount] = useState<number | null>(null);
-  const [imageWarning, setImageWarning] = useState<string | null>(null);
   const [imageSkipWarning, setImageSkipWarning] = useState<string | null>(null);
   const [approvedEventId, setApprovedEventId] = useState<string | null>(createdEventId);
   const rejectReasonRef = useRef<HTMLTextAreaElement>(null);
@@ -79,7 +78,6 @@ export default function IngestCandidateActions({
     if (loadingAction || status !== "PENDING") return;
     setError(null);
     setMissingTimezone(false);
-    setImageWarning(null);
     setImageSkipWarning(null);
     setLoadingAction("approve");
     try {
@@ -98,7 +96,6 @@ export default function IngestCandidateActions({
         imageAttached?: boolean;
       };
       setLinkedArtistCount(body.linkedArtistCount ?? 0);
-      setImageWarning(body.imageWarning ?? null);
       if (body.imageWarning && !body.imageAttached) {
         setImageSkipWarning(body.imageWarning);
       }
@@ -178,12 +175,6 @@ export default function IngestCandidateActions({
       {linkedArtistCount === 0 && status === "APPROVED" ? (
         <p className="text-xs text-amber-700">
           No artists were auto-linked. Check artist names manually.
-        </p>
-      ) : null}
-
-      {imageWarning ? (
-        <p className="text-xs text-amber-700">
-          Event created, but image could not be imported: {imageWarning}
         </p>
       ) : null}
       {linkedArtistCount !== null && linkedArtistCount > 0 ? (
