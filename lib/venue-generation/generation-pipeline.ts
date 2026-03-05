@@ -6,7 +6,8 @@ import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/for
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
 import { normalizeEmail, normalizeFacebookUrl, normalizeInstagramUrl } from "@/lib/venues/normalize-social";
-import { extractHomepageImages } from "@/lib/venue-generation/extract-homepage-images";
+import { extractHomepageImagesFromHtml, fetchHomepage } from "@/lib/venue-generation/extract-homepage-images";
+import { extractHomepageDetails, type HomepageDetails } from "@/lib/venue-generation/extract-homepage-details";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { assertSafeUrl } from "@/lib/ingest/url-guard";
 
@@ -48,9 +49,11 @@ type PipelineDb = {
         instagramUrl: true;
         facebookUrl: true;
         contactEmail: true;
+        description: true;
+        openingHours: true;
         _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } };
       };
-    }) => Promise<{ id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; _count: { homepageImageCandidates: number } } | null>;
+    }) => Promise<{ id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; description: string | null; openingHours: Prisma.JsonValue | null; _count: { homepageImageCandidates: number } } | null>;
     findUnique: (args: { where: { slug: string }; select: { id: true } }) => Promise<{ id: string } | null>;
     create: (args: { data: Prisma.VenueCreateInput }) => Promise<{ id: string }>;
     update: (args: { where: { id: string }; data: Prisma.VenueUpdateInput }) => Promise<{ id: string }>;
@@ -239,49 +242,53 @@ async function geocodeVenue(venue: GeneratedVenue, geocodeFn: typeof forwardGeoc
   }
 }
 
-async function runHomepageImageExtraction(args: {
+async function runHomepageExtraction(args: {
   venueId: string;
   runItemId: string;
   websiteUrl: string | null;
-  extractFn: typeof extractHomepageImages;
   fetchHtmlFn: typeof fetchHtmlWithGuards;
   db: Pick<PipelineDb, "venueHomepageImageCandidate" | "venueGenerationRunItem">;
-}): Promise<{ homepageImageStatus: string; homepageImageCandidateCount: number }> {
+}): Promise<{
+  homepageImageStatus: string;
+  homepageImageCandidateCount: number;
+  details: HomepageDetails | null;
+}> {
   let homepageImageStatus = "no_url";
   let homepageImageCandidateCount = 0;
 
-  if (!args.websiteUrl) return { homepageImageStatus, homepageImageCandidateCount };
+  if (!args.websiteUrl) return { homepageImageStatus, homepageImageCandidateCount, details: null };
 
-  try {
-    const result = await args.extractFn({
-      websiteUrl: args.websiteUrl,
-      fetchHtml: args.fetchHtmlFn,
-      assertUrl: assertSafeUrl,
+  const fetched = await fetchHomepage({
+    websiteUrl: args.websiteUrl,
+    fetchHtml: args.fetchHtmlFn,
+    assertUrl: assertSafeUrl,
+  });
+
+  if (!fetched) return { homepageImageStatus: "fetch_failed", homepageImageCandidateCount, details: null };
+
+  const [imageResult, details] = await Promise.all([
+    extractHomepageImagesFromHtml(fetched, assertSafeUrl),
+    extractHomepageDetails(fetched),
+  ]);
+
+  if (imageResult.candidates.length === 0) {
+    homepageImageStatus = "none_found";
+  } else {
+    await args.db.venueHomepageImageCandidate.createMany({
+      data: imageResult.candidates.map((candidate) => ({
+        venueId: args.venueId,
+        runItemId: args.runItemId,
+        url: candidate.url,
+        source: candidate.source,
+        sortOrder: candidate.sortOrder,
+        status: "pending",
+      })),
     });
-
-    if (result === null) {
-      homepageImageStatus = "fetch_failed";
-    } else if (result.candidates.length === 0) {
-      homepageImageStatus = "none_found";
-    } else {
-      await args.db.venueHomepageImageCandidate.createMany({
-        data: result.candidates.map((candidate) => ({
-          venueId: args.venueId,
-          runItemId: args.runItemId,
-          url: candidate.url,
-          source: candidate.source,
-          sortOrder: candidate.sortOrder,
-          status: "pending",
-        })),
-      });
-      homepageImageStatus = "candidates_extracted";
-      homepageImageCandidateCount = result.candidates.length;
-    }
-  } catch {
-    homepageImageStatus = "fetch_failed";
+    homepageImageStatus = "candidates_extracted";
+    homepageImageCandidateCount = imageResult.candidates.length;
   }
 
-  return { homepageImageStatus, homepageImageCandidateCount };
+  return { homepageImageStatus, homepageImageCandidateCount, details };
 }
 
 export function getStructuredPayloadFromResponses(raw: OpenAIResponse): unknown {
@@ -348,7 +355,6 @@ export async function runVenueGenerationPipeline(args: {
   openai: OpenAIClient;
   geocode?: typeof forwardGeocodeVenueAddressToLatLng;
   model?: string;
-  extractHomepageImagesFn?: typeof extractHomepageImages;
   fetchHtmlFn?: typeof fetchHtmlWithGuards;
 }) {
   const run = await args.db.venueGenerationRun.create({
@@ -422,7 +428,6 @@ export async function runVenueGenerationPipeline(args: {
       throw error;
     }
     const geocodeFn = args.geocode ?? forwardGeocodeVenueAddressToLatLng;
-    const extractHomepageImagesFn = args.extractHomepageImagesFn ?? extractHomepageImages;
     const fetchHtmlFn = args.fetchHtmlFn ?? fetchHtmlWithGuards;
 
     let totalCreated = 0;
@@ -471,21 +476,14 @@ export async function runVenueGenerationPipeline(args: {
         instagramUrl: true,
         facebookUrl: true,
         contactEmail: true,
+        description: true,
+        openingHours: true,
         _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } },
       },
     });
     if (duplicate) {
       totalSkipped += 1;
       seen.add(memoryDedupeKey);
-
-      await args.db.venue.update({
-        where: { id: duplicate.id },
-        data: {
-          instagramUrl: duplicate.instagramUrl ? undefined : normalizedSocials.instagramUrl,
-          facebookUrl: duplicate.facebookUrl ? undefined : normalizedSocials.facebookUrl,
-          contactEmail: duplicate.contactEmail ? undefined : normalizedSocials.contactEmail,
-        },
-      });
 
       const runItem = await args.db.venueGenerationRunItem.create({
         data: {
@@ -507,21 +505,34 @@ export async function runVenueGenerationPipeline(args: {
         },
       });
 
-      const homepageImageResult =
+      const homepageResult =
         duplicate._count.homepageImageCandidates === 0
-          ? await runHomepageImageExtraction({
+          ? await runHomepageExtraction({
               venueId: duplicate.id,
               runItemId: runItem.id,
               websiteUrl: venue.websiteUrl,
-              extractFn: extractHomepageImagesFn,
               fetchHtmlFn,
               db: args.db,
             })
-          : { homepageImageStatus: "skipped", homepageImageCandidateCount: 0 };
+          : { homepageImageStatus: "skipped", homepageImageCandidateCount: 0, details: null as HomepageDetails | null };
+
+      await args.db.venue.update({
+        where: { id: duplicate.id },
+        data: {
+          instagramUrl: duplicate.instagramUrl ? undefined : normalizedSocials.instagramUrl,
+          facebookUrl: duplicate.facebookUrl ? undefined : normalizedSocials.facebookUrl,
+          contactEmail: duplicate.contactEmail ? undefined : normalizedSocials.contactEmail,
+          description: duplicate.description ? undefined : homepageResult.details?.description,
+          openingHours: duplicate.openingHours ? undefined : toJsonOpeningHours(homepageResult.details?.openingHours ?? null),
+        },
+      });
 
       await args.db.venueGenerationRunItem.update({
         where: { id: runItem.id },
-        data: homepageImageResult,
+        data: {
+          homepageImageStatus: homepageResult.homepageImageStatus,
+          homepageImageCandidateCount: homepageResult.homepageImageCandidateCount,
+        },
       });
       continue;
     }
@@ -616,19 +627,33 @@ export async function runVenueGenerationPipeline(args: {
       },
     });
 
-    const homepageImageResult = await runHomepageImageExtraction({
+    const homepageResult = await runHomepageExtraction({
       venueId: created.id,
       runItemId: runItem.id,
       websiteUrl: venue.websiteUrl,
-      extractFn: extractHomepageImagesFn,
       fetchHtmlFn,
       db: args.db,
     });
 
     await args.db.venueGenerationRunItem.update({
       where: { id: runItem.id },
-      data: homepageImageResult,
+      data: {
+        homepageImageStatus: homepageResult.homepageImageStatus,
+        homepageImageCandidateCount: homepageResult.homepageImageCandidateCount,
+      },
     });
+
+    if (homepageResult.details) {
+      const detailPatch: Prisma.VenueUpdateInput = {};
+      if (!normalizedSocials.instagramUrl && homepageResult.details.instagramUrl) detailPatch.instagramUrl = homepageResult.details.instagramUrl;
+      if (!normalizedSocials.facebookUrl && homepageResult.details.facebookUrl) detailPatch.facebookUrl = homepageResult.details.facebookUrl;
+      if (!normalizedSocials.contactEmail && homepageResult.details.contactEmail) detailPatch.contactEmail = homepageResult.details.contactEmail;
+      if (homepageResult.details.description) detailPatch.description = homepageResult.details.description;
+      if (homepageResult.details.openingHours && !venue.openingHours) detailPatch.openingHours = toJsonOpeningHours(homepageResult.details.openingHours);
+      if (Object.keys(detailPatch).length > 0) {
+        await args.db.venue.update({ where: { id: created.id }, data: detailPatch });
+      }
+    }
 
     seen.add(memoryDedupeKey);
     totalCreated += 1;

@@ -8,12 +8,14 @@ function baseDb() {
   const createdVenues: Array<Record<string, unknown>> = [];
   const runs: Array<Record<string, unknown>> = [];
   const homepageCandidates: Array<Record<string, unknown>> = [];
+  const venueUpdates: Array<Record<string, unknown>> = [];
 
   return {
     createdItems,
     createdVenues,
     runs,
     homepageCandidates,
+    venueUpdates,
     db: {
       venue: {
         findFirst: async () => null,
@@ -22,7 +24,10 @@ function baseDb() {
           createdVenues.push(data);
           return { id: `venue-${createdVenues.length}` };
         },
-        update: async () => ({ id: "venue-updated" }),
+        update: async ({ data }: { data: Record<string, unknown> }) => {
+          venueUpdates.push(data);
+          return { id: "venue-updated" };
+        },
       },
       venueGenerationRun: {
         create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -123,7 +128,7 @@ test("venue generation pipeline dedupe tiering uses postcode before city", async
   state.db.venue.findFirst = async ({ where }: { where: Record<string, unknown> }) => {
     whereClauses.push(where);
     if ((where.postcode as { equals?: string })?.equals === "8001") {
-      return { id: "dup-1", instagramUrl: null, facebookUrl: null, contactEmail: null, _count: { homepageImageCandidates: 0 } };
+      return { id: "dup-1", instagramUrl: null, facebookUrl: null, contactEmail: null, description: null, openingHours: null, _count: { homepageImageCandidates: 0 } };
     }
     return null;
   };
@@ -242,6 +247,8 @@ test("venue generation pipeline records warnings and preserves existing social f
     instagramUrl: "https://www.instagram.com/existing",
     facebookUrl: null,
     contactEmail: null,
+    description: null,
+    openingHours: null,
     _count: { homepageImageCandidates: 0 },
   });
   state.db.venue.update = async ({ data }: { data: Record<string, unknown> }) => {
@@ -253,10 +260,13 @@ test("venue generation pipeline records warnings and preserves existing social f
     input: { country: "United Kingdom", region: "England" },
     triggeredById: "11111111-1111-4111-8111-111111111111",
     db: state.db as never,
-    extractHomepageImagesFn: async () => ({
-      candidates: [{ url: "https://img.example.com/home.jpg", source: "og", sortOrder: 0 }],
-    }),
-    fetchHtmlFn: async () => null as never,
+    fetchHtmlFn: async () => ({
+      finalUrl: "https://example.com",
+      contentType: "text/html",
+      html: `<meta property="og:image" content="/home.jpg">`,
+      status: 200,
+      bytes: 10,
+    }) as never,
     openai: {
       createResponse: async () => ({
         output_parsed: {
@@ -268,7 +278,7 @@ test("venue generation pipeline records warnings and preserves existing social f
               instagramUrl: "https://bad.example/social",
               facebookUrl: "https://facebook.com/newpage",
               contactEmail: "not-an-email",
-              websiteUrl: "https://existing.example.com",
+              websiteUrl: "https://example.com",
             },
           ],
         },
@@ -282,12 +292,61 @@ test("venue generation pipeline records warnings and preserves existing social f
   assert.equal(updates[0].instagramUrl, undefined);
   assert.equal(updates[0].facebookUrl, "https://www.facebook.com/newpage");
   assert.equal(updates[0].contactEmail, null);
+  assert.equal(updates[0].description, null);
+  assert.equal(updates[0].openingHours, undefined);
   assert.equal(state.createdItems[0].socialWarning, "invalid_instagram_url,invalid_contact_email");
   assert.equal(state.homepageCandidates.filter((candidate) => candidate.venueId === "venue-existing").length, 1);
 });
 
 
 
+
+
+test("venue generation pipeline applies extracted homepage details to created venue when missing", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "United Kingdom", region: "England" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    fetchHtmlFn: async () => ({
+      finalUrl: "https://example.com",
+      contentType: "text/html",
+      html: `
+        <meta name="description" content="A detailed venue description that is definitely long enough for extraction.">
+        <a href="mailto:hello@created.example.com">Email</a>
+        <a href="https://instagram.com/createdvenue">Instagram</a>
+        <a href="https://facebook.com/createdvenue">Facebook</a>
+        <div class="hours">Mon-Fri 10:00-18:00</div>
+        <meta property="og:image" content="/hero.jpg">
+      `,
+      status: 200,
+      bytes: 10,
+    }) as never,
+    openai: {
+      createResponse: async () => ({
+        output_parsed: {
+          venues: [
+            {
+              ...openAiPayload.output_parsed.venues[0],
+              name: "Created Venue",
+              country: "United Kingdom",
+              websiteUrl: "https://example.com",
+            },
+          ],
+        },
+      }),
+    },
+    geocode: async () => null,
+  });
+
+  assert.equal(state.venueUpdates.length, 1);
+  assert.equal(state.venueUpdates[0].description, "A detailed venue description that is definitely long enough for extraction.");
+  assert.equal(state.venueUpdates[0].contactEmail, "hello@created.example.com");
+  assert.equal(state.venueUpdates[0].instagramUrl, "https://instagram.com/createdvenue");
+  assert.equal(state.venueUpdates[0].facebookUrl, "https://facebook.com/createdvenue");
+  assert.deepEqual(state.venueUpdates[0].openingHours, { raw: "Mon-Fri 10:00-18:00" });
+});
 test("venue generation pipeline skips duplicate homepage extraction when pending candidates already exist", async () => {
   const state = baseDb();
 
@@ -296,6 +355,8 @@ test("venue generation pipeline skips duplicate homepage extraction when pending
     instagramUrl: null,
     facebookUrl: null,
     contactEmail: null,
+    description: null,
+    openingHours: null,
     _count: { homepageImageCandidates: 2 },
   });
 
@@ -303,9 +364,6 @@ test("venue generation pipeline skips duplicate homepage extraction when pending
     input: { country: "United Kingdom", region: "England" },
     triggeredById: "11111111-1111-4111-8111-111111111111",
     db: state.db as never,
-    extractHomepageImagesFn: async () => ({
-      candidates: [{ url: "https://img.example.com/should-not-run.jpg", source: "og", sortOrder: 0 }],
-    }),
     fetchHtmlFn: async () => null as never,
     openai: {
       createResponse: async () => ({
@@ -315,7 +373,7 @@ test("venue generation pipeline skips duplicate homepage extraction when pending
               ...openAiPayload.output_parsed.venues[0],
               name: "Existing Venue With Pending Candidates",
               country: "United Kingdom",
-              websiteUrl: "https://existing.example.com",
+              websiteUrl: "https://example.com",
             },
           ],
         },

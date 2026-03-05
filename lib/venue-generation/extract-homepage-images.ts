@@ -12,6 +12,12 @@ export type ExtractHomepageImagesResult = {
   warning?: string;
 };
 
+export type FetchedHomepage = {
+  html: string;
+  finalUrl: string;
+  contentType: string;
+};
+
 const HERO_HINT_RE = /(hero|banner|cover|feature|highlight)/i;
 
 function parseNumberAttr(raw: string | null | undefined): number | null {
@@ -77,7 +83,20 @@ export async function extractHomepageImages(args: {
   assertUrl: typeof assertSafeUrl;
 }): Promise<ExtractHomepageImagesResult | null> {
   if (!args.websiteUrl) return null;
+  const fetched = await fetchHomepage({
+    websiteUrl: args.websiteUrl,
+    fetchHtml: args.fetchHtml,
+    assertUrl: args.assertUrl,
+  });
+  if (!fetched) return null;
+  return extractHomepageImagesFromHtml(fetched, args.assertUrl);
+}
 
+export async function fetchHomepage(args: {
+  websiteUrl: string;
+  fetchHtml: typeof fetchHtmlWithGuards;
+  assertUrl: typeof assertSafeUrl;
+}): Promise<FetchedHomepage | null> {
   try {
     await args.assertUrl(args.websiteUrl);
   } catch {
@@ -93,19 +112,30 @@ export async function extractHomepageImages(args: {
 
   if (!fetched.contentType?.toLowerCase().includes("html")) return null;
 
+  return {
+    html: fetched.html ?? "",
+    finalUrl: fetched.finalUrl,
+    contentType: fetched.contentType,
+  };
+}
+
+export async function extractHomepageImagesFromHtml(
+  fetched: FetchedHomepage,
+  assertUrl: typeof assertSafeUrl,
+): Promise<ExtractHomepageImagesResult> {
   try {
     const html = fetched.html ?? "";
     const candidates: HomepageImageCandidate[] = [];
     const seen = new Set<string>();
 
     const ogMetaRe = /<meta\b[^>]*\bproperty\s*=\s*(["'])og:image\1[^>]*\bcontent\s*=\s*(["'])(.*?)\2[^>]*>/gi;
-    for (const m of html.matchAll(ogMetaRe)) await pushCandidate(candidates, seen, m[3], "og_image", 0, fetched.finalUrl, args.assertUrl);
+    for (const m of html.matchAll(ogMetaRe)) await pushCandidate(candidates, seen, m[3], "og_image", 0, fetched.finalUrl, assertUrl);
 
     const twMetaRe = /<meta\b[^>]*\bname\s*=\s*(["'])twitter:image\1[^>]*\bcontent\s*=\s*(["'])(.*?)\2[^>]*>/gi;
-    for (const m of html.matchAll(twMetaRe)) await pushCandidate(candidates, seen, m[3], "twitter_image", 10, fetched.finalUrl, args.assertUrl);
+    for (const m of html.matchAll(twMetaRe)) await pushCandidate(candidates, seen, m[3], "twitter_image", 10, fetched.finalUrl, assertUrl);
 
     const preloadRe = /<link\b[^>]*\brel\s*=\s*(["'])preload\1[^>]*\bas\s*=\s*(["'])image\2[^>]*\bhref\s*=\s*(["'])(.*?)\3[^>]*>/gi;
-    for (const m of html.matchAll(preloadRe)) await pushCandidate(candidates, seen, m[4], "preload", 20, fetched.finalUrl, args.assertUrl);
+    for (const m of html.matchAll(preloadRe)) await pushCandidate(candidates, seen, m[4], "preload", 20, fetched.finalUrl, assertUrl);
 
     const heroBlocks = [
       ...html.matchAll(/<header\b[^>]*>[\s\S]*?<\/header>/gi),
@@ -119,7 +149,7 @@ export async function extractHomepageImages(args: {
         const imgRe = /<img\b[^>]*>/gi;
         for (const imgMatch of blockMatch[0].matchAll(imgRe)) {
           const tag = imgMatch[0];
-          await pushCandidate(candidates, seen, getAttr(tag, "src"), "hero_img", 30 + heroIndex, fetched.finalUrl, args.assertUrl, parseNumberAttr(getAttr(tag, "width")), parseNumberAttr(getAttr(tag, "height")));
+          await pushCandidate(candidates, seen, getAttr(tag, "src"), "hero_img", 30 + heroIndex, fetched.finalUrl, assertUrl, parseNumberAttr(getAttr(tag, "width")), parseNumberAttr(getAttr(tag, "height")));
           heroIndex += 1;
         }
       }
@@ -133,7 +163,7 @@ export async function extractHomepageImages(args: {
       const width = parseNumberAttr(getAttr(tag, "width"));
       const srcset = getAttr(tag, "srcset");
       if ((width !== null && width >= 400) || srcset) {
-        await pushCandidate(candidates, seen, getAttr(tag, "src"), "body_img", 40 + bodyIndex, fetched.finalUrl, args.assertUrl, width, parseNumberAttr(getAttr(tag, "height")));
+        await pushCandidate(candidates, seen, getAttr(tag, "src"), "body_img", 40 + bodyIndex, fetched.finalUrl, assertUrl, width, parseNumberAttr(getAttr(tag, "height")));
         bodyIndex += 1;
       }
     }
