@@ -12,11 +12,11 @@ export default async function AdminEditEvent({ params }: { params: Promise<{ id:
   const { id } = await params;
   const event = await db.event.findUnique({
     where: { id },
-    include: { eventTags: { include: { tag: true } }, eventArtists: { include: { artist: true } }, venue: { select: { status: true, isPublished: true } } },
+    include: { eventTags: { include: { tag: true } }, eventArtists: { include: { artist: true } }, venue: { select: { status: true, isPublished: true } }, images: { select: { id: true } } },
   });
   if (!event) notFound();
 
-  const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone, venue: event.venue });
+  const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone, venue: event.venue, hasImage: event.images.length > 0 });
 
   return (
     <main className="space-y-6">

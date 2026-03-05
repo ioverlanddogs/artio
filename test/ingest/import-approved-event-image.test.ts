@@ -17,7 +17,9 @@ test("uses valid candidateImageUrl without fetching source html", async () => {
     appDb: {
       event: {
         findUnique: async () => ({ featuredAssetId: null, featuredAsset: null }),
-        update: async () => ({ id: "event-1" }),
+      },
+      eventImage: {
+        create: async () => ({ id: "event-image-1" }),
       },
       asset: {
         create: async () => ({ id: "asset-1", url: "https://blob.example/uploaded.jpg" }),
@@ -62,7 +64,9 @@ test("returns warning when image import feature flag is disabled", async () => {
     appDb: {
       event: {
         findUnique: async () => ({ featuredAssetId: null, featuredAsset: null }),
-        update: async () => ({ id: "event-1" }),
+      },
+      eventImage: {
+        create: async () => ({ id: "event-image-1" }),
       },
       asset: {
         create: async () => ({ id: "asset-1", url: "https://blob.example/uploaded.jpg" }),
@@ -96,7 +100,9 @@ test("skips image import when resolved URL is not absolute http(s)", async () =>
     appDb: {
       event: {
         findUnique: async () => ({ featuredAssetId: null, featuredAsset: null }),
-        update: async () => ({ id: "event-1" }),
+      },
+      eventImage: {
+        create: async () => ({ id: "event-image-1" }),
       },
       asset: {
         create: async () => ({ id: "asset-1", url: "https://blob.example/uploaded.jpg" }),

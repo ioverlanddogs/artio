@@ -9,7 +9,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     requireAdminUser: async () => {
       await requireAdmin();
     },
-    findEvent: async (id) => db.event.findUnique({ where: { id }, select: { id: true, slug: true, deletedAt: true } }),
+    findEvent: async (id) => db.event.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        deletedAt: true,
+        startAt: true,
+        timezone: true,
+        venue: { select: { status: true, isPublished: true } },
+        _count: { select: { images: true } },
+      },
+    }),
     updateEvent: async (id, data) => {
       await db.event.update({ where: { id }, data });
     },

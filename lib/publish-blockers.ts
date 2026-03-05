@@ -13,6 +13,7 @@ type EventEntity = {
   startAt: Date | null;
   timezone: string | null;
   venue: { status?: string | null; isPublished?: boolean | null } | null;
+  hasImage?: boolean;
 };
 
 function hasText(value: string | null | undefined) {
@@ -34,6 +35,7 @@ export function computeEventPublishBlockers(event: EventEntity): PublishBlocker[
   if (!hasText(event.timezone)) blockers.push({ id: "timezone", message: "Event timezone is required." });
   const venuePublished = event.venue?.status === "PUBLISHED" || event.venue?.isPublished === true;
   if (!venuePublished) blockers.push({ id: "venue", message: "Event venue must be published." });
+  if (event.hasImage === false) blockers.push({ id: "coverImage", message: "At least one event image is required." });
   return blockers;
 }
 

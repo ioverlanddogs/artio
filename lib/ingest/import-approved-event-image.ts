@@ -18,10 +18,19 @@ export async function importApprovedEventImage(params: {
         where: { id: string };
         select: { featuredAssetId: true; featuredAsset: { select: { url: true } } };
       }) => Promise<{ featuredAssetId: string | null; featuredAsset: { url: string | null } | null } | null>;
-      update: (args: {
-        where: { id: string };
-        data: { featuredAssetId: string };
-        select: { id: true };
+    };
+    eventImage: {
+      create: (args: {
+        data: {
+          eventId: string;
+          assetId: string;
+          url: string;
+          alt: string;
+          contentType: string;
+          sizeBytes: number;
+          sortOrder: number;
+          isPrimary: boolean;
+        };
       }) => Promise<{ id: string }>;
     };
     asset: {
@@ -109,7 +118,6 @@ export async function importApprovedEventImage(params: {
       bytes: image.bytes,
     });
 
-    // Canonical ingest image storage follows manual featured image semantics: Asset + Event.featuredAssetId.
     const asset = await params.appDb.asset.create({
       data: {
         ownerUserId: null,
@@ -123,12 +131,17 @@ export async function importApprovedEventImage(params: {
       select: { id: true, url: true },
     });
 
-    await params.appDb.event.update({
-      where: { id: params.eventId },
+    await params.appDb.eventImage.create({
       data: {
-        featuredAssetId: asset.id,
+        eventId: params.eventId,
+        assetId: asset.id,
+        url: uploaded.url,
+        alt: params.title,
+        contentType: image.contentType,
+        sizeBytes: image.sizeBytes,
+        sortOrder: 0,
+        isPrimary: true,
       },
-      select: { id: true },
     });
 
     return { attached: true, warning: null, imageUrl: asset.url };

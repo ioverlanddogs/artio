@@ -1,8 +1,17 @@
 import { apiError } from "@/lib/api";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { ok, parseModerationIntentBody } from "@/lib/admin-moderation-intent";
+import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 
-type EventRecord = { id: string; slug: string | null; deletedAt: Date | null };
+type EventRecord = {
+  id: string;
+  slug: string | null;
+  deletedAt: Date | null;
+  startAt: Date | null;
+  timezone: string | null;
+  venue: { status: string | null; isPublished: boolean | null } | null;
+  _count: { images: number };
+};
 
 type Deps = {
   requireAdminUser: () => Promise<void>;
@@ -29,6 +38,16 @@ export async function handleEventModerationIntent(req: Request, params: { id: st
   if (!event) return apiError(404, "not_found", "Event not found");
 
   if (parsedBody.action === "approve_publish") {
+    const blockers = computeEventPublishBlockers({
+      startAt: event.startAt,
+      timezone: event.timezone,
+      venue: event.venue,
+      hasImage: event._count.images > 0,
+    });
+    if (blockers.length > 0) {
+      return apiError(409, "publish_blocked", "Publishing is blocked", { blockers });
+    }
+
     await deps.updateEvent(event.id, { status: "PUBLISHED", isPublished: true, publishedAt: new Date(), reviewedAt: new Date(), reviewNotes: null });
     if (deps.onPublished) await deps.onPublished(event.id);
     return ok({ ok: true, status: "PUBLISHED", message: "Event approved and published.", publicUrl: event.slug ? `/events/${event.slug}` : undefined });
