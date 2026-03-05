@@ -90,7 +90,9 @@ If missing in production-like environments, auth boot will fail fast with a clea
    - `AUTH_GOOGLE_SECRET`
    - `GEOCODER_PROVIDER` (`mapbox` default, set to `google` to use Google server-side geocoding)
    - `GOOGLE_MAPS_API_KEY` (required when `GEOCODER_PROVIDER=google`; server-side only, never `NEXT_PUBLIC_*`)
-   - Optional: `NEXT_PUBLIC_MAPBOX_TOKEN` (canonical; `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` also works and enables `/nearby` map view)
+   - Optional: `NEXT_PUBLIC_MAPBOX_TOKEN` (canonical; `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` also works for any client Mapbox usage)
+   - `MAPBOX_ACCESS_TOKEN` (server-side only, used by Mapbox forward geocoding in `lib/geocode/mapbox-forward.ts`)
+   - Note: `/nearby` map rendering now uses Leaflet + OpenStreetMap and does not require a public Mapbox token.
 3. Ensure the production database is reachable from Vercel.
 4. Run migrations on deploy (`pnpm prisma:deploy`) before serving traffic.
 5. Optionally run `SEED_ENABLED=true pnpm db:seed` for initial sample/admin data.
