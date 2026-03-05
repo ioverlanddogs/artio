@@ -177,7 +177,7 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
                                   type="button"
                                   className="text-[10px] leading-tight text-white underline disabled:opacity-50"
                                   disabled={importingImageFor === candidate.id || importedImageFor.has(candidate.id)}
-                                  onClick={() => importImage(candidate.id, candidate.imageUrl!, false)}
+                                  onClick={() => importImage(candidate.id, candidate.blobImageUrl ?? candidate.imageUrl!, false)}
                                 >
                                   {importedImageFor.has(candidate.id) ? "✓ added" : importingImageFor === candidate.id ? "…" : "+ gallery"}
                                 </button>
@@ -185,7 +185,7 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
                                   type="button"
                                   className="text-[10px] leading-tight text-white underline disabled:opacity-50"
                                   disabled={importingImageFor === candidate.id || importedImageFor.has(candidate.id)}
-                                  onClick={() => importImage(candidate.id, candidate.imageUrl!, true)}
+                                  onClick={() => importImage(candidate.id, candidate.blobImageUrl ?? candidate.imageUrl!, true)}
                                 >
                                   {importingImageFor === candidate.id ? "" : "★ cover"}
                                 </button>

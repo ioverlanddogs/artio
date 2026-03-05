@@ -95,6 +95,11 @@ export async function handleAdminIngestRun(req: NextRequest, params: { venueId?:
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required", undefined, requestId);
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Editor role required", undefined, requestId);
+    console.error("handleAdminIngestRun_unexpected_error", {
+      requestId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return apiError(500, "internal_error", "Unexpected server error", undefined, requestId);
   }
 }

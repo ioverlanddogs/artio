@@ -11,6 +11,18 @@ import { getServerBaseUrl } from "@/lib/server/get-base-url";
 
 export const dynamic = "force-dynamic";
 
+
+function normalizeOpeningHours(value: unknown): string | null {
+  if (typeof value === "string") return value || null;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.raw === "string") return obj.raw || null;
+    if (typeof obj.text === "string") return obj.text || null;
+    if (typeof obj.value === "string") return obj.value || null;
+  }
+  return null;
+}
+
 type RunDetailResponse = {
   ok: true;
   run: {
@@ -96,12 +108,7 @@ export default async function AdminIngestRunDetailPage({ params }: { params: Pro
   const venueDetailsForSnapshot = venueDetails
     ? {
       ...venueDetails,
-      openingHours:
-          typeof venueDetails.openingHours === "string"
-            ? venueDetails.openingHours
-            : venueDetails.openingHours && typeof venueDetails.openingHours === "object" && "raw" in venueDetails.openingHours && typeof venueDetails.openingHours.raw === "string"
-              ? venueDetails.openingHours.raw
-              : null,
+      openingHours: normalizeOpeningHours(venueDetails.openingHours),
     }
     : null;
 

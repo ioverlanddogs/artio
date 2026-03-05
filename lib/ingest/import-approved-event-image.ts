@@ -93,6 +93,10 @@ export async function importApprovedEventImage(params: {
       return { attached: false, warning: "image-import skipped: no discoverable image URL", imageUrl: null };
     }
 
+    if (!resolvedUrl.startsWith("http://") && !resolvedUrl.startsWith("https://")) {
+      return { attached: false, warning: "image-import skipped: resolved image URL is not absolute", imageUrl: null };
+    }
+
     const image = await deps.fetchImageWithGuards(resolvedUrl, {
       maxBytes: Number.parseInt(process.env.AI_INGEST_IMAGE_MAX_BYTES ?? "5000000", 10) || 5_000_000,
     });
