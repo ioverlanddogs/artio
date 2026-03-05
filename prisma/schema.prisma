@@ -591,6 +591,7 @@ model IngestRun {
   usageTotalTokens Int?
   costUsdMicros    Int?
   stopReason       String?
+  venueSnapshot    Json?
   venue            Venue                 @relation(fields: [venueId], references: [id], onDelete: Cascade)
   extractedEvents  IngestExtractedEvent[]
   events           Event[]               @relation("EventIngestSourceRun")

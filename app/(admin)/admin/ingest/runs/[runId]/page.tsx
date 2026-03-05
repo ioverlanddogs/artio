@@ -24,6 +24,14 @@ type RunDetailResponse = {
     usageCompletionTokens: number | null;
     usageTotalTokens: number | null;
     stopReason: string | null;
+    venueSnapshot: {
+      venueDescription?: string | null;
+      venueCoverImageUrl?: string | null;
+      venueOpeningHours?: string | null;
+      venueContactEmail?: string | null;
+      venueInstagramUrl?: string | null;
+      venueFacebookUrl?: string | null;
+    } | null;
     fetchFinalUrl: string | null;
     fetchContentType: string | null;
     fetchBytes: number | null;

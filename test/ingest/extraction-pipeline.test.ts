@@ -26,6 +26,7 @@ type RunRecord = {
   usageCompletionTokens?: number | null;
   usageTotalTokens?: number | null;
   stopReason?: string | null;
+  venueSnapshot?: Record<string, unknown> | null;
 };
 
 function createStore() {
@@ -120,7 +121,7 @@ test("dedupe skips existing fingerprint", async () => {
     {
       store,
       fetchHtml: async () => ({ finalUrl: "https://example.com", status: 200, contentType: "text/html", bytes: 100, html: "<html></html>" }),
-      extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "already", startAt: "2025-01-01T10:00:00.000Z", locationText: "main hall" }], raw: [] }),
+      extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "already", startAt: "2025-01-01T10:00:00.000Z", locationText: "main hall" }], venueSnapshot: {}, raw: [] }),
     },
   );
 
@@ -129,7 +130,7 @@ test("dedupe skips existing fingerprint", async () => {
     {
       store,
       fetchHtml: async () => ({ finalUrl: "https://example.com", status: 200, contentType: "text/html", bytes: 100, html: "<html></html>" }),
-      extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "already", startAt: "2025-01-01T10:00:00.000Z", locationText: "main hall" }], raw: [] }),
+      extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "already", startAt: "2025-01-01T10:00:00.000Z", locationText: "main hall" }], venueSnapshot: {}, raw: [] }),
     },
   );
 
@@ -154,13 +155,15 @@ test("within-run near duplicate is persisted as DUPLICATE", async () => {
           { title: "Summer Opening", startAt: "2026-07-01T19:00:00.000Z", locationText: "Main Hall" },
           { title: "The Summer Opening", startAt: "2026-07-01T19:30:00.000Z", locationText: "Main Hall" },
         ],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
 
   assert.equal(result.createdCount, 1);
   assert.equal(result.createdDuplicateCount, 1);
+  assert.equal(typeof store.runs[0]?.venueSnapshot, "object");
+  assert.notEqual(store.runs[0]?.venueSnapshot, null);
   const primary = store.extracted.find((row) => row.status === "PENDING");
   assert.equal(typeof primary?.confidenceScore, "number");
   assert.match(String(primary?.confidenceBand), /HIGH|MEDIUM|LOW/);
@@ -197,7 +200,7 @@ test("historical near duplicate links to existing primary", async () => {
       extractWithOpenAI: async () => ({
         model: "test-model",
         events: [{ title: "The Summer Opening", startAt: "2026-07-01T20:00:00.000Z", locationText: "Main Hall" }],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
@@ -223,7 +226,7 @@ test("invalid model output marks run as failed", async () => {
         {
           store,
           fetchHtml: async () => ({ finalUrl: "https://example.com", status: 200, contentType: "text/html", bytes: 100, html: "<html></html>" }),
-          extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "" }], raw: {} }),
+          extractWithOpenAI: async () => ({ model: "test-model", events: [{ title: "" }], venueSnapshot: {}, raw: {} }),
         },
       ),
     (error: unknown) => {
@@ -250,7 +253,7 @@ test("infers endAt when startAt exists and endAt is missing", async () => {
       extractWithOpenAI: async () => ({
         model: "test-model",
         events: [{ title: "Timed Event", startAt: "2026-07-01T19:00:00.000Z", endAt: null, timezone: "UTC", locationText: "Main Hall" }],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
@@ -274,7 +277,7 @@ test("keeps candidate missing startAt non-approvable", async () => {
       extractWithOpenAI: async () => ({
         model: "test-model",
         events: [{ title: "No Start", startAt: null, endAt: null, timezone: null, locationText: "Main Hall" }],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
@@ -298,7 +301,7 @@ test("infers Europe/London timezone for UK sources when missing", async () => {
       extractWithOpenAI: async () => ({
         model: "test-model",
         events: [{ title: "UK Event", startAt: "2026-07-01T19:00:00.000Z", endAt: null, timezone: null, locationText: "Main Hall" }],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
@@ -331,7 +334,7 @@ test("infers timezone from venue lat/lng when missing", async () => {
       extractWithOpenAI: async () => ({
         model: "test-model",
         events: [{ title: "LatLng Event", startAt: "2026-07-01T19:00:00.000Z", endAt: null, timezone: null, locationText: "Main Hall" }],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );
@@ -357,7 +360,7 @@ test("returns stopReason when model returns more candidates than cap", async () 
           { title: "Event 1", startAt: "2026-07-01T19:00:00.000Z", locationText: "Main Hall" },
           { title: "Event 2", startAt: "2026-07-02T19:00:00.000Z", locationText: "Main Hall" },
         ],
-        raw: [],
+        venueSnapshot: {}, raw: [],
       }),
     },
   );

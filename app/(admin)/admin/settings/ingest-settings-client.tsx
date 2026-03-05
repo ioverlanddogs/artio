@@ -12,6 +12,10 @@ type IngestSettingsProps = {
 };
 
 const DEFAULT_PROMPT_PLACEHOLDER = [
+  "You are extracting structured data from a venue website. Your output must contain",
+  "two things: a list of upcoming events, and venue profile data observed from the same page.",
+  "",
+  "EVENTS",
   "Extract ONLY upcoming events (startAt in the future). Ignore navigation links,",
   "past events, and page furniture. For artistNames return only names clearly",
   "attributed to this event — do not include venue staff or sponsors.",
@@ -22,6 +26,18 @@ const DEFAULT_PROMPT_PLACEHOLDER = [
   "Do NOT return the venue's global hero, banner, or logo image.",
   "If the src is relative, return it as-is — do not attempt to resolve it.",
   "If no event-specific image is found, return null.",
+  "",
+  "VENUE PROFILE",
+  "Extract the following from the page. Only return values you are confident about —",
+  "if unsure, return null. Do not invent values.",
+  "venueDescription: A factual 1-3 sentence description of the venue. Null if insufficient.",
+  "venueCoverImageUrl: Primary image of the venue itself — exterior, interior, or official",
+  "venue image. Use og:image only if clearly a venue image not event-specific.",
+  "Do not return event artwork. Return relative src as-is. Null if not found.",
+  "venueOpeningHours: Opening hours as a plain string if present. Null if not found.",
+  "venueContactEmail: General contact email visible on the page. Null if not found.",
+  "venueInstagramUrl: Full https:// URL of the venue Instagram profile. Null if not found.",
+  "venueFacebookUrl: Full https:// URL of the venue Facebook page. Null if not found.",
   "Return results in the provided schema.",
 ].join("\n");
 

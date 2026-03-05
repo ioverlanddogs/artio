@@ -518,6 +518,7 @@ export async function runVenueIngestExtraction(
         usagePromptTokens: extracted.usage?.promptTokens,
         usageCompletionTokens: extracted.usage?.completionTokens,
         usageTotalTokens: extracted.usage?.totalTokens,
+        venueSnapshot: extracted.venueSnapshot as Prisma.JsonObject,
         stopReason,
       },
     });

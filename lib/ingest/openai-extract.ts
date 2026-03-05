@@ -12,6 +12,15 @@ export type ExtractedEvent = {
   imageUrl?: string | null;
 };
 
+export type VenueSnapshot = {
+  venueDescription?: string | null;
+  venueCoverImageUrl?: string | null;
+  venueOpeningHours?: string | null;
+  venueContactEmail?: string | null;
+  venueInstagramUrl?: string | null;
+  venueFacebookUrl?: string | null;
+};
+
 export type ExtractUsage = {
   promptTokens?: number;
   completionTokens?: number;
@@ -20,12 +29,18 @@ export type ExtractUsage = {
 
 type StructuredExtractResponse = {
   events: ExtractedEvent[];
+  venueDescription?: string | null;
+  venueCoverImageUrl?: string | null;
+  venueOpeningHours?: string | null;
+  venueContactEmail?: string | null;
+  venueInstagramUrl?: string | null;
+  venueFacebookUrl?: string | null;
 };
 
 const extractionJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["events"],
+  required: ["events", "venueDescription", "venueCoverImageUrl", "venueOpeningHours", "venueContactEmail", "venueInstagramUrl", "venueFacebookUrl"],
   properties: {
     events: {
       type: "array",
@@ -46,6 +61,12 @@ const extractionJsonSchema = {
         },
       },
     },
+    venueDescription: { type: ["string", "null"] },
+    venueCoverImageUrl: { type: ["string", "null"] },
+    venueOpeningHours: { type: ["string", "null"] },
+    venueContactEmail: { type: ["string", "null"] },
+    venueInstagramUrl: { type: ["string", "null"] },
+    venueFacebookUrl: { type: ["string", "null"] },
   },
 } as const;
 
@@ -128,10 +149,16 @@ function buildModelOutputDebugSignature(raw: OpenAIResponsesApiResponse) {
   };
 }
 
-function isExtractResponse(value: unknown): value is StructuredExtractResponse {
+export function isExtractResponse(value: unknown): value is StructuredExtractResponse {
   if (!value || typeof value !== "object") return false;
-  const maybe = value as { events?: unknown };
+  const maybe = value as Record<string, unknown>;
   if (!Array.isArray(maybe.events)) return false;
+
+  const topLevelOptional = ["venueDescription", "venueCoverImageUrl", "venueOpeningHours", "venueContactEmail", "venueInstagramUrl", "venueFacebookUrl"];
+  const hasValidTopLevel = topLevelOptional.every(
+    (key) => maybe[key] === undefined || typeof maybe[key] === "string" || maybe[key] === null,
+  );
+  if (!hasValidTopLevel) return false;
 
   return maybe.events.every((event) => {
     if (!event || typeof event !== "object") return false;
@@ -161,7 +188,7 @@ export async function extractEventsWithOpenAI(params: {
     name: string;
     address: string | null;
   };
-}): Promise<{ model: string; events: ExtractedEvent[]; raw: unknown; usage?: ExtractUsage }> {
+}): Promise<{ model: string; events: ExtractedEvent[]; venueSnapshot: VenueSnapshot; raw: unknown; usage?: ExtractUsage }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new IngestError("FETCH_FAILED", "OPENAI_API_KEY is required for extraction");
@@ -180,6 +207,10 @@ export async function extractEventsWithOpenAI(params: {
   const staticPromptLines = params.systemPromptOverride?.trim()
     ? [params.systemPromptOverride.trim()]
     : [
+      "You are extracting structured data from a venue website. Your output must contain",
+      "two things: a list of upcoming events, and venue profile data observed from the same page.",
+      "",
+      "EVENTS",
       "Extract ONLY upcoming events (startAt in the future). Ignore navigation links,",
       "past events, and page furniture. For artistNames return only names clearly",
       "attributed to this event — do not include venue staff or sponsors.",
@@ -190,6 +221,18 @@ export async function extractEventsWithOpenAI(params: {
       "Do NOT return the venue's global hero, banner, or logo image.",
       "If the src is relative, return it as-is — do not attempt to resolve it.",
       "If no event-specific image is found, return null.",
+      "",
+      "VENUE PROFILE",
+      "Extract the following from the page. Only return values you are confident about —",
+      "if unsure, return null. Do not invent values.",
+      "venueDescription: A factual 1-3 sentence description of the venue. Null if insufficient.",
+      "venueCoverImageUrl: Primary image of the venue itself — exterior, interior, or official",
+      "venue image. Use og:image only if clearly a venue image not event-specific.",
+      "Do not return event artwork. Return relative src as-is. Null if not found.",
+      "venueOpeningHours: Opening hours as a plain string if present. Null if not found.",
+      "venueContactEmail: General contact email visible on the page. Null if not found.",
+      "venueInstagramUrl: Full https:// URL of the venue Instagram profile. Null if not found.",
+      "venueFacebookUrl: Full https:// URL of the venue Facebook page. Null if not found.",
       "Return results in the provided schema.",
     ];
 
@@ -258,6 +301,14 @@ export async function extractEventsWithOpenAI(params: {
   }
 
   const events = parsed.events;
+  const venueSnapshot: VenueSnapshot = {
+    venueDescription: typeof parsed.venueDescription === "string" ? parsed.venueDescription.trim() || null : null,
+    venueCoverImageUrl: typeof parsed.venueCoverImageUrl === "string" ? parsed.venueCoverImageUrl.trim() || null : null,
+    venueOpeningHours: typeof parsed.venueOpeningHours === "string" ? parsed.venueOpeningHours.trim() || null : null,
+    venueContactEmail: typeof parsed.venueContactEmail === "string" ? parsed.venueContactEmail.trim() || null : null,
+    venueInstagramUrl: typeof parsed.venueInstagramUrl === "string" ? parsed.venueInstagramUrl.trim() || null : null,
+    venueFacebookUrl: typeof parsed.venueFacebookUrl === "string" ? parsed.venueFacebookUrl.trim() || null : null,
+  };
 
   const usage = raw.usage
     ? {
@@ -267,5 +318,5 @@ export async function extractEventsWithOpenAI(params: {
     }
     : undefined;
 
-  return { model, events, raw: parsed, usage };
+  return { model, events, venueSnapshot, raw: parsed, usage };
 }

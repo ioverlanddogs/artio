@@ -73,6 +73,7 @@ async function runWithTwoPrimaryCandidates(store: ReturnType<typeof createStore>
           { title: "A", startAt: "2026-07-01T10:00:00.000Z", locationText: "Main", imageUrl: "https://cdn.example.com/a.jpg" },
           { title: "B", startAt: "2026-07-02T10:00:00.000Z", locationText: "Main", imageUrl: "https://cdn.example.com/b.jpg" },
         ],
+        venueSnapshot: {},
         raw: [],
       }),
       assertSafeUrl: overrides.assertSafeUrl ?? (async (input: string) => new URL(input)),

@@ -19,7 +19,7 @@ test("systemPromptOverride replaces hardcoded extraction lines while keeping dyn
   global.fetch = (async (_input, init) => {
     const body = JSON.parse(String(init?.body ?? "{}")) as { input?: Array<{ content?: string }> };
     systemPrompt = body.input?.[0]?.content ?? "";
-    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }], venueDescription: null, venueCoverImageUrl: null, venueOpeningHours: null, venueContactEmail: null, venueInstagramUrl: null, venueFacebookUrl: null } }), { status: 200 });
   }) as typeof fetch;
 
   await extractEventsWithOpenAI({
@@ -43,7 +43,7 @@ test("null systemPromptOverride uses hardcoded extraction lines", async () => {
   global.fetch = (async (_input, init) => {
     const body = JSON.parse(String(init?.body ?? "{}")) as { input?: Array<{ content?: string }> };
     systemPrompt = body.input?.[0]?.content ?? "";
-    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }], venueDescription: null, venueCoverImageUrl: null, venueOpeningHours: null, venueContactEmail: null, venueInstagramUrl: null, venueFacebookUrl: null } }), { status: 200 });
   }) as typeof fetch;
 
   await extractEventsWithOpenAI({
@@ -64,7 +64,7 @@ test("modelOverride takes precedence over params.model and OPENAI_MODEL", async 
   global.fetch = (async (_input, init) => {
     const body = JSON.parse(String(init?.body ?? "{}")) as { model?: string };
     requestModel = body.model ?? "";
-    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }], venueDescription: null, venueCoverImageUrl: null, venueOpeningHours: null, venueContactEmail: null, venueInstagramUrl: null, venueFacebookUrl: null } }), { status: 200 });
   }) as typeof fetch;
 
   await extractEventsWithOpenAI({
@@ -84,7 +84,7 @@ test("maxOutputTokensOverride is used when provided; default 4000 when omitted",
   global.fetch = (async (_input, init) => {
     const body = JSON.parse(String(init?.body ?? "{}")) as { max_output_tokens?: number };
     tokenValues.push(body.max_output_tokens ?? -1);
-    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }], venueDescription: null, venueCoverImageUrl: null, venueOpeningHours: null, venueContactEmail: null, venueInstagramUrl: null, venueFacebookUrl: null } }), { status: 200 });
   }) as typeof fetch;
 
   await extractEventsWithOpenAI({

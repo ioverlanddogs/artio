@@ -170,6 +170,7 @@ export async function handleAdminIngestRunGet(req: NextRequest, params: { runId?
         usageCompletionTokens: true,
         usageTotalTokens: true,
         stopReason: true,
+        venueSnapshot: true,
         startedAt: true,
         finishedAt: true,
         venue: { select: { id: true, name: true } },

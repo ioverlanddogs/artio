@@ -18,6 +18,12 @@ test("extractEventsWithOpenAI reads structured JSON output without parsing outpu
 
   global.fetch = (async () => new Response(JSON.stringify({
     output_parsed: {
+      venueDescription: null,
+      venueCoverImageUrl: null,
+      venueOpeningHours: null,
+      venueContactEmail: null,
+      venueInstagramUrl: null,
+      venueFacebookUrl: null,
       events: [
         {
           title: "Opening Night",
@@ -47,6 +53,12 @@ test("extractEventsWithOpenAI reads structured JSON output without parsing outpu
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0]?.title, "Opening Night");
   assert.deepEqual(result.raw, {
+    venueDescription: null,
+    venueCoverImageUrl: null,
+    venueOpeningHours: null,
+    venueContactEmail: null,
+    venueInstagramUrl: null,
+    venueFacebookUrl: null,
     events: [
       {
         title: "Opening Night",
@@ -95,7 +107,7 @@ test("extractEventsWithOpenAI parses JSON from output_text fallback", async () =
   process.env.OPENAI_API_KEY = "test-key";
 
   global.fetch = (async () => new Response(JSON.stringify({
-    output_text: '{"events":[{"title":"Test"}]}',
+    output_text: '{"events":[{"title":"Test"}],"venueDescription":null,"venueCoverImageUrl":null,"venueOpeningHours":null,"venueContactEmail":null,"venueInstagramUrl":null,"venueFacebookUrl":null}',
   }), { status: 200 })) as typeof fetch;
 
   const result = await extractEventsWithOpenAI({
@@ -146,7 +158,7 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
   let capturedBody: Record<string, unknown> | null = null;
   global.fetch = (async (_input, init) => {
     capturedBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }] } }), { status: 200 });
+    return new Response(JSON.stringify({ output_parsed: { events: [{ title: "Test" }], venueDescription: null, venueCoverImageUrl: null, venueOpeningHours: null, venueContactEmail: null, venueInstagramUrl: null, venueFacebookUrl: null } }), { status: 200 });
   }) as typeof fetch;
 
   await extractEventsWithOpenAI({
@@ -164,7 +176,9 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
   assert.equal(text?.format?.strict, true);
   assert.ok(text?.format?.schema);
   const schema = text?.format?.schema as {
+    required?: string[];
     properties?: {
+      venueDescription?: { type?: unknown };
       events?: {
         items?: {
           required?: string[];
@@ -176,6 +190,8 @@ test("extractEventsWithOpenAI uses default model and Responses API request shape
       };
     };
   } | undefined;
+  assert.deepEqual(schema?.required, ["events", "venueDescription", "venueCoverImageUrl", "venueOpeningHours", "venueContactEmail", "venueInstagramUrl", "venueFacebookUrl"]);
+  assert.deepEqual(schema?.properties?.venueDescription?.type, ["string", "null"]);
   const eventItems = schema?.properties?.events?.items;
   assert.ok(Array.isArray(eventItems?.required));
   assert.deepEqual(eventItems?.required, ["title", "startAt", "endAt", "timezone", "locationText", "description", "sourceUrl", "artistNames", "imageUrl"]);
