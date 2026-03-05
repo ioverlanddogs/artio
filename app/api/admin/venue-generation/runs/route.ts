@@ -64,10 +64,14 @@ export async function getVenueGenerationRuns(deps: {
     },
   });
 
-  const createdVenueIds = runs
-    .flatMap((run) => run.items)
-    .filter((item) => item.status === "created" && item.venueId)
-    .map((item) => item.venueId as string);
+  const createdVenueIds = [
+    ...new Set(
+      runs
+        .flatMap((run) => run.items)
+        .filter((item) => item.status === "created" && item.venueId)
+        .map((item) => item.venueId as string),
+    ),
+  ];
 
   const venues = createdVenueIds.length > 0
     ? await appDb.venue.findMany({

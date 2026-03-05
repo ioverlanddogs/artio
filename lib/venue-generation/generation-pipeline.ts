@@ -1,4 +1,4 @@
-import { type Prisma } from "@prisma/client";
+import { type Prisma, type PrismaClient } from "@prisma/client";
 import { ZodError } from "zod";
 import { ForwardGeocodeError, type ForwardGeocodeErrorCode, forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
 import tzLookup from "tz-lookup";
@@ -44,7 +44,7 @@ export class VenueGenerationError extends Error {
 
 type PipelineDb = {
   venue: {
-    findFirst: (args: { where: Prisma.VenueWhereInput; select: Record<string, unknown> }) => Promise<Record<string, unknown> | null>;
+    findFirst: PrismaClient["venue"]["findFirst"];
     findUnique: (args: { where: { slug: string }; select: { id: true } }) => Promise<{ id: string } | null>;
     create: (args: { data: Prisma.VenueCreateInput }) => Promise<{ id: string }>;
     update: (args: { where: { id: string }; data: Prisma.VenueUpdateInput }) => Promise<{ id: string }>;
@@ -547,7 +547,7 @@ export async function runVenueGenerationPipeline(args: {
         openingHours: true,
         _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } },
       },
-    }) as { id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; description: string | null; openingHours: Prisma.JsonValue | null; _count: { homepageImageCandidates: number } } | null;
+    });
     if (duplicate) {
       totalSkipped += 1;
       seen.add(memoryDedupeKey);
