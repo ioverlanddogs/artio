@@ -55,6 +55,7 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
       displayUrl: item.featuredImageUrl,
       originalUrl: item.featuredImageUrl,
       title: item.name,
+      source: "generation" as const,
     }));
 
   const ingestSuggestions = Array.from(

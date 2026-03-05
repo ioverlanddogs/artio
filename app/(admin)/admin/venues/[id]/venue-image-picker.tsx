@@ -20,8 +20,11 @@ type VenueImagePickerProps = {
     displayUrl: string;
     originalUrl: string;
     title: string;
+    source?: "ingest" | "generation";
   }>;
 };
+
+type Suggestion = VenueImagePickerProps["suggestions"][number];
 
 export default function VenueImagePicker(props: VenueImagePickerProps) {
   const { venueId, suggestions } = props;
@@ -50,11 +53,15 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
     }
   }
 
-  async function importSuggestion(suggestion: VenueImagePickerProps["suggestions"][number], setAsFeatured: boolean) {
+  async function importSuggestion(suggestion: Suggestion, setAsFeatured: boolean) {
     setImportingUrl(suggestion.originalUrl);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/ingest/runs/${suggestion.runId}/import-venue-image`, {
+      const url = suggestion.source === "generation"
+        ? `/api/admin/venues/${venueId}/import-generation-image`
+        : `/api/admin/ingest/runs/${suggestion.runId}/import-venue-image`;
+
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: suggestion.originalUrl, setAsFeatured }),
