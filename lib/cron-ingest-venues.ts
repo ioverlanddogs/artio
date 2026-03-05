@@ -28,11 +28,19 @@ const querySchema = z.object({
 type IngestVenueDb = {
   venue: {
     findMany: (args: {
-      where: { websiteUrl: { not: null }; isPublished: true; deletedAt: null };
+      where:
+        | { websiteUrl: { not: null }; isPublished: true; deletedAt: null }
+        | {
+          deletedAt: null;
+          OR: Array<
+            | { isPublished: true; websiteUrl: { not: null } }
+            | { aiGenerated: true; isPublished: false; eventsPageUrl: { not: null } }
+          >;
+        };
       orderBy: { updatedAt: "asc" };
       take: number;
-      select: { id: true; websiteUrl: true; eventsPageUrl: true };
-    }) => Promise<Array<{ id: string; websiteUrl: string | null; eventsPageUrl: string | null }>>;
+      select: { id: true; websiteUrl: true; eventsPageUrl: true; aiGenerated: true };
+    }) => Promise<Array<{ id: string; websiteUrl: string | null; eventsPageUrl: string | null; aiGenerated: boolean }>>;
   };
   ingestRun: {
     findFirst: (args: {
@@ -119,6 +127,7 @@ export async function runCronIngestVenues(
   const cbWindowHours = envInt("AI_INGEST_CRON_CIRCUIT_BREAKER_WINDOW_HOURS", 6);
   const cbMinRuns = envInt("AI_INGEST_CRON_CIRCUIT_BREAKER_MIN_RUNS", 5);
   const cbFailRate = envFloat("AI_INGEST_CRON_CIRCUIT_BREAKER_FAIL_RATE", 0.6);
+  const ingestUnpublished = process.env.AI_INGEST_UNPUBLISHED_VENUES === "1";
 
   const dryRun = parsed.data.dryRun === "true";
   const lock = await tryAcquireCronLock(cronDb, "cron:ingest:venues");
@@ -206,14 +215,29 @@ export async function runCronIngestVenues(
       }
 
       const sourceVenues = await cronDb.venue.findMany({
-        where: {
-          websiteUrl: { not: null },
-          isPublished: true,
-          deletedAt: null,
-        },
+        where: ingestUnpublished
+          ? {
+            deletedAt: null,
+            OR: [
+              {
+                isPublished: true,
+                websiteUrl: { not: null },
+              },
+              {
+                aiGenerated: true,
+                isPublished: false,
+                eventsPageUrl: { not: null },
+              },
+            ],
+          }
+          : {
+            websiteUrl: { not: null },
+            isPublished: true,
+            deletedAt: null,
+          },
         orderBy: { updatedAt: "asc" },
         take: Math.min(MAX_SCAN_VENUES, Math.max(enforcedLimit * 5, enforcedLimit)),
-        select: { id: true, websiteUrl: true, eventsPageUrl: true },
+        select: { id: true, websiteUrl: true, eventsPageUrl: true, aiGenerated: true },
       });
 
       const minLastRunAt = new Date(now() - parsed.data.minHoursSinceLastRun * 60 * 60 * 1000);
@@ -286,6 +310,7 @@ export async function runCronIngestVenues(
             runId: result.runId,
             status: "succeeded",
             sourceUrl,
+            aiGenerated: item.venue.aiGenerated,
             usedEventsPageUrl: Boolean(item.venue.eventsPageUrl?.trim()),
             createdCount: result.createdCount,
             dedupedCount: result.dedupedCount,
@@ -329,6 +354,7 @@ export async function runCronIngestVenues(
         stopReason,
         limit: enforcedLimit,
         minHoursSinceLastRun: parsed.data.minHoursSinceLastRun,
+        ingestUnpublished,
         venues: venueResults,
         circuitBreaker: { open: false, failRate, runCount, windowHours: cbWindowHours },
       };

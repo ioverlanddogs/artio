@@ -4,10 +4,18 @@ import { runCronIngestVenues } from "../lib/cron-ingest-venues.ts";
 
 type MockRun = { venueId: string; createdAt: Date; status: "RUNNING" | "SUCCEEDED" | "FAILED"; errorCode?: string | null };
 
-function createDb(venues: Array<{ id: string; websiteUrl: string | null; eventsPageUrl?: string | null }>, runs: MockRun[] = [], lockAcquired = true) {
+function createDb(
+  venues: Array<{ id: string; websiteUrl: string | null; eventsPageUrl?: string | null; aiGenerated?: boolean }>,
+  runs: MockRun[] = [],
+  lockAcquired = true,
+) {
+  let lastVenueFindManyArgs: unknown = null;
   return {
     venue: {
-      findMany: async () => venues,
+      findMany: async (args: unknown) => {
+        lastVenueFindManyArgs = args;
+        return venues.map((venue) => ({ ...venue, eventsPageUrl: venue.eventsPageUrl ?? null, aiGenerated: venue.aiGenerated ?? false }));
+      },
     },
     ingestRun: {
       findFirst: async (args: { where: { venueId: string; status: { in: Array<"RUNNING" | "SUCCEEDED"> } } }) => {
@@ -25,6 +33,7 @@ function createDb(venues: Array<{ id: string; websiteUrl: string | null; eventsP
       },
     },
     $queryRaw: async () => [{ locked: lockAcquired }],
+    __getLastVenueFindManyArgs: () => lastVenueFindManyArgs,
   };
 }
 
@@ -226,4 +235,84 @@ test("cron stops early when time budget exceeded", async () => {
 
   const body = await response.json();
   assert.equal(body.stopReason, "TIME_BUDGET_EXCEEDED");
+});
+
+test("cron uses OR venue filter when AI_INGEST_UNPUBLISHED_VENUES=1", async () => {
+  process.env.CRON_SECRET = "secret";
+  process.env.AI_INGEST_ENABLED = "1";
+  process.env.AI_INGEST_UNPUBLISHED_VENUES = "1";
+
+  const db = createDb([{ id: "venue-1", websiteUrl: "https://venue.one", eventsPageUrl: null }]);
+  const response = await runCronIngestVenues("secret", { limit: "1", dryRun: "1" }, db);
+
+  assert.equal(response.status, 200);
+  const findManyArgs = db.__getLastVenueFindManyArgs() as { where?: { OR?: unknown[] } };
+  assert.ok(Array.isArray(findManyArgs.where?.OR));
+  assert.equal(findManyArgs.where?.OR?.length, 2);
+});
+
+test("cron uses original flat venue filter when AI_INGEST_UNPUBLISHED_VENUES is unset", async () => {
+  process.env.CRON_SECRET = "secret";
+  process.env.AI_INGEST_ENABLED = "1";
+  delete process.env.AI_INGEST_UNPUBLISHED_VENUES;
+
+  const db = createDb([{ id: "venue-1", websiteUrl: "https://venue.one", eventsPageUrl: null }]);
+  const response = await runCronIngestVenues("secret", { limit: "1", dryRun: "1" }, db);
+
+  assert.equal(response.status, 200);
+  const findManyArgs = db.__getLastVenueFindManyArgs() as { where?: { OR?: unknown[] } };
+  assert.equal(findManyArgs.where?.OR, undefined);
+});
+
+test("cron ingests unpublished AI-generated venue when AI_INGEST_UNPUBLISHED_VENUES=1 and eventsPageUrl exists", async () => {
+  process.env.CRON_SECRET = "secret";
+  process.env.AI_INGEST_ENABLED = "1";
+  process.env.AI_INGEST_UNPUBLISHED_VENUES = "1";
+
+  const calls: Array<{ venueId: string; sourceUrl: string }> = [];
+  const response = await runCronIngestVenues(
+    "secret",
+    { limit: "1", minHoursSinceLastRun: "24" },
+    createDb([{ id: "venue-ai", websiteUrl: null, eventsPageUrl: "https://venue.ai/events", aiGenerated: true }]),
+    {},
+    {
+      runExtraction: async (params) => {
+        calls.push(params);
+        return { runId: "run-ai", createdCount: 1, dedupedCount: 0, createdDuplicateCount: 0, stopReason: null };
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [{ venueId: "venue-ai", sourceUrl: "https://venue.ai/events" }]);
+  const body = await response.json();
+  assert.equal(body.ingestUnpublished, true);
+  assert.equal(body.venues[0].aiGenerated, true);
+});
+
+test("cron DB query gates unpublished AI-generated venue without eventsPageUrl when AI_INGEST_UNPUBLISHED_VENUES=1", async () => {
+  process.env.CRON_SECRET = "secret";
+  process.env.AI_INGEST_ENABLED = "1";
+  process.env.AI_INGEST_UNPUBLISHED_VENUES = "1";
+
+  const db = createDb([]);
+  const response = await runCronIngestVenues("secret", { limit: "1" }, db);
+
+  assert.equal(response.status, 200);
+  const findManyArgs = db.__getLastVenueFindManyArgs() as {
+    where: {
+      OR: Array<Record<string, unknown>>;
+    };
+  };
+  assert.ok(
+    findManyArgs.where.OR.some((condition) =>
+      "eventsPageUrl" in condition
+      && (condition.eventsPageUrl as { not: null }).not === null
+      && condition.aiGenerated === true
+      && condition.isPublished === false,
+    ),
+  );
+
+  const body = await response.json();
+  assert.equal(body.selected, 0);
 });
