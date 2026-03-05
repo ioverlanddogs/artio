@@ -83,6 +83,12 @@ function createStore() {
         extracted.push(row);
         return row;
       },
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const row = extracted.find((item) => item.id === where.id);
+        if (!row) throw new Error("candidate not found");
+        Object.assign(row, data);
+        return row;
+      },
     },
   };
 }

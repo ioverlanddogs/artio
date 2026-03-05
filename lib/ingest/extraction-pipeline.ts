@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { IngestError } from "@/lib/ingest/errors";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { extractEventsWithOpenAI } from "@/lib/ingest/openai-extract";
+import { assertSafeUrl } from "@/lib/ingest/url-guard";
+import { fetchImageWithGuards } from "@/lib/ingest/fetch-image";
+import { uploadCandidateImageToBlob } from "@/lib/blob/upload-image";
 import { computeConfidence, sanitizeReasons } from "@/lib/ingest/confidence";
 import { parseExtractedEventsFromModel, type NormalizedExtractedEvent } from "@/lib/ingest/schemas";
 import { clusterCandidates, computeSimilarityKey, scoreSimilarity } from "@/lib/ingest/similarity";
@@ -35,6 +38,7 @@ type IngestStore = {
     findUnique: typeof db.ingestExtractedEvent.findUnique;
     findMany: typeof db.ingestExtractedEvent.findMany;
     create: typeof db.ingestExtractedEvent.create;
+    update: typeof db.ingestExtractedEvent.update;
   };
   venue: {
     findUnique: typeof db.venue.findUnique;
@@ -157,12 +161,18 @@ export async function runVenueIngestExtraction(
     fetchHtml?: Fetcher;
     extractWithOpenAI?: Extractor;
     now?: () => number;
+    assertSafeUrl?: typeof assertSafeUrl;
+    fetchImageWithGuards?: typeof fetchImageWithGuards;
+    uploadCandidateImageToBlob?: typeof uploadCandidateImageToBlob;
   } = {},
 ): Promise<{ runId: string; createdCount: number; dedupedCount: number; createdDuplicateCount: number; stopReason: string | null }> {
   const store = deps.store ?? db;
   const fetchHtml = deps.fetchHtml ?? fetchHtmlWithGuards;
   const extractWithOpenAI = deps.extractWithOpenAI ?? extractEventsWithOpenAI;
   const now = deps.now ?? Date.now;
+  const assertSafeUrlImpl = deps.assertSafeUrl ?? assertSafeUrl;
+  const fetchImageWithGuardsImpl = deps.fetchImageWithGuards ?? fetchImageWithGuards;
+  const uploadCandidateImageToBlobImpl = deps.uploadCandidateImageToBlob ?? uploadCandidateImageToBlob;
   const startedAtMs = now();
 
   const run = await store.ingestRun.create({
@@ -376,6 +386,41 @@ export async function runVenueIngestExtraction(
 
       createdPrimaryIdByTempId.set(candidate.tempId, created.id);
       createdCount += 1;
+    }
+
+    if (process.env.AI_INGEST_IMAGE_PREFETCH_ENABLED === "1") {
+      const prefetchTasks = candidates
+        .filter((candidate) => {
+          const assignment = assignmentById.get(candidate.tempId);
+          return Boolean(assignment?.isPrimary) && Boolean(createdPrimaryIdByTempId.get(candidate.tempId)) && Boolean(candidate.event.imageUrl);
+        })
+        .map(async (candidate) => {
+          const candidateId = createdPrimaryIdByTempId.get(candidate.tempId);
+          const imageUrl = candidate.event.imageUrl;
+          if (!candidateId || !imageUrl) return;
+
+          try {
+            const safeUrl = await assertSafeUrlImpl(imageUrl);
+            const image = await fetchImageWithGuardsImpl(safeUrl.toString());
+            const uploaded = await uploadCandidateImageToBlobImpl({
+              venueId: params.venueId,
+              candidateId,
+              sourceUrl: image.finalUrl,
+              contentType: image.contentType,
+              bytes: image.bytes,
+            });
+
+            await store.ingestExtractedEvent.update({
+              where: { id: candidateId },
+              data: { blobImageUrl: uploaded.url },
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn("ingest_image_prefetch_failed", { candidateId, imageUrl, message });
+          }
+        });
+
+      await Promise.allSettled(prefetchTasks);
     }
 
     for (const candidate of candidates) {

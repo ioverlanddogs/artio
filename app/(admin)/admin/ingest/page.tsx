@@ -14,6 +14,7 @@ export default async function AdminIngestPage() {
         id: true,
         title: true,
         imageUrl: true,
+        blobImageUrl: true,
         startAt: true,
         locationText: true,
         confidenceScore: true,

@@ -35,6 +35,7 @@ type RunDetailResponse = {
       title: string;
       artistNames: string[];
       imageUrl: string | null;
+      blobImageUrl: string | null;
       startAt: string | null;
       locationText: string | null;
       status: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";

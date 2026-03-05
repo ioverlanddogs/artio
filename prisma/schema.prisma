@@ -620,6 +620,7 @@ model IngestExtractedEvent {
   description     String?
   artistNames     String[]                   @default([])
   imageUrl        String?
+  blobImageUrl    String?
   rawJson         Json
   model           String?
   confidenceScore Int                        @default(0)

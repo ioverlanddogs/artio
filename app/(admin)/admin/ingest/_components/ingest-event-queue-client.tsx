@@ -9,6 +9,7 @@ type QueueCandidate = {
   id: string;
   title: string;
   imageUrl: string | null;
+  blobImageUrl: string | null;
   startAt: Date | null;
   locationText: string | null;
   confidenceScore: number;
@@ -105,7 +106,7 @@ export default function IngestEventQueueClient({ candidates }: { candidates: Que
                   {candidate.imageUrl
                     ? (
                       <div className="group relative h-10 w-16">
-                        <img src={candidate.imageUrl} alt={candidate.title} className="h-10 w-16 rounded object-cover" />
+                        <img src={candidate.blobImageUrl ?? candidate.imageUrl} alt={candidate.title} className="h-10 w-16 rounded object-cover" />
                         {candidate.status !== "DUPLICATE" ? (
                           <div className="absolute inset-0 hidden flex-col items-center justify-center gap-0.5 rounded bg-black/60 group-hover:flex">
                             <button

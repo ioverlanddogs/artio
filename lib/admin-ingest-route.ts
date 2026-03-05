@@ -181,6 +181,7 @@ export async function handleAdminIngestRunGet(req: NextRequest, params: { runId?
             title: true,
             artistNames: true,
             imageUrl: true,
+            blobImageUrl: true,
             startAt: true,
             endAt: true,
             locationText: true,
