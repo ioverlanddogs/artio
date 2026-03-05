@@ -1,8 +1,9 @@
 import { unstable_noStore as noStore } from "next/cache";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 import { requireAdmin, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { handleVenueGenerationPost } from "@/lib/venue-generation/admin-venue-generation-handler";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,7 @@ export async function GET() {
         geocodeSucceeded: true,
         geocodeFailed: true,
         geocodeFailureBreakdown: true,
+      autoPublishedCount: true,
         triggeredById: true,
         createdAt: true,
         items: {
@@ -60,4 +62,9 @@ export async function GET() {
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");
   }
+}
+
+export async function POST(req: NextRequest) {
+  noStore();
+  return handleVenueGenerationPost(req);
 }

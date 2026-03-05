@@ -38,6 +38,7 @@ type Run = {
   geocodeSucceeded: number;
   geocodeFailed: number;
   geocodeFailureBreakdown: unknown;
+  autoPublishedCount: number;
   createdAt: string | Date;
   status?: string | null;
   items: RunItem[];
@@ -128,7 +129,7 @@ export function VenueGenerationClient({ initialRuns }: { initialRuns: Run[] }) {
                 <span className={run.status === "FAILED" ? "text-red-600" : run.status === "RUNNING" ? "text-amber-600" : "text-emerald-700"}>
                   [{run.status ?? "SUCCEEDED"}]
                 </span>{" "}
-                {run.region}, {run.country} — created {run.totalCreated}/{run.totalReturned}, skipped {run.totalSkipped}, failed {run.totalFailed}, geocode {geocodeRate(run)}
+                {run.region}, {run.country} — created {run.totalCreated}/{run.totalReturned}, skipped {run.totalSkipped}, failed {run.totalFailed}, geocode {geocodeRate(run)}{run.autoPublishedCount > 0 ? `, auto-published: ${run.autoPublishedCount}` : ""}
               </summary>
               <div className="mt-3 space-y-3 text-sm">
                 <div className="flex flex-wrap items-center gap-3">

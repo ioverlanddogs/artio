@@ -1,0 +1,2 @@
+ALTER TABLE "VenueGenerationRun"
+  ADD COLUMN IF NOT EXISTS "autoPublishedCount" INTEGER NOT NULL DEFAULT 0;

@@ -9,6 +9,8 @@ function baseDb() {
   const runs: Array<Record<string, unknown>> = [];
   const homepageCandidates: Array<Record<string, unknown>> = [];
   const venueUpdates: Array<Record<string, unknown>> = [];
+  const assets: Array<Record<string, unknown>> = [];
+  const venueImages: Array<Record<string, unknown>> = [];
 
   return {
     createdItems,
@@ -16,9 +18,16 @@ function baseDb() {
     runs,
     homepageCandidates,
     venueUpdates,
+    assets,
+    venueImages,
     db: {
       venue: {
-        findFirst: async () => null,
+        findFirst: async ({ where }: { where?: { id?: string } } = {}) => {
+          if (where?.id) {
+            return { id: String(where.id), instagramUrl: null, facebookUrl: null, contactEmail: null, description: null, openingHours: null, name: "Generated", city: "Cape Town", country: "South Africa", lat: -33.9, lng: 18.4, featuredAssetId: venueImages.length ? "asset-1" : null, status: "DRAFT", isPublished: false, _count: { homepageImageCandidates: 0 } };
+          }
+          return null;
+        },
         findUnique: async () => null,
         create: async ({ data }: { data: Record<string, unknown> }) => {
           createdVenues.push(data);
@@ -51,6 +60,14 @@ function baseDb() {
           homepageCandidates.push(...data);
           return { count: data.length };
         },
+        findFirst: async () => ({ id: "candidate-1" }),
+        update: async () => ({ id: "candidate-1" }),
+      },
+      asset: {
+        create: async ({ data }: { data: Record<string, unknown> }) => { assets.push(data); return { id: "asset-1" }; },
+      },
+      venueImage: {
+        create: async ({ data }: { data: Record<string, unknown> }) => { venueImages.push(data); return { id: "venue-image-1" }; },
       },
     },
   };
@@ -383,4 +400,63 @@ test("venue generation pipeline skips duplicate homepage extraction when pending
   });
 
   assert.equal(state.homepageCandidates.filter((candidate) => candidate.venueId === "venue-existing").length, 0);
+});
+
+
+test("venue generation pipeline auto-publishes created venues when auto-select succeeds", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "South Africa", region: "Western Cape" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    fetchHtmlFn: async () => ({ finalUrl: "https://example.com", contentType: "text/html", html: '<meta property="og:image" content="/hero.jpg">', status: 200, bytes: 10 }) as never,
+    openai: { createResponse: async () => ({ output_parsed: { venues: [{ ...openAiPayload.output_parsed.venues[0], websiteUrl: "https://example.com" }] } }) },
+    geocode: async () => ({ lat: -33.9, lng: 18.4 }),
+    autoPublish: true,
+    autoSelectDeps: {
+      assertUrl: async () => undefined,
+      fetchImage: async () => ({ contentType: "image/jpeg", bytes: new Uint8Array([1]), sizeBytes: 1 }),
+      uploadImage: async () => ({ url: "https://blob.example/hero.jpg", path: "x" }),
+    },
+  });
+
+  assert.ok(state.venueUpdates.some((update) => update.status === "PUBLISHED" && update.isPublished === true));
+});
+
+test("venue generation pipeline does not auto-publish when autoPublish is false", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "South Africa", region: "Western Cape" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    fetchHtmlFn: async () => ({ finalUrl: "https://example.com", contentType: "text/html", html: '<meta property="og:image" content="/hero.jpg">', status: 200, bytes: 10 }) as never,
+    openai: { createResponse: async () => ({ output_parsed: { venues: [{ ...openAiPayload.output_parsed.venues[0], websiteUrl: "https://example.com" }] } }) },
+    geocode: async () => ({ lat: -33.9, lng: 18.4 }),
+    autoPublish: false,
+  });
+
+  assert.equal(state.venueUpdates.some((update) => update.status === "PUBLISHED"), false);
+});
+
+test("venue generation pipeline continues without publish when auto-select fails", async () => {
+  const state = baseDb();
+
+  await runVenueGenerationPipeline({
+    input: { country: "South Africa", region: "Western Cape" },
+    triggeredById: "11111111-1111-4111-8111-111111111111",
+    db: state.db as never,
+    fetchHtmlFn: async () => ({ finalUrl: "https://example.com", contentType: "text/html", html: '<meta property="og:image" content="/hero.jpg">', status: 200, bytes: 10 }) as never,
+    openai: { createResponse: async () => ({ output_parsed: { venues: [{ ...openAiPayload.output_parsed.venues[0], websiteUrl: "https://example.com" }] } }) },
+    geocode: async () => ({ lat: -33.9, lng: 18.4 }),
+    autoPublish: true,
+    autoSelectDeps: {
+      assertUrl: async () => undefined,
+      fetchImage: async () => { throw new Error("boom"); },
+      uploadImage: async () => ({ url: "https://blob.example/hero.jpg", path: "x" }),
+    },
+  });
+
+  assert.equal(state.venueUpdates.some((update) => update.status === "PUBLISHED"), false);
 });

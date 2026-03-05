@@ -22,6 +22,7 @@ export default async function AdminVenueGenerationPage() {
       geocodeSucceeded: true,
       geocodeFailed: true,
       geocodeFailureBreakdown: true,
+      autoPublishedCount: true,
       createdAt: true,
       items: {
         orderBy: { createdAt: "asc" },

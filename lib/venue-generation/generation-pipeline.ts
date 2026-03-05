@@ -10,6 +10,8 @@ import { extractHomepageImagesFromHtml, fetchHomepage } from "@/lib/venue-genera
 import { extractHomepageDetails, type HomepageDetails } from "@/lib/venue-generation/extract-homepage-details";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { assertSafeUrl } from "@/lib/ingest/url-guard";
+import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { autoSelectVenueCover, type AutoSelectDb, type AutoSelectDeps } from "@/lib/venue-generation/auto-select-venue-cover";
 
 type ResponseOutputContentItem = {
   type?: string;
@@ -42,18 +44,7 @@ export class VenueGenerationError extends Error {
 
 type PipelineDb = {
   venue: {
-    findFirst: (args: {
-      where: Prisma.VenueWhereInput;
-      select: {
-        id: true;
-        instagramUrl: true;
-        facebookUrl: true;
-        contactEmail: true;
-        description: true;
-        openingHours: true;
-        _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } };
-      };
-    }) => Promise<{ id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; description: string | null; openingHours: Prisma.JsonValue | null; _count: { homepageImageCandidates: number } } | null>;
+    findFirst: (args: { where: Prisma.VenueWhereInput; select: Record<string, unknown> }) => Promise<Record<string, unknown> | null>;
     findUnique: (args: { where: { slug: string }; select: { id: true } }) => Promise<{ id: string } | null>;
     create: (args: { data: Prisma.VenueCreateInput }) => Promise<{ id: string }>;
     update: (args: { where: { id: string }; data: Prisma.VenueUpdateInput }) => Promise<{ id: string }>;
@@ -87,6 +78,7 @@ type PipelineDb = {
         geocodeSucceeded?: number;
         geocodeFailed?: number;
         geocodeFailureBreakdown?: Record<string, number>;
+        autoPublishedCount?: number;
       };
     }) => Promise<{ id: string }>;
   };
@@ -125,7 +117,22 @@ type PipelineDb = {
         status: string;
       }>;
     }) => Promise<{ count: number }>;
+    findFirst: (args: {
+      where: {
+        venueId: string;
+        runItemId: string;
+        url: string;
+        source: string;
+        sortOrder: number;
+        status: string;
+      };
+      orderBy: { createdAt: "desc" };
+      select: { id: true };
+    }) => Promise<{ id: string } | null>;
+    update: AutoSelectDb["venueHomepageImageCandidate"]["update"];
   };
+  venueImage: AutoSelectDb["venueImage"];
+  asset: AutoSelectDb["asset"];
 };
 
 type OpenAIClient = {
@@ -247,16 +254,21 @@ async function runHomepageExtraction(args: {
   runItemId: string;
   websiteUrl: string | null;
   fetchHtmlFn: typeof fetchHtmlWithGuards;
-  db: Pick<PipelineDb, "venueHomepageImageCandidate" | "venueGenerationRunItem">;
+  db: Pick<PipelineDb, "venueHomepageImageCandidate" | "venueImage" | "venue" | "asset">;
+  autoSelectDeps?: Partial<AutoSelectDeps>;
+  autoPublish?: boolean;
 }): Promise<{
   homepageImageStatus: string;
   homepageImageCandidateCount: number;
   details: HomepageDetails | null;
+  autoSelectedCandidateId: string | null;
+  autoPublished: boolean;
 }> {
   let homepageImageStatus = "no_url";
   let homepageImageCandidateCount = 0;
+  let autoSelectedCandidateId: string | null = null;
 
-  if (!args.websiteUrl) return { homepageImageStatus, homepageImageCandidateCount, details: null };
+  if (!args.websiteUrl) return { homepageImageStatus, homepageImageCandidateCount, details: null, autoSelectedCandidateId, autoPublished: false };
 
   const fetched = await fetchHomepage({
     websiteUrl: args.websiteUrl,
@@ -264,7 +276,7 @@ async function runHomepageExtraction(args: {
     assertUrl: assertSafeUrl,
   });
 
-  if (!fetched) return { homepageImageStatus: "fetch_failed", homepageImageCandidateCount, details: null };
+  if (!fetched) return { homepageImageStatus: "fetch_failed", homepageImageCandidateCount, details: null, autoSelectedCandidateId, autoPublished: false };
 
   const [imageResult, details] = await Promise.all([
     extractHomepageImagesFromHtml(fetched, assertSafeUrl),
@@ -284,12 +296,63 @@ async function runHomepageExtraction(args: {
         status: "pending",
       })),
     });
+
     homepageImageStatus = "candidates_extracted";
     homepageImageCandidateCount = imageResult.candidates.length;
+
+    if (args.autoPublish === true) {
+      const sorted = imageResult.candidates
+        .map((candidate, index) => ({ candidate, index }))
+        .sort((a, b) => {
+          const aGroup = a.candidate.source === "og_image" ? 0 : 1;
+          const bGroup = b.candidate.source === "og_image" ? 0 : 1;
+          if (aGroup !== bGroup) return aGroup - bGroup;
+          if (a.candidate.sortOrder !== b.candidate.sortOrder) return a.candidate.sortOrder - b.candidate.sortOrder;
+          return a.index - b.index;
+        });
+      const bestCandidate = sorted[0]?.candidate;
+
+      if (bestCandidate) {
+        const persistedCandidate = await args.db.venueHomepageImageCandidate.findFirst({
+          where: {
+            venueId: args.venueId,
+            runItemId: args.runItemId,
+            url: bestCandidate.url,
+            source: bestCandidate.source,
+            sortOrder: bestCandidate.sortOrder,
+            status: "pending",
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+
+        if (persistedCandidate) {
+          const selectResult = await autoSelectVenueCover({
+            venueId: args.venueId,
+            candidateId: persistedCandidate.id,
+            candidateUrl: bestCandidate.url,
+            db: args.db,
+            deps: args.autoSelectDeps,
+          });
+
+          if (selectResult.ok) {
+            autoSelectedCandidateId = persistedCandidate.id;
+          } else {
+            console.warn("venue_cover_auto_select_failed", {
+              venueId: args.venueId,
+              runItemId: args.runItemId,
+              candidateId: persistedCandidate.id,
+              reason: selectResult.reason,
+            });
+          }
+        }
+      }
+    }
   }
 
-  return { homepageImageStatus, homepageImageCandidateCount, details };
+  return { homepageImageStatus, homepageImageCandidateCount, details, autoSelectedCandidateId, autoPublished: false };
 }
+
 
 export function getStructuredPayloadFromResponses(raw: OpenAIResponse): unknown {
   if (raw.output_parsed !== undefined) return raw.output_parsed;
@@ -356,6 +419,8 @@ export async function runVenueGenerationPipeline(args: {
   geocode?: typeof forwardGeocodeVenueAddressToLatLng;
   model?: string;
   fetchHtmlFn?: typeof fetchHtmlWithGuards;
+  autoPublish?: boolean;
+  autoSelectDeps?: Partial<AutoSelectDeps>;
 }) {
   const run = await args.db.venueGenerationRun.create({
     data: {
@@ -429,6 +494,7 @@ export async function runVenueGenerationPipeline(args: {
     }
     const geocodeFn = args.geocode ?? forwardGeocodeVenueAddressToLatLng;
     const fetchHtmlFn = args.fetchHtmlFn ?? fetchHtmlWithGuards;
+    const autoPublish = args.autoPublish ?? (process.env.VENUE_AUTO_PUBLISH === "1");
 
     let totalCreated = 0;
     let totalSkipped = 0;
@@ -437,6 +503,7 @@ export async function runVenueGenerationPipeline(args: {
     let geocodeSucceeded = 0;
     let geocodeFailed = 0;
     const geocodeFailureBreakdown: Record<string, number> = {};
+    let autoPublishedCount = 0;
 
     const seen = new Set<string>();
 
@@ -480,7 +547,7 @@ export async function runVenueGenerationPipeline(args: {
         openingHours: true,
         _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } },
       },
-    });
+    }) as { id: string; instagramUrl: string | null; facebookUrl: string | null; contactEmail: string | null; description: string | null; openingHours: Prisma.JsonValue | null; _count: { homepageImageCandidates: number } } | null;
     if (duplicate) {
       totalSkipped += 1;
       seen.add(memoryDedupeKey);
@@ -513,6 +580,7 @@ export async function runVenueGenerationPipeline(args: {
               websiteUrl: venue.websiteUrl,
               fetchHtmlFn,
               db: args.db,
+              autoPublish: false,
             })
           : { homepageImageStatus: "skipped", homepageImageCandidateCount: 0, details: null as HomepageDetails | null };
 
@@ -633,6 +701,8 @@ export async function runVenueGenerationPipeline(args: {
       websiteUrl: venue.websiteUrl,
       fetchHtmlFn,
       db: args.db,
+      autoPublish,
+      autoSelectDeps: args.autoSelectDeps,
     });
 
     await args.db.venueGenerationRunItem.update({
@@ -642,6 +712,37 @@ export async function runVenueGenerationPipeline(args: {
         homepageImageCandidateCount: homepageResult.homepageImageCandidateCount,
       },
     });
+
+
+    if (autoPublish && homepageResult.autoSelectedCandidateId) {
+      const refreshed = await args.db.venue.findFirst({
+        where: { id: created.id },
+        select: {
+          id: true,
+          instagramUrl: true,
+          facebookUrl: true,
+          contactEmail: true,
+          description: true,
+          openingHours: true,
+          name: true,
+          city: true,
+          country: true,
+          lat: true,
+          lng: true,
+          featuredAssetId: true,
+          status: true,
+          isPublished: true,
+          _count: { select: { homepageImageCandidates: { where: { status: "pending" } } } },
+        },
+      }) as { country: string | null; lat: number | null; lng: number | null; name: string | null; city: string | null; featuredAssetId: string | null } | null;
+      if (refreshed) {
+        const blockers = computeVenuePublishBlockers(refreshed);
+        if (blockers.length === 0 && refreshed.featuredAssetId) {
+          await args.db.venue.update({ where: { id: created.id }, data: { status: "PUBLISHED", isPublished: true } });
+          autoPublishedCount += 1;
+        }
+      }
+    }
 
     if (homepageResult.details) {
       const detailPatch: Prisma.VenueUpdateInput = {};
@@ -671,6 +772,7 @@ export async function runVenueGenerationPipeline(args: {
         geocodeSucceeded,
         geocodeFailed,
         geocodeFailureBreakdown,
+        autoPublishedCount,
       },
     });
 
@@ -684,6 +786,7 @@ export async function runVenueGenerationPipeline(args: {
       geocodeSucceeded,
       geocodeFailed,
       geocodeFailureBreakdown,
+      autoPublishedCount,
     };
   } catch (error) {
     await args.db.venueGenerationRun

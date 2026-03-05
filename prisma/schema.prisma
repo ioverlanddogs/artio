@@ -398,6 +398,7 @@ model VenueGenerationRun {
   geocodeSucceeded        Int                      @default(0)
   geocodeFailed           Int                      @default(0)
   geocodeFailureBreakdown Json?
+  autoPublishedCount      Int                      @default(0)
   triggeredById           String                   @db.Uuid
   createdAt               DateTime                 @default(now())
   triggeredBy             User                     @relation(fields: [triggeredById], references: [id], onDelete: Restrict)

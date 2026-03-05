@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { requireAdmin, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { VenueGenerationError, createOpenAIResponsesClient, runVenueGenerationPipeline } from "@/lib/venue-generation/generation-pipeline";
+import { defaultAutoSelectDeps } from "@/lib/venue-generation/auto-select-venue-cover";
 import { venueGenerationInputSchema } from "@/lib/venue-generation/schemas";
 import { parseBody, zodDetails } from "@/lib/validators";
 
@@ -37,6 +38,8 @@ export async function handleVenueGenerationPost(req: NextRequest, deps?: Partial
       triggeredById: admin.id,
       db: dbClient,
       openai,
+      autoPublish: process.env.VENUE_AUTO_PUBLISH === "1",
+      autoSelectDeps: defaultAutoSelectDeps,
     });
 
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
