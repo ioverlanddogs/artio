@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getVenueGenerationRuns } from "@/app/api/admin/venue-generation/runs/route";
+import { getVenueGenerationRuns } from "@/lib/venue-generation/get-venue-generation-runs";
 
 test("GET run items include publishable, blockers, and venueStatus", async () => {
   const readyVenueId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
