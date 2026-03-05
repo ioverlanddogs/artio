@@ -12,7 +12,7 @@ import VenueImagePicker from "@/app/(admin)/admin/venues/[id]/venue-image-picker
 
 export default async function AdminVenue({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [venue, venueImages, generationItems, ingestCandidates] = await Promise.all([
+  const [venue, venueImages, generationItems, ingestCandidates, homepageCandidates] = await Promise.all([
     db.venue.findUnique({ where: { id } }),
     db.venueImage.findMany({
       where: { venueId: id },
@@ -43,6 +43,11 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
       orderBy: { createdAt: "desc" },
       take: 30,
       select: { id: true, imageUrl: true, blobImageUrl: true, title: true, run: { select: { id: true } } },
+    }),
+    db.venueHomepageImageCandidate.findMany({
+      where: { venueId: id, status: "pending" },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, url: true, source: true, sortOrder: true, status: true },
     }),
   ]);
   if (!venue) notFound();
@@ -110,6 +115,7 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
         venueId={id}
         images={venueImages}
         suggestions={[...generationSuggestions, ...ingestSuggestions]}
+        initialHomepageCandidates={homepageCandidates}
       />
       <ModerationPanel resource="venues" id={venue.id} status={venue.status} blockers={blockers.map((item) => item.message)} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">

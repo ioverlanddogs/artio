@@ -5,7 +5,10 @@ import tzLookup from "tz-lookup";
 import { buildVenueGeocodeQueries, normalizeCountryCode } from "@/lib/venues/format-venue-address";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { generatedVenuesResponseSchema, type GeneratedVenue, type VenueGenerationInput } from "@/lib/venue-generation/schemas";
-import { normalizeEmail, normalizeFacebookUrl, normalizeHttpsImageUrl, normalizeInstagramUrl } from "@/lib/venues/normalize-social";
+import { normalizeEmail, normalizeFacebookUrl, normalizeInstagramUrl } from "@/lib/venues/normalize-social";
+import { extractHomepageImages } from "@/lib/venue-generation/extract-homepage-images";
+import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
+import { assertSafeUrl } from "@/lib/ingest/url-guard";
 
 type ResponseOutputContentItem = {
   type?: string;
@@ -92,13 +95,27 @@ type PipelineDb = {
         instagramUrl?: string | null;
         facebookUrl?: string | null;
         contactEmail?: string | null;
-        featuredImageUrl?: string | null;
         socialWarning?: string;
         geocodeStatus: string;
         geocodeErrorCode?: string;
         timezoneWarning?: string;
+        homepageImageStatus: string;
+        homepageImageCandidateCount: number;
       };
     }) => Promise<{ id: string }>;
+    update: (args: { where: { id: string }; data: { homepageImageStatus: string; homepageImageCandidateCount: number } }) => Promise<{ id: string }>;
+  };
+  venueHomepageImageCandidate: {
+    createMany: (args: {
+      data: Array<{
+        venueId: string;
+        runItemId: string;
+        url: string;
+        source: string;
+        sortOrder: number;
+        status: string;
+      }>;
+    }) => Promise<{ count: number }>;
   };
 };
 
@@ -132,7 +149,6 @@ function normalizeGeneratedVenue(venue: GeneratedVenue): GeneratedVenue {
     contactEmail: venue.contactEmail?.trim() || null,
     instagramUrl: venue.instagramUrl?.trim() || null,
     facebookUrl: venue.facebookUrl?.trim() || null,
-    featuredImageUrl: venue.featuredImageUrl?.trim() || null,
   };
 }
 
@@ -141,9 +157,8 @@ function normalizeSocialsAndEmail(venue: GeneratedVenue) {
   const instagram = normalizeInstagramUrl(venue.instagramUrl);
   const facebook = normalizeFacebookUrl(venue.facebookUrl);
   const email = normalizeEmail(venue.contactEmail);
-  const image = normalizeHttpsImageUrl(venue.featuredImageUrl);
 
-  for (const warning of [instagram.warning, facebook.warning, email.warning, image.warning]) {
+  for (const warning of [instagram.warning, facebook.warning, email.warning]) {
     if (warning) warnings.push(warning);
   }
 
@@ -151,7 +166,6 @@ function normalizeSocialsAndEmail(venue: GeneratedVenue) {
     instagramUrl: instagram.value,
     facebookUrl: facebook.value,
     contactEmail: email.value,
-    featuredImageUrl: image.value,
     warnings,
   };
 }
@@ -268,9 +282,8 @@ function venuePrompt(input: VenueGenerationInput) {
     "Include galleries, museums, art centres, artist-run spaces, sculpture parks, and foundations.",
     "Only return official venue social profiles.",
     "Instagram/Facebook must be full URLs beginning with https://.",
-    "If not confident in any social URL, email, or image URL, return null and do not invent values.",
+    "If not confident in any social URL or email, return null and do not invent values.",
     "contactEmail must be a real email address; otherwise null.",
-    "featuredImageUrl should only be an actual venue image URL (not a homepage URL); if unsure return null.",
     "Output ONLY JSON matching schema.",
     `Country: ${input.country}`,
     `Region: ${input.region}`,
@@ -284,6 +297,8 @@ export async function runVenueGenerationPipeline(args: {
   openai: OpenAIClient;
   geocode?: typeof forwardGeocodeVenueAddressToLatLng;
   model?: string;
+  extractHomepageImagesFn?: typeof extractHomepageImages;
+  fetchHtmlFn?: typeof fetchHtmlWithGuards;
 }) {
   const run = await args.db.venueGenerationRun.create({
     data: {
@@ -319,7 +334,7 @@ export async function runVenueGenerationPipeline(args: {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["name", "addressLine1", "addressLine2", "city", "region", "postcode", "country", "contactEmail", "contactPhone", "websiteUrl", "instagramUrl", "facebookUrl", "featuredImageUrl", "openingHours", "venueType"],
+              required: ["name", "addressLine1", "addressLine2", "city", "region", "postcode", "country", "contactEmail", "contactPhone", "websiteUrl", "instagramUrl", "facebookUrl", "openingHours", "venueType"],
               properties: {
                 name: { type: "string" },
                 addressLine1: { type: ["string", "null"] },
@@ -333,7 +348,6 @@ export async function runVenueGenerationPipeline(args: {
                 websiteUrl: { type: ["string", "null"] },
                 instagramUrl: { type: ["string", "null"] },
                 facebookUrl: { type: ["string", "null"] },
-                featuredImageUrl: { type: ["string", "null"] },
                 openingHours: { type: ["string", "null"] },
                 venueType: { type: "string", enum: ["GALLERY", "MUSEUM", "ART_CENTRE", "FOUNDATION", "OTHER"] },
               },
@@ -357,6 +371,8 @@ export async function runVenueGenerationPipeline(args: {
       throw error;
     }
     const geocodeFn = args.geocode ?? forwardGeocodeVenueAddressToLatLng;
+    const extractHomepageImagesFn = args.extractHomepageImagesFn ?? extractHomepageImages;
+    const fetchHtmlFn = args.fetchHtmlFn ?? fetchHtmlWithGuards;
 
     let totalCreated = 0;
     let totalSkipped = 0;
@@ -385,11 +401,12 @@ export async function runVenueGenerationPipeline(args: {
           instagramUrl: venue.instagramUrl,
           facebookUrl: venue.facebookUrl,
           contactEmail: venue.contactEmail,
-          featuredImageUrl: normalizedSocials.featuredImageUrl,
           socialWarning,
           status: "skipped",
           reason: "duplicate(in-run)",
           geocodeStatus: "not_attempted",
+          homepageImageStatus: "skipped",
+          homepageImageCandidateCount: 0,
         },
       });
       continue;
@@ -410,7 +427,6 @@ export async function runVenueGenerationPipeline(args: {
           instagramUrl: duplicate.instagramUrl ? undefined : normalizedSocials.instagramUrl,
           facebookUrl: duplicate.facebookUrl ? undefined : normalizedSocials.facebookUrl,
           contactEmail: duplicate.contactEmail ? undefined : normalizedSocials.contactEmail,
-          featuredImageUrl: duplicate.featuredImageUrl ? undefined : normalizedSocials.featuredImageUrl,
         },
       });
 
@@ -424,12 +440,13 @@ export async function runVenueGenerationPipeline(args: {
           instagramUrl: venue.instagramUrl,
           facebookUrl: venue.facebookUrl,
           contactEmail: venue.contactEmail,
-          featuredImageUrl: normalizedSocials.featuredImageUrl,
           socialWarning,
           status: "skipped",
           reason: dedupe.reason,
           venueId: duplicate.id,
           geocodeStatus: "not_attempted",
+          homepageImageStatus: "skipped",
+          homepageImageCandidateCount: 0,
         },
       });
       continue;
@@ -449,11 +466,12 @@ export async function runVenueGenerationPipeline(args: {
           instagramUrl: venue.instagramUrl,
           facebookUrl: venue.facebookUrl,
           contactEmail: venue.contactEmail,
-          featuredImageUrl: normalizedSocials.featuredImageUrl,
           socialWarning,
           status: "failed",
           reason: "slug_generation_failed",
           geocodeStatus: "not_attempted",
+          homepageImageStatus: "skipped",
+          homepageImageCandidateCount: 0,
         },
       });
       continue;
@@ -492,7 +510,6 @@ export async function runVenueGenerationPipeline(args: {
         websiteUrl: venue.websiteUrl,
         instagramUrl: normalizedSocials.instagramUrl,
         facebookUrl: normalizedSocials.facebookUrl,
-        featuredImageUrl: normalizedSocials.featuredImageUrl,
         openingHours: toJsonOpeningHours(venue.openingHours),
         lat: geocodeResult.geocoded?.lat,
         lng: geocodeResult.geocoded?.lng,
@@ -504,7 +521,7 @@ export async function runVenueGenerationPipeline(args: {
       },
     });
 
-    await args.db.venueGenerationRunItem.create({
+    const runItem = await args.db.venueGenerationRunItem.create({
       data: {
         runId: run.id,
         name: venue.name,
@@ -514,14 +531,54 @@ export async function runVenueGenerationPipeline(args: {
         instagramUrl: venue.instagramUrl,
         facebookUrl: venue.facebookUrl,
         contactEmail: venue.contactEmail,
-        featuredImageUrl: normalizedSocials.featuredImageUrl,
         socialWarning,
         status: "created",
         venueId: created.id,
         geocodeStatus: geocodeResult.status,
         geocodeErrorCode: geocodeResult.geocodeErrorCode,
         timezoneWarning,
+        homepageImageStatus: "pending",
+        homepageImageCandidateCount: 0,
       },
+    });
+
+    let homepageImageStatus = "no_url";
+    let homepageImageCandidateCount = 0;
+
+    if (venue.websiteUrl) {
+      try {
+        const result = await extractHomepageImagesFn({
+          websiteUrl: venue.websiteUrl,
+          fetchHtml: fetchHtmlFn,
+          assertUrl: assertSafeUrl,
+        });
+
+        if (result === null) {
+          homepageImageStatus = "fetch_failed";
+        } else if (result.candidates.length === 0) {
+          homepageImageStatus = "none_found";
+        } else {
+          await args.db.venueHomepageImageCandidate.createMany({
+            data: result.candidates.map((candidate) => ({
+              venueId: created.id,
+              runItemId: runItem.id,
+              url: candidate.url,
+              source: candidate.source,
+              sortOrder: candidate.sortOrder,
+              status: "pending",
+            })),
+          });
+          homepageImageStatus = "candidates_extracted";
+          homepageImageCandidateCount = result.candidates.length;
+        }
+      } catch {
+        homepageImageStatus = "fetch_failed";
+      }
+    }
+
+    await args.db.venueGenerationRunItem.update({
+      where: { id: runItem.id },
+      data: { homepageImageStatus, homepageImageCandidateCount },
     });
 
     seen.add(memoryDedupeKey);

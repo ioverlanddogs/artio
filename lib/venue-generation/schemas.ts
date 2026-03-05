@@ -32,7 +32,6 @@ export const generatedVenueSchema = z.object({
   websiteUrl: urlSchema.nullable(),
   instagramUrl: urlSchema.nullable(),
   facebookUrl: urlSchema.nullable(),
-  featuredImageUrl: urlSchema.nullable(),
   openingHours: z.string().trim().max(400).nullable(),
   venueType: z.enum(["GALLERY", "MUSEUM", "ART_CENTRE", "FOUNDATION", "OTHER"]),
 });

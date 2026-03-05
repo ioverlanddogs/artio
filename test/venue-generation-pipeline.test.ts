@@ -7,11 +7,13 @@ function baseDb() {
   const createdItems: Array<Record<string, unknown>> = [];
   const createdVenues: Array<Record<string, unknown>> = [];
   const runs: Array<Record<string, unknown>> = [];
+  const homepageCandidates: Array<Record<string, unknown>> = [];
 
   return {
     createdItems,
     createdVenues,
     runs,
+    homepageCandidates,
     db: {
       venue: {
         findFirst: async () => null,
@@ -36,6 +38,13 @@ function baseDb() {
         create: async ({ data }: { data: Record<string, unknown> }) => {
           createdItems.push(data);
           return { id: `item-${createdItems.length}` };
+        },
+        update: async () => ({ id: "item-updated" }),
+      },
+      venueHomepageImageCandidate: {
+        createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => {
+          homepageCandidates.push(...data);
+          return { count: data.length };
         },
       },
     },
@@ -208,7 +217,6 @@ test("venue generation pipeline normalizes and persists social fields", async ()
               instagramUrl: "https://instagram.com/socialvenue/?hl=en",
               facebookUrl: "https://www.facebook.com/socialvenue/posts/1?ref=foo",
               contactEmail: "hello@socialvenue.com",
-              featuredImageUrl: "https://cdn.example.com/images/venue-cover",
             },
           ],
         },
@@ -220,7 +228,6 @@ test("venue generation pipeline normalizes and persists social fields", async ()
   assert.equal(state.createdVenues[0].instagramUrl, "https://www.instagram.com/socialvenue");
   assert.equal(state.createdVenues[0].facebookUrl, "https://www.facebook.com/socialvenue");
   assert.equal(state.createdVenues[0].contactEmail, "hello@socialvenue.com");
-  assert.equal(state.createdVenues[0].featuredImageUrl, "https://cdn.example.com/images/venue-cover");
   assert.equal(state.createdItems[0].socialWarning, undefined);
 });
 
@@ -255,7 +262,6 @@ test("venue generation pipeline records warnings and preserves existing social f
               instagramUrl: "https://bad.example/social",
               facebookUrl: "https://facebook.com/newpage",
               contactEmail: "not-an-email",
-              featuredImageUrl: "http://example.com/not-https.jpg",
             },
           ],
         },
@@ -269,35 +275,6 @@ test("venue generation pipeline records warnings and preserves existing social f
   assert.equal(updates[0].instagramUrl, undefined);
   assert.equal(updates[0].facebookUrl, "https://www.facebook.com/newpage");
   assert.equal(updates[0].contactEmail, null);
-  assert.equal(updates[0].featuredImageUrl, undefined);
-  assert.equal(state.createdItems[0].socialWarning, "invalid_instagram_url,invalid_contact_email,invalid_featured_image_url");
+  assert.equal(state.createdItems[0].socialWarning, "invalid_instagram_url,invalid_contact_email");
 });
 
-test("venue generation pipeline stores normalized featured image URL on run item", async () => {
-  const state = baseDb();
-
-  await runVenueGenerationPipeline({
-    input: { country: "United Kingdom", region: "England" },
-    triggeredById: "11111111-1111-4111-8111-111111111111",
-    db: state.db as never,
-    openai: {
-      createResponse: async () => ({
-        output_parsed: {
-          venues: [
-            {
-              ...openAiPayload.output_parsed.venues[0],
-              name: "Raw Image Venue",
-              country: "United Kingdom",
-              featuredImageUrl: "http://example.com/not-https.jpg",
-            },
-          ],
-        },
-      }),
-    },
-    geocode: async () => null,
-  });
-
-  assert.equal(state.createdVenues[0].featuredImageUrl, null);
-  assert.equal(state.createdItems[0].featuredImageUrl, null);
-  assert.equal(state.createdItems[0].socialWarning, "invalid_featured_image_url");
-});

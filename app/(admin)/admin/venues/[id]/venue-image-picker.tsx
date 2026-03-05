@@ -22,6 +22,13 @@ type VenueImagePickerProps = {
     title: string;
     source?: "ingest" | "generation";
   }>;
+  initialHomepageCandidates: Array<{
+    id: string;
+    url: string;
+    source: string;
+    sortOrder: number;
+    status: string;
+  }>;
 };
 
 type Suggestion = VenueImagePickerProps["suggestions"][number];
@@ -32,6 +39,8 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [importingUrl, setImportingUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [homepageCandidates, setHomepageCandidates] = useState(props.initialHomepageCandidates);
+  const [candidateLoadingId, setCandidateLoadingId] = useState<string | null>(null);
 
   async function setPrimary(imageId: string) {
     setLoadingId(imageId);
@@ -50,6 +59,51 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
       setImages((prev) => prev.map((img) => ({ ...img, isPrimary: img.id === imageId })));
     } finally {
       setLoadingId(null);
+    }
+  }
+
+
+  async function selectCandidate(candidateId: string, setAsPrimary: boolean) {
+    setCandidateLoadingId(candidateId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/venues/${venueId}/homepage-image-candidates/${candidateId}/select`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        setError(body.error?.message ?? "Upload failed.");
+        return;
+      }
+      const body = await res.json() as { venueImageId: string; url: string };
+      setImages((prev) => [
+        ...(setAsPrimary ? prev.map((img) => ({ ...img, isPrimary: false })) : prev),
+        { id: body.venueImageId, url: body.url, alt: null, isPrimary: setAsPrimary, sortOrder: 0, width: null, height: null },
+      ]);
+      if (setAsPrimary) {
+        await fetch(`/api/admin/venues/${venueId}/images/${body.venueImageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPrimary: true }),
+        });
+      }
+      setHomepageCandidates((prev) => prev.filter((candidate) => candidate.id !== candidateId));
+    } finally {
+      setCandidateLoadingId(null);
+    }
+  }
+
+  async function rejectCandidate(candidateId: string) {
+    setCandidateLoadingId(candidateId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/venues/${venueId}/homepage-image-candidates/${candidateId}/reject`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        setError(body.error?.message ?? "Dismiss failed.");
+        return;
+      }
+      setHomepageCandidates((prev) => prev.filter((candidate) => candidate.id !== candidateId));
+    } finally {
+      setCandidateLoadingId(null);
     }
   }
 
@@ -168,6 +222,65 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
             </div>
           </section>
         ) : null}
+
+
+        {homepageCandidates.length > 0 && (
+          <section className="space-y-2">
+            <div>
+              <h3 className="text-sm font-medium">From venue homepage</h3>
+              <p className="text-xs text-muted-foreground">
+                Candidate images extracted from the venue website at generation time.
+                Uploading fetches the full-resolution image and adds it to the gallery.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {homepageCandidates.map((candidate) => {
+                const isLoading = candidateLoadingId === candidate.id;
+                return (
+                  <div key={candidate.id} className="group relative h-24 w-36 overflow-hidden rounded-lg border-2 border-transparent">
+                    <img
+                      src={candidate.url}
+                      alt="Homepage candidate"
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        (event.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                    <div className="absolute inset-0 hidden items-center justify-center gap-1 rounded-lg bg-black/60 group-hover:flex flex-col">
+                      <button
+                        type="button"
+                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white disabled:opacity-50"
+                        onClick={() => selectCandidate(candidate.id, true)}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "…" : "★ Upload & set cover"}
+                      </button>
+                      <button
+                        type="button"
+                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white disabled:opacity-50"
+                        onClick={() => selectCandidate(candidate.id, false)}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "…" : "+ Upload to gallery"}
+                      </button>
+                      <button
+                        type="button"
+                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-red-300 disabled:opacity-50"
+                        onClick={() => rejectCandidate(candidate.id)}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "…" : "✕ Dismiss"}
+                      </button>
+                    </div>
+                    {isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-xs text-white">…</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {error ? (
           <div className="flex items-center justify-between rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700">

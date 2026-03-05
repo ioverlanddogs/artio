@@ -219,6 +219,7 @@ model User {
   pageViewEvents       PageViewEvent[]
   venueGenerationRunsTriggered VenueGenerationRun[]
   venueClaimRequests   VenueClaimRequest[]
+  selectedHomepageImageCandidates VenueHomepageImageCandidate[]
 
   @@index([locationLat, locationLng])
 }
@@ -361,6 +362,7 @@ model Venue {
   ingestExtractedEvents IngestExtractedEvent[]
   claimRequests      VenueClaimRequest[]
   generationRunItems VenueGenerationRunItem[]
+  homepageImageCandidates VenueHomepageImageCandidate[]
 
   @@index([isPublished])
   @@index([status])
@@ -422,14 +424,39 @@ model VenueGenerationRunItem {
   geocodeStatus     String             @default("not_attempted")
   geocodeErrorCode  String?
   timezoneWarning   String?
+  homepageImageStatus String           @default("skipped")
+  homepageImageCandidateCount Int      @default(0)
   createdAt         DateTime           @default(now())
   run               VenueGenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   venue             Venue?             @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  homepageImageCandidates VenueHomepageImageCandidate[]
 
   @@index([runId, status])
   @@index([runId, geocodeStatus])
   @@index([venueId])
   @@index([createdAt])
+}
+
+model VenueHomepageImageCandidate {
+  id           String    @id @default(uuid()) @db.Uuid
+  venueId      String    @db.Uuid
+  runItemId    String    @db.Uuid
+  url          String
+  source       String
+  sortOrder    Int
+  status       String    @default("pending")
+  selectedAt   DateTime?
+  selectedById String?   @db.Uuid
+  venueImageId String?   @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+
+  venue      Venue                  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  runItem    VenueGenerationRunItem @relation(fields: [runItemId], references: [id], onDelete: Cascade)
+  selectedBy User?                  @relation(fields: [selectedById], references: [id], onDelete: SetNull)
+  venueImage VenueImage?            @relation(fields: [venueImageId], references: [id], onDelete: SetNull)
+
+  @@index([venueId, status])
+  @@index([runItemId])
 }
 
 model VenueClaimRequest {
@@ -900,6 +927,7 @@ model VenueImage {
   updatedAt   DateTime @default(now()) @updatedAt
   venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
   asset       Asset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  homepageImageCandidates VenueHomepageImageCandidate[]
 
   @@index([assetId])
   @@index([venueId, sortOrder])
