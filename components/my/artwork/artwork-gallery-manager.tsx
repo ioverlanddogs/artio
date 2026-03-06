@@ -1,8 +1,24 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +26,97 @@ import { buildLoginRedirectUrl } from "@/lib/auth-redirect";
 import { enqueueToast } from "@/lib/toast";
 
 type ArtworkImage = { id: string; url: string; alt: string | null; assetId: string };
+
+function SortableArtworkImageCard({
+  image,
+  coverAssetId,
+  loadingMap,
+  altDraftMap,
+  setAltDraftMap,
+  saveAlt,
+  setAsCover,
+  deleteTargetId,
+  setDeleteTargetId,
+  removeImage,
+}: {
+  image: ArtworkImage;
+  coverAssetId: string | null;
+  loadingMap: Record<string, boolean>;
+  altDraftMap: Record<string, string>;
+  setAltDraftMap: Dispatch<SetStateAction<Record<string, string>>>;
+  saveAlt: (id: string) => Promise<void>;
+  setAsCover: (id: string) => Promise<void>;
+  deleteTargetId: string | null;
+  setDeleteTargetId: Dispatch<SetStateAction<string | null>>;
+  removeImage: (id: string) => Promise<void>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <article ref={setNodeRef} style={style} className="space-y-2 rounded border p-3">
+      <div className="flex items-center gap-2">
+        <button type="button" className="cursor-grab text-muted-foreground" {...attributes} {...listeners}>
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="relative h-36 w-full overflow-hidden rounded border">
+          <Image src={image.url} alt={image.alt ?? "Artwork image"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+        </div>
+      </div>
+      {coverAssetId === image.assetId ? <p className="text-xs font-medium text-emerald-700">Current cover</p> : null}
+      <div className="flex gap-2">
+        <Input
+          value={altDraftMap[image.id] ?? ""}
+          placeholder="Alt text"
+          onChange={(event) => setAltDraftMap((prev) => ({ ...prev, [image.id]: event.target.value }))}
+          disabled={Boolean(loadingMap[image.id])}
+        />
+        <Button type="button" variant="outline" onClick={() => saveAlt(image.id)} disabled={Boolean(loadingMap[image.id])}>
+          Save
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setAsCover(image.id)}
+          disabled={coverAssetId === image.assetId || Boolean(loadingMap[`cover:${image.id}`])}
+        >
+          Set Cover
+        </Button>
+        {deleteTargetId === image.id ? (
+          <>
+            <span className="text-sm">Delete?</span>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={Boolean(loadingMap[image.id])}
+              onClick={() => void removeImage(image.id)}
+            >
+              Yes, delete
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteTargetId(null)}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setDeleteTargetId(image.id)}
+            disabled={Boolean(loadingMap[image.id])}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
+    </article>
+  );
+}
 
 export function ArtworkGalleryManager({
   artworkId,
@@ -29,6 +136,7 @@ export function ArtworkGalleryManager({
   const [altDraftMap, setAltDraftMap] = useState<Record<string, string>>(
     Object.fromEntries(initialImages.map((image) => [image.id, image.alt ?? ""])),
   );
+  const sensors = useSensors(useSensor(PointerSensor));
 
   const orderedImages = useMemo(() => images, [images]);
 
@@ -104,37 +212,28 @@ export function ArtworkGalleryManager({
     }
   }
 
-  async function reorderImages(nextImages: ArtworkImage[], fallbackImages: ArtworkImage[]) {
-    setImages(nextImages);
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedImages.findIndex((image) => image.id === active.id);
+    const newIndex = orderedImages.findIndex((image) => image.id === over.id);
+    const fallback = [...orderedImages];
+    const reordered = arrayMove(orderedImages, oldIndex, newIndex);
+    setImages(reordered);
 
     const res = await fetch(`/api/my/artwork/${artworkId}/images/reorder`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ imageIds: nextImages.map((image) => image.id) }),
+      body: JSON.stringify({ imageIds: reordered.map((image: ArtworkImage) => image.id) }),
     });
 
     if (handleAuth(res)) return;
 
     if (!res.ok) {
-      setImages(fallbackImages);
+      setImages(fallback);
       enqueueToast({ title: "Failed to reorder images", variant: "error" });
-      return;
     }
-
-    enqueueToast({ title: "Order saved", variant: "success" });
-  }
-
-  async function move(imageId: string, direction: -1 | 1) {
-    const index = orderedImages.findIndex((image) => image.id === imageId);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= orderedImages.length) return;
-
-    const fallback = [...orderedImages];
-    const reordered = [...orderedImages];
-    const [item] = reordered.splice(index, 1);
-    reordered.splice(nextIndex, 0, item);
-
-    await reorderImages(reordered, fallback);
   }
 
   async function saveAlt(imageId: string) {
@@ -249,72 +348,27 @@ export function ArtworkGalleryManager({
         />
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 md:grid-cols-2">
-          {orderedImages.map((image, index) => (
-            <article key={image.id} className="space-y-2 rounded border p-3">
-              <div className="relative h-36 w-full overflow-hidden rounded border">
-                <Image src={image.url} alt={image.alt ?? "Artwork image"} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
-              </div>
-              {coverAssetId === image.assetId ? <p className="text-xs font-medium text-emerald-700">Current cover</p> : null}
-              <div className="flex gap-2">
-                <Input
-                  value={altDraftMap[image.id] ?? ""}
-                  placeholder="Alt text"
-                  onChange={(event) => setAltDraftMap((prev) => ({ ...prev, [image.id]: event.target.value }))}
-                  disabled={Boolean(loadingMap[image.id])}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={orderedImages.map((image) => image.id)} strategy={rectSortingStrategy}>
+            <div className="grid gap-3 md:grid-cols-2">
+              {orderedImages.map((image) => (
+                <SortableArtworkImageCard
+                  key={image.id}
+                  image={image}
+                  coverAssetId={coverAssetId}
+                  loadingMap={loadingMap}
+                  altDraftMap={altDraftMap}
+                  setAltDraftMap={setAltDraftMap}
+                  saveAlt={saveAlt}
+                  setAsCover={setAsCover}
+                  deleteTargetId={deleteTargetId}
+                  setDeleteTargetId={setDeleteTargetId}
+                  removeImage={removeImage}
                 />
-                <Button type="button" variant="outline" onClick={() => saveAlt(image.id)} disabled={Boolean(loadingMap[image.id])}>
-                  Save
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => move(image.id, -1)} disabled={index === 0}>
-                  Move Left
-                </Button>
-                <Button type="button" variant="outline" onClick={() => move(image.id, 1)} disabled={index === orderedImages.length - 1}>
-                  Move Right
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAsCover(image.id)}
-                  disabled={coverAssetId === image.assetId || Boolean(loadingMap[`cover:${image.id}`])}
-                >
-                  Set Cover
-                </Button>
-                {deleteTargetId === image.id ? (
-                  <>
-                    <span className="text-sm">Delete?</span>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={Boolean(loadingMap[image.id])}
-                      onClick={() => void removeImage(image.id)}
-                    >
-                      Yes, delete
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setDeleteTargetId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setDeleteTargetId(image.id)}
-                    disabled={Boolean(loadingMap[image.id])}
-                  >
-                    Delete
-                  </Button>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </CardContent>
     </Card>
   );
