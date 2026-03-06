@@ -98,8 +98,11 @@ export async function renderEmailTemplate(type: NotificationType, payload: Notif
       const { default: NewUserWelcomeEmail, getSubject } = await import("./templates/new-user-welcome");
       return renderTemplate(NewUserWelcomeEmail, payload, getSubject);
     }
+    case "BROADCAST": {
+      const { default: BroadcastEmail, getSubject } = await import("./templates/broadcast");
+      return renderTemplate(BroadcastEmail, payload, getSubject);
+    }
     case "ARTWORK_VIEW_MILESTONE":
-    case "BROADCAST":
       throw new Error(`template not yet implemented: ${type}`);
     default: {
       const exhaustiveType: never = type;

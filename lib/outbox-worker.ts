@@ -132,13 +132,14 @@ export async function sendPendingNotificationsWithDb({ limit }: { limit: number 
           "Artpulse <noreply@mail.artpulse.co>";
 
         const resend = getResendClient();
+        const payload = notification.payload as { tags?: Array<{ name: string; value: string }> };
         await resend.emails.send({
           from: fromAddress,
           to: notification.toEmail,
           subject,
           html,
           text,
-          tags: [{ name: "type", value: notification.type }],
+          tags: [{ name: "type", value: notification.type }, ...(payload.tags ?? [])],
         });
 
         const markedSent = await db.notificationOutbox.updateMany({
