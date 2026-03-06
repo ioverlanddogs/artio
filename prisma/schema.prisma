@@ -518,6 +518,7 @@ model Artist {
   targetSubmissions Submission[]             @relation("SubmissionTargetArtist")
   featuredAsset     Asset?                   @relation("ArtistFeaturedAsset", fields: [featuredAssetId], references: [id], onDelete: SetNull)
   venueAssociations ArtistVenueAssociation[]
+  eventAssociations ArtistEventAssociation[]
   artworks          Artwork[]
   featuredArtworks  ArtistFeaturedArtwork[]
 
@@ -544,6 +545,24 @@ model ArtistVenueAssociation {
   @@unique([artistId, venueId])
   @@index([venueId, status, createdAt])
   @@index([artistId, status, createdAt])
+}
+
+model ArtistEventAssociation {
+  id                String    @id @default(uuid()) @db.Uuid
+  artistId          String    @db.Uuid
+  eventId           String    @db.Uuid
+  status            String    @default("PENDING")
+  role              String?
+  message           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  requestedByUserId String?   @db.Uuid
+  artist            Artist    @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  event             Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([artistId, eventId])
+  @@index([artistId, status, createdAt])
+  @@index([eventId, status, createdAt])
 }
 
 model Event {
@@ -585,6 +604,7 @@ model Event {
   images        EventImage[]
   eventTags     EventTag[]
   eventArtists  EventArtist[]
+  artistAssociations ArtistEventAssociation[]
   submissions   Submission[]
   artworkEvents ArtworkEvent[]
   attendances   Attendance[]

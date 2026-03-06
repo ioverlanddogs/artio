@@ -8,6 +8,7 @@ import { ArtistProfileForm } from "@/components/artists/artist-profile-form";
 import { ArtistGalleryManager } from "@/components/artists/artist-gallery-manager";
 import { ArtistPublishPanel } from "@/app/my/_components/ArtistPublishPanel";
 import { ArtistVenuesPanel } from "@/components/artists/artist-venues-panel";
+import { ArtistEventsPanel } from "@/components/artists/artist-events-panel";
 import { Button } from "@/components/ui/button";
 import { countAllArtworksByArtist } from "@/lib/artworks";
 import { ArtistFeaturedArtworksPanel } from "@/components/artists/artist-featured-artworks-panel";
@@ -72,12 +73,18 @@ export default async function MyArtistPage() {
   }
 
   const latestSubmission = artist.targetSubmissions[0] ?? null;
-  const [publishedVenues, artworkCount, publishedArtworks, featuredArtworks] = await Promise.all([
+  const [publishedVenues, publishedEvents, artworkCount, publishedArtworks, featuredArtworks] = await Promise.all([
     db.venue.findMany({
       where: { isPublished: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
       take: 20, // Limited to avoid large payloads — ArtistVenuesPanel should move to search/autocomplete for scale
+    }),
+    db.event.findMany({
+      where: { isPublished: true },
+      orderBy: { startAt: "asc" },
+      select: { id: true, title: true, slug: true, startAt: true },
+      take: 50,
     }),
     countAllArtworksByArtist(artist.id),
     db.artwork.findMany({
@@ -135,6 +142,7 @@ export default async function MyArtistPage() {
         initialCover={resolveArtistCoverUrl(artist)}
       />
       <ArtistVenuesPanel initialVenues={publishedVenues} />
+      <ArtistEventsPanel initialEvents={publishedEvents} />
       <ArtistFeaturedArtworksPanel
         initialFeatured={featuredArtworks.map((row) => ({ id: row.artwork.id, slug: row.artwork.slug, title: row.artwork.title, coverUrl: row.artwork.featuredAsset?.url ?? row.artwork.images[0]?.asset?.url ?? null, sortOrder: row.sortOrder }))}
         options={publishedArtworks.map((item) => ({ id: item.id, slug: item.slug, title: item.title, coverUrl: item.featuredAsset?.url ?? item.images[0]?.asset?.url ?? null, isPublished: item.isPublished }))}
