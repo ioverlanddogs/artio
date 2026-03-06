@@ -82,8 +82,8 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
         orderBy: { sortOrder: "asc" },
         select: { id: true, alt: true, asset: { select: { url: true } } },
       },
-      venues: { select: { venueId: true } },
-      events: { select: { eventId: true } },
+      venues: { select: { venue: { select: { id: true, name: true, slug: true } } } },
+      events: { select: { event: { select: { id: true, title: true, slug: true, startAt: true } } } },
     },
   });
 
@@ -124,8 +124,12 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
     .filter((image) => Boolean(image.asset?.url))
     .map((image) => ({ id: image.id, src: image.asset.url ?? "", alt: image.alt ?? artwork.title }));
 
-  const venueIds = Array.from(new Set(artwork.venues.map((entry) => entry.venueId)));
-  const eventIds = Array.from(new Set(artwork.events.map((entry) => entry.eventId)));
+  const venueIds = Array.from(new Set(artwork.venues.map((entry) => entry.venue.id)));
+  const eventIds = Array.from(new Set(artwork.events.map((entry) => entry.event.id)));
+
+  const venueChips = artwork.venues.map((v) => ({ label: v.venue.name, href: `/venues/${v.venue.slug}` }));
+  const eventChips = artwork.events.map((e) => ({ label: e.event.title, href: `/events/${e.event.slug}` }));
+  const hasProvenance = venueChips.length > 0 || eventChips.length > 0;
 
   const [venueRelatedArtworksByVenue, eventRelatedArtworksByEvent] = await Promise.all([
     Promise.all(venueIds.slice(0, 2).map((venueId) => listPublishedArtworksByVenue(venueId, 6))),
@@ -173,7 +177,24 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
             />
           </div>
         }
-        meta={<div className="flex flex-wrap gap-2">{metadataChips.map((chip) => <Badge key={chip} variant="secondary">{chip}</Badge>)}</div>}
+        meta={
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {metadataChips.map((chip) => <Badge key={chip} variant="secondary">{chip}</Badge>)}
+            </div>
+            {hasProvenance && (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>Shown at:</span>
+                {venueChips.map((chip) => (
+                  <Link key={chip.href} href={chip.href} className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted">{chip.label}</Link>
+                ))}
+                {eventChips.map((chip) => (
+                  <Link key={chip.href} href={chip.href} className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted">{chip.label}</Link>
+                ))}
+              </div>
+            )}
+          </div>
+        }
       />
 
       {artwork.description ? (
@@ -189,8 +210,8 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
 
       {galleryImages.length > 0 ? <EventGalleryLightbox images={galleryImages} /> : null}
 
-      <ArtworkRelatedSection title="Artworks shown at related venues" subtitle="Other published works seen at venues where this artwork appeared." items={venueRelatedArtworks} viewAllHref={artwork.venues[0] ? `/artwork?venueId=${artwork.venues[0].venueId}` : undefined} showArtistName />
-      <ArtworkRelatedSection title="Artworks from related events" subtitle="Other published works linked to events featuring this artwork." items={eventRelatedArtworks} viewAllHref={artwork.events[0] ? `/artwork?eventId=${artwork.events[0].eventId}` : undefined} showArtistName />
+      <ArtworkRelatedSection title="Artworks shown at related venues" subtitle="Other published works seen at venues where this artwork appeared." items={venueRelatedArtworks} viewAllHref={artwork.venues[0] ? `/artwork?venueId=${artwork.venues[0].venue.id}` : undefined} showArtistName />
+      <ArtworkRelatedSection title="Artworks from related events" subtitle="Other published works linked to events featuring this artwork." items={eventRelatedArtworks} viewAllHref={artwork.events[0] ? `/artwork?eventId=${artwork.events[0].event.id}` : undefined} showArtistName />
     </PageShell>
   );
 }

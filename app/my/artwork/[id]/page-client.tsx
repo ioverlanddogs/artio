@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { evaluateArtworkReadiness } from "@/lib/publish-readiness";
 import { ArtworkGalleryManager } from "@/components/my/artwork/artwork-gallery-manager";
+import { ArtworkRelationsPanel } from "@/components/my/artwork/artwork-relations-panel";
 import { PublishPanel } from "@/components/my/PublishPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,19 @@ type Artwork = {
   isPublished: boolean;
   deletedAt?: string | null;
   images: Array<{ id: string; alt: string | null; assetId: string; sortOrder: number; asset: { url: string } }>;
+  initialVenues?: Array<{ id: string; name: string; slug: string }>;
+  initialEvents?: Array<{ id: string; title: string; slug: string; startAt: string }>;
 };
 
-export function ArtworkDetailClient({ initialArtwork }: { initialArtwork: Artwork }) {
+export function ArtworkDetailClient({
+  initialArtwork,
+  initialVenues,
+  initialEvents,
+}: {
+  initialArtwork: Artwork;
+  initialVenues: Array<{ id: string; name: string; slug: string }>;
+  initialEvents: Array<{ id: string; title: string; slug: string; startAt: string }>;
+}) {
   const router = useRouter();
   const [artwork, setArtwork] = useState<Artwork>(initialArtwork);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -160,6 +171,7 @@ export function ArtworkDetailClient({ initialArtwork }: { initialArtwork: Artwor
           }} />
         </aside>
       </div>
+      <ArtworkRelationsPanel artworkId={artwork.id} initialVenues={initialVenues} initialEvents={initialEvents} />
     </main>
   );
 }

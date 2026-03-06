@@ -25,11 +25,31 @@ export default async function MyArtworkDetailPage({
 
   const artwork = await db.artwork.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+      year: true,
+      medium: true,
+      dimensions: true,
+      priceAmount: true,
+      currency: true,
+      featuredAssetId: true,
+      isPublished: true,
+      deletedAt: true,
       images: {
-        include: { asset: true },
         orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          alt: true,
+          assetId: true,
+          sortOrder: true,
+          asset: { select: { url: true } },
+        },
       },
+      venues: { select: { venue: { select: { id: true, name: true, slug: true } } } },
+      events: { select: { event: { select: { id: true, title: true, slug: true, startAt: true } } } },
     },
   });
 
@@ -58,6 +78,8 @@ export default async function MyArtworkDetailPage({
           asset: { url: img.asset.url },
         })),
       }}
+      initialVenues={artwork.venues.map((v) => v.venue)}
+      initialEvents={artwork.events.map((e) => ({ ...e.event, startAt: e.event.startAt.toISOString() }))}
     />
   );
 }
