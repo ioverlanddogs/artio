@@ -67,7 +67,7 @@ export async function getArtistArtworks(
     isPublished: true,
     deletedAt: null,
     ...(opts.forSale ? { priceAmount: { not: null } } : {}),
-    ...(tag ? { medium: { contains: tag, mode: "insensitive" as const } } : {}),
+    ...(tag ? { medium: { equals: tag, mode: "insensitive" as const } } : {}),
   };
 
   let cursorItem: UpdatedAtIdCursor | null = null;

@@ -44,7 +44,7 @@ function installLibMocks() {
 
   db.artwork.findMany = (async ({ where, take, orderBy }: { where: any; take: number; orderBy: any }) => {
     let rows = DATA.filter((item) => item.artistId === where.artistId && item.isPublished && where.deletedAt === null);
-    if (where.medium?.contains) rows = rows.filter((item) => item.medium.includes(String(where.medium.contains)));
+    if (where.medium?.equals) rows = rows.filter((item) => item.medium.toLowerCase() === String(where.medium.equals).toLowerCase());
     if (where.priceAmount?.not === null) rows = rows.filter((item) => item.priceAmount != null);
     if (where.OR) {
       rows = rows.filter((item) => where.OR.some((rule: any) => {
@@ -78,7 +78,7 @@ function installLibMocks() {
 
   db.artwork.count = (async ({ where }: { where: any }) => {
     let rows = DATA.filter((item) => item.artistId === where.artistId && item.isPublished && where.deletedAt === null);
-    if (where.medium?.contains) rows = rows.filter((item) => item.medium.includes(String(where.medium.contains)));
+    if (where.medium?.equals) rows = rows.filter((item) => item.medium.toLowerCase() === String(where.medium.equals).toLowerCase());
     if (where.priceAmount?.not === null) rows = rows.filter((item) => item.priceAmount != null);
     return rows.length;
   }) as never;
@@ -185,6 +185,44 @@ test("Uses title-aware A-Z cursor predicate", async () => {
       { title: "C", id: { gt: "w3" } },
     ]);
     assert.equal(capturedWhere.id, undefined);
+  } finally {
+    db.artwork.findMany = originalFindMany;
+    restore();
+  }
+});
+
+
+test("Tag filter uses exact medium equals clause", async () => {
+  const restore = installLibMocks();
+  const originalFindMany = db.artwork.findMany;
+  let capturedWhere: any;
+  db.artwork.findMany = (async ({ where, take, orderBy }: { where: any; take: number; orderBy: any }) => {
+    capturedWhere = where;
+    return originalFindMany({ where, take, orderBy } as never);
+  }) as never;
+
+  try {
+    await getArtistArtworks("artist", { tag: "Oil on Canvas", limit: 10 });
+    assert.deepEqual(capturedWhere.medium, { equals: "Oil on Canvas", mode: "insensitive" });
+    assert.equal(capturedWhere.medium?.contains, undefined);
+  } finally {
+    db.artwork.findMany = originalFindMany;
+    restore();
+  }
+});
+
+test("No medium clause is added when tag is omitted", async () => {
+  const restore = installLibMocks();
+  const originalFindMany = db.artwork.findMany;
+  let capturedWhere: any;
+  db.artwork.findMany = (async ({ where, take, orderBy }: { where: any; take: number; orderBy: any }) => {
+    capturedWhere = where;
+    return originalFindMany({ where, take, orderBy } as never);
+  }) as never;
+
+  try {
+    await getArtistArtworks("artist", { limit: 10 });
+    assert.equal("medium" in capturedWhere, false);
   } finally {
     db.artwork.findMany = originalFindMany;
     restore();

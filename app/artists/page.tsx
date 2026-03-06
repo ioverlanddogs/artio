@@ -8,7 +8,7 @@ import { hasDatabaseUrl } from "@/lib/runtime-db";
 import { uiFixtureArtists, useUiFixtures as getUiFixturesEnabled } from "@/lib/ui-fixtures";
 import { resolveEntityPrimaryImage } from "@/lib/public-images";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 const fixturesEnabled = getUiFixturesEnabled();
 
 export default async function ArtistsPage() {

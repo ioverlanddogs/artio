@@ -78,6 +78,21 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
       if (submission.type === "EVENT" && submission.targetEventId) {
         await tx.event.update({ where: { id: submission.targetEventId }, data: { isPublished: true, status: "PUBLISHED", publishedAt: decidedAt } });
       }
+      if (submission.type === "ARTWORK" && submission.note?.startsWith("artworkId:")) {
+        const artworkId = submission.note.replace("artworkId:", "").trim();
+        await tx.artwork.update({
+          where: { id: artworkId },
+          data: { isPublished: true, status: "PUBLISHED" },
+        });
+      }
+    }
+
+    if (!isApprove && submission.type === "ARTWORK" && submission.note?.startsWith("artworkId:")) {
+      const artworkId = submission.note.replace("artworkId:", "").trim();
+      await tx.artwork.update({
+        where: { id: artworkId },
+        data: { status: "REJECTED" },
+      });
     }
 
     const updated = await tx.submission.update({

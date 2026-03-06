@@ -18,7 +18,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     requireMyArtworkAccess,
     findArtworkById: (artworkId) => db.artwork.findUnique({ where: { id: artworkId }, select: { id: true, title: true, description: true, year: true, medium: true, featuredAssetId: true, isPublished: true } }),
     listArtworkImages: (artworkId) => db.artworkImage.findMany({ where: { artworkId }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, assetId: true } }),
-    updateArtworkPublishState: (artworkId, input) => db.artwork.update({ where: { id: artworkId }, data: { isPublished: input.isPublished, ...(input.featuredAssetId ? { featuredAssetId: input.featuredAssetId } : {}) } }),
+    updateArtworkPublishState: (artworkId, input) => db.artwork.update({ where: { id: artworkId }, data: { isPublished: input.isPublished, ...(input.status ? { status: input.status } : {}), ...(input.featuredAssetId ? { featuredAssetId: input.featuredAssetId } : {}) } }),
+    createArtworkSubmission: async (artworkId, userId) =>
+      db.submission.create({
+        data: {
+          type: "ARTWORK",
+          status: "IN_REVIEW",
+          submitterUserId: userId,
+          note: `artworkId:${artworkId}`,
+          submittedAt: new Date(),
+        },
+        select: { id: true },
+      }),
     logAdminAction,
   });
 }

@@ -43,6 +43,7 @@ enum SubmissionType {
   EVENT
   VENUE
   ARTIST
+  ARTWORK
 }
 
 enum SubmissionStatus {
@@ -996,6 +997,7 @@ model Artwork {
   priceAmount     Int?
   currency        String?
   isPublished     Boolean        @default(false)
+  status          ContentStatus  @default(DRAFT)
   featuredAssetId String?        @db.Uuid
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -1012,6 +1014,7 @@ model Artwork {
 
   @@index([artistId])
   @@index([isPublished])
+  @@index([status])
   @@index([artistId, isPublished, updatedAt])
   @@index([featuredAssetId])
   @@index([deletedAt])

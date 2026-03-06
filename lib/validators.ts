@@ -33,6 +33,11 @@ export const eventsQuerySchema = z.object({
 });
 
 export const searchQuerySchema = z.object({ query: z.string().trim().min(1).optional() });
+export const artistListQuerySchema = z.object({
+  query: z.string().trim().min(1).max(120).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(48),
+});
 export const slugParamSchema = z.object({ slug: slugSchema });
 export const idParamSchema = z.object({ id: z.string().uuid() });
 export const venueIdParamSchema = z.object({ id: z.string().uuid() });
