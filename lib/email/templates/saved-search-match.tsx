@@ -15,7 +15,7 @@ export function SavedSearchMatchEmail({ searchName, eventTitle, eventSlug }: Sav
   return (
     <EmailLayout preview={`${eventTitle} matches your saved search.`}>
       <p>
-        {eventTitle} matches your saved search "{searchName}".
+        {eventTitle} matches your saved search &quot;{searchName}&quot;.
       </p>
       {eventSlug ? <a href={`/events/${eventSlug}`}>View event</a> : null}
     </EmailLayout>
