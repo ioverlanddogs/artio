@@ -13,7 +13,6 @@ import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-t
 import { SectionHeader } from "@/components/ui/section-header";
 import { ContextualNudgeSlot } from "@/components/onboarding/contextual-nudge-slot";
 import { ArtistArtworkShowcase } from "@/components/artists/artist-artwork-showcase";
-import { ArtistBio } from "@/components/artists/artist-bio";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hasDatabaseUrl } from "@/lib/runtime-db";
@@ -158,7 +157,6 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
         meta={<div className="flex items-center gap-2"><ArtworkCountBadge count={artworkCount} href={`/artwork?artistId=${artist.id}`} /><span className="text-xs text-muted-foreground">{forSaleCount} for sale</span></div>}
       />
 
-      {artist.bio ? <ArtistBio bio={artist.bio} /> : null}
 
       {Boolean(user) ? <ContextualNudgeSlot page="artist_detail" type="entity_save_search" nudgeId="nudge_entity_save_search" title="Turn this into alerts" body="Save a search like this to get weekly updates." destination={`/search?q=${encodeURIComponent(artist.name)}`} /> : null}
 

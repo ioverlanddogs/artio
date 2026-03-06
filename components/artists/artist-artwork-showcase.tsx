@@ -26,6 +26,7 @@ export function ArtistArtworkShowcase({
   const [sort, setSort] = useState<"newest" | "oldest" | "az">("newest");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [artworks, setArtworks] = useState(initialArtworks);
+  const [filteredTotal, setFilteredTotal] = useState(totalCount);
   const [cursor, setCursor] = useState<string | null>(initialNextCursor);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<ArtworkSummary | null>(null);
@@ -47,6 +48,7 @@ export function ArtistArtworkShowcase({
           setArtworks(body.artworks);
         }
         setCursor(body.nextCursor);
+        if (!next.cursor) setFilteredTotal(body.total ?? totalCount);
       }
     } finally {
       setLoading(false);
@@ -118,7 +120,7 @@ export function ArtistArtworkShowcase({
 
       {artworks.length === 0 && !loading ? <EmptyState title="No artworks found" description="Try changing filters to see more works." /> : null}
       {cursor ? <button type="button" onClick={() => void loadMore()} className="rounded border px-4 py-2 text-sm" disabled={loading}>{loading ? "Loading..." : "Load more"}</button> : null}
-      <p className="text-xs text-muted-foreground">Showing {artworks.length} of {totalCount}</p>
+      <p className="text-xs text-muted-foreground">Showing {artworks.length} of {filteredTotal}</p>
       <ArtistArtworkLightbox artwork={selected} onClose={() => setSelected(null)} />
     </section>
   );

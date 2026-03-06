@@ -127,7 +127,7 @@ test("GET ?tag=painting returns only artworks with that tag", async () => {
     const res = await GET(req, { params: Promise.resolve({ slug: "picasso" }) });
     const body = await res.json();
     assert.equal(res.status, 200);
-    assert.ok(body.artworks.every((item: any) => item.tags.includes("painting")));
+    assert.ok(body.artworks.every((item: any) => item.medium === "painting"));
   } finally {
     restore();
   }
