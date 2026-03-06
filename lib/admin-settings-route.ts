@@ -10,6 +10,9 @@ const patchSchema = z.object({
   ingestSystemPrompt: z.string().trim().min(1).nullable().optional(),
   ingestModel: z.string().trim().min(1).nullable().optional(),
   ingestMaxOutputTokens: z.number().int().positive().nullable().optional(),
+  emailEnabled: z.boolean().optional(),
+  emailFromAddress: z.string().max(200).nullable().optional(),
+  emailOutboxBatchSize: z.number().int().min(1).max(100).nullable().optional(),
 });
 
 export async function handleAdminSettingsGet(_req: Request, deps: {
@@ -22,6 +25,9 @@ export async function handleAdminSettingsGet(_req: Request, deps: {
       ingestSystemPrompt: settings.ingestSystemPrompt,
       ingestModel: settings.ingestModel,
       ingestMaxOutputTokens: settings.ingestMaxOutputTokens,
+      emailEnabled: settings.emailEnabled,
+      emailFromAddress: settings.emailFromAddress,
+      emailOutboxBatchSize: settings.emailOutboxBatchSize,
     });
   }, { requireAdminFn: deps.requireAdminFn });
 }
@@ -41,6 +47,9 @@ export async function handleAdminSettingsPatch(req: Request, deps: {
         ingestSystemPrompt: updated.ingestSystemPrompt,
         ingestModel: updated.ingestModel,
         ingestMaxOutputTokens: updated.ingestMaxOutputTokens,
+        emailEnabled: updated.emailEnabled,
+        emailFromAddress: updated.emailFromAddress,
+        emailOutboxBatchSize: updated.emailOutboxBatchSize,
       },
     });
   }, { requireAdminFn: deps.requireAdminFn });

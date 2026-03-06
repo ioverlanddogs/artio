@@ -12,6 +12,9 @@ test("GET returns null ingest settings when row has no values", async () => {
       ingestSystemPrompt: null,
       ingestModel: null,
       ingestMaxOutputTokens: null,
+      emailEnabled: false,
+      emailFromAddress: null,
+      emailOutboxBatchSize: null,
     }) as never,
   });
 
@@ -20,6 +23,9 @@ test("GET returns null ingest settings when row has no values", async () => {
     ingestSystemPrompt: null,
     ingestModel: null,
     ingestMaxOutputTokens: null,
+    emailEnabled: false,
+    emailFromAddress: null,
+    emailOutboxBatchSize: null,
   });
 });
 
@@ -27,7 +33,14 @@ test("PATCH updates and returns ingest settings", async () => {
   const req = new NextRequest("http://localhost/api/admin/settings", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ingestSystemPrompt: "custom prompt", ingestModel: "gpt-4o", ingestMaxOutputTokens: 8000 }),
+    body: JSON.stringify({
+      ingestSystemPrompt: "custom prompt",
+      ingestModel: "gpt-4o",
+      ingestMaxOutputTokens: 8000,
+      emailEnabled: true,
+      emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
+      emailOutboxBatchSize: 50,
+    }),
   });
 
   let captured: Record<string, unknown> | null = null;
@@ -39,7 +52,14 @@ test("PATCH updates and returns ingest settings", async () => {
     },
   });
 
-  assert.deepEqual(captured, { ingestSystemPrompt: "custom prompt", ingestModel: "gpt-4o", ingestMaxOutputTokens: 8000 });
+  assert.deepEqual(captured, {
+    ingestSystemPrompt: "custom prompt",
+    ingestModel: "gpt-4o",
+    ingestMaxOutputTokens: 8000,
+    emailEnabled: true,
+    emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
+    emailOutboxBatchSize: 50,
+  });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), {
     ok: true,
@@ -47,6 +67,9 @@ test("PATCH updates and returns ingest settings", async () => {
       ingestSystemPrompt: "custom prompt",
       ingestModel: "gpt-4o",
       ingestMaxOutputTokens: 8000,
+      emailEnabled: true,
+      emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
+      emailOutboxBatchSize: 50,
     },
   });
 });
@@ -65,6 +88,9 @@ test("PATCH allows clearing ingestSystemPrompt to null", async () => {
       ingestSystemPrompt: data.ingestSystemPrompt ?? null,
       ingestModel: null,
       ingestMaxOutputTokens: null,
+      emailEnabled: false,
+      emailFromAddress: null,
+      emailOutboxBatchSize: null,
     }) as never,
   });
 
@@ -75,6 +101,9 @@ test("PATCH allows clearing ingestSystemPrompt to null", async () => {
       ingestSystemPrompt: null,
       ingestModel: null,
       ingestMaxOutputTokens: null,
+      emailEnabled: false,
+      emailFromAddress: null,
+      emailOutboxBatchSize: null,
     },
   });
 });
