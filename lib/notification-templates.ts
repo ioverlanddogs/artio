@@ -39,6 +39,21 @@ export type NotificationTemplatePayload =
       searchName: string;
       eventTitle: string;
       eventSlug?: string | null;
+    }
+  | {
+      type: "VENUE_CLAIM_VERIFY";
+      verifyUrl: string;
+      venueSlug: string;
+      expiresAt: string;
+    }
+  | {
+      type: "VENUE_CLAIM_APPROVED";
+      venueSlug: string;
+    }
+  | {
+      type: "VENUE_CLAIM_REJECTED";
+      venueSlug: string;
+      reason?: string | null;
     };
 
 export function buildNotification({ type, payload }: { type: NotificationType; payload: NotificationTemplatePayload }) {
@@ -106,6 +121,33 @@ export function buildNotification({ type, payload }: { type: NotificationType; p
       body: `${payload.eventTitle} matches your saved search "${payload.searchName}".`,
       href: payload.eventSlug ? `/events/${payload.eventSlug}` : undefined,
       dedupeKey: `saved-search-match:${payload.savedSearchId}:${payload.eventId}`,
+    };
+  }
+
+  if (type === "VENUE_CLAIM_VERIFY" && payload.type === "VENUE_CLAIM_VERIFY") {
+    return {
+      title: "Verify venue claim",
+      body: `Confirm ownership for @${payload.venueSlug} before the link expires.`,
+      href: payload.verifyUrl,
+      dedupeKey: `venue-claim:${payload.venueSlug}:verify:${payload.expiresAt}`,
+    };
+  }
+
+  if (type === "VENUE_CLAIM_APPROVED" && payload.type === "VENUE_CLAIM_APPROVED") {
+    return {
+      title: "Venue claim approved",
+      body: `Your claim for @${payload.venueSlug} has been approved.`,
+      href: `/venues/${payload.venueSlug}`,
+      dedupeKey: `venue-claim:${payload.venueSlug}:approved`,
+    };
+  }
+
+  if (type === "VENUE_CLAIM_REJECTED" && payload.type === "VENUE_CLAIM_REJECTED") {
+    return {
+      title: "Venue claim rejected",
+      body: payload.reason ?? `Your claim for @${payload.venueSlug} was rejected.`,
+      href: `/venues/${payload.venueSlug}`,
+      dedupeKey: `venue-claim:${payload.venueSlug}:rejected`,
     };
   }
 
