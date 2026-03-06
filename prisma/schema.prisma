@@ -493,6 +493,10 @@ model Artist {
   bio               String?
   websiteUrl        String?
   instagramUrl      String?
+  twitterUrl        String?
+  linkedinUrl       String?
+  tiktokUrl         String?
+  youtubeUrl        String?
   mediums           String[]                 @default([])
   avatarImageUrl    String?
   featuredImageUrl  String?

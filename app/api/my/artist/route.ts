@@ -56,12 +56,36 @@ export async function PATCH(req: NextRequest) {
     requireAuth,
     findOwnedArtistByUserId: async (userId) => db.artist.findUnique({
       where: { userId },
-      select: { id: true, name: true, bio: true, websiteUrl: true, instagramUrl: true, avatarImageUrl: true, featuredAssetId: true },
+      select: {
+        id: true,
+        name: true,
+        bio: true,
+        websiteUrl: true,
+        instagramUrl: true,
+        twitterUrl: true,
+        linkedinUrl: true,
+        tiktokUrl: true,
+        youtubeUrl: true,
+        avatarImageUrl: true,
+        featuredAssetId: true,
+      },
     }),
     updateArtistById: async (artistId, patch) => db.artist.update({
       where: { id: artistId },
       data: patch,
-      select: { id: true, name: true, bio: true, websiteUrl: true, instagramUrl: true, avatarImageUrl: true, featuredAssetId: true },
+      select: {
+        id: true,
+        name: true,
+        bio: true,
+        websiteUrl: true,
+        instagramUrl: true,
+        twitterUrl: true,
+        linkedinUrl: true,
+        tiktokUrl: true,
+        youtubeUrl: true,
+        avatarImageUrl: true,
+        featuredAssetId: true,
+      },
     }),
   });
 }

@@ -11,6 +11,10 @@ type ArtistProfile = {
   bio: string | null;
   websiteUrl: string | null;
   instagramUrl: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  tiktokUrl: string | null;
+  youtubeUrl: string | null;
   avatarImageUrl: string | null;
   featuredAssetId: string | null;
   featuredAssetUrl: string | null;
@@ -99,6 +103,22 @@ export function ArtistProfileForm({ initialProfile }: { initialProfile: ArtistPr
       <label className="block">
         <span className="text-sm">Instagram URL</span>
         <input className="w-full rounded border px-2 py-1" value={form.instagramUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, instagramUrl: e.target.value || null }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">Twitter / X URL</span>
+        <input className="w-full rounded border px-2 py-1" value={form.twitterUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, twitterUrl: e.target.value || null }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">LinkedIn URL</span>
+        <input className="w-full rounded border px-2 py-1" value={form.linkedinUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, linkedinUrl: e.target.value || null }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">TikTok URL</span>
+        <input className="w-full rounded border px-2 py-1" value={form.tiktokUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, tiktokUrl: e.target.value || null }))} />
+      </label>
+      <label className="block">
+        <span className="text-sm">YouTube URL</span>
+        <input className="w-full rounded border px-2 py-1" value={form.youtubeUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, youtubeUrl: e.target.value || null }))} />
       </label>
       <label className="block">
         <span className="text-sm">Disciplines / mediums</span>

@@ -50,6 +50,10 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
       bio: true,
       websiteUrl: true,
       instagramUrl: true,
+      twitterUrl: true,
+      linkedinUrl: true,
+      tiktokUrl: true,
+      youtubeUrl: true,
       mediums: true,
       avatarImageUrl: true,
       featuredImageUrl: true,
@@ -184,7 +188,7 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
             )}
           </section>
         )}
-        about={<EntityAboutCard description={artist.bio} websiteUrl={artist.websiteUrl} instagramUrl={artist.instagramUrl} tags={artistTags} />}
+        about={<EntityAboutCard description={artist.bio} websiteUrl={artist.websiteUrl} instagramUrl={artist.instagramUrl} twitterUrl={artist.twitterUrl} linkedinUrl={artist.linkedinUrl} tiktokUrl={artist.tiktokUrl} youtubeUrl={artist.youtubeUrl} tags={artistTags} />}
       />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />

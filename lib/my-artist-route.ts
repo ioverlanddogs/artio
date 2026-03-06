@@ -10,6 +10,10 @@ type ArtistRecord = {
   bio: string | null;
   websiteUrl: string | null;
   instagramUrl: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  tiktokUrl: string | null;
+  youtubeUrl: string | null;
   avatarImageUrl: string | null;
   featuredAssetId: string | null;
   mediums?: string[];
