@@ -45,8 +45,8 @@ function installDbMocks() {
 
   db.artwork.findMany = (async ({ where, orderBy, take }: { where: any; orderBy: any; take: number }) => {
     let filtered = ARTWORKS.filter((item) => (item.isPublished ?? true));
-    if (where?.medium?.contains) {
-      filtered = filtered.filter((item) => item.medium.toLowerCase().includes(String(where.medium.contains).toLowerCase()));
+    if (where?.medium?.equals) {
+      filtered = filtered.filter((item) => item.medium.toLowerCase() === String(where.medium.equals).toLowerCase());
     }
     if (where?.priceAmount?.not === null) {
       filtered = filtered.filter((item) => item.priceAmount != null);
@@ -90,7 +90,7 @@ function installDbMocks() {
 
   db.artwork.count = (async ({ where }: { where: any }) => {
     let filtered = ARTWORKS.filter((item) => (item.isPublished ?? true));
-    if (where?.medium?.contains) filtered = filtered.filter((item) => item.medium.toLowerCase().includes(String(where.medium.contains).toLowerCase()));
+    if (where?.medium?.equals) filtered = filtered.filter((item) => item.medium.toLowerCase() === String(where.medium.equals).toLowerCase());
     if (where?.priceAmount?.not === null) filtered = filtered.filter((item) => item.priceAmount != null);
     return filtered.length;
   }) as never;
