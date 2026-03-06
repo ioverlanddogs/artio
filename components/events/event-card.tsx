@@ -25,9 +25,10 @@ type EventCardProps = {
   className?: string;
   onOpen?: () => void;
   artworkCount?: number;
+  viewArtworksHref?: string;
 };
 
-export function EventCard({ title, startAt, endAt, venueName, imageUrl, imageAlt, href, badges, tags, secondaryText, action, distanceLabel, className, onOpen, artworkCount = 0 }: EventCardProps) {
+export function EventCard({ title, startAt, endAt, venueName, imageUrl, imageAlt, href, badges, tags, secondaryText, action, distanceLabel, className, onOpen, artworkCount = 0, viewArtworksHref }: EventCardProps) {
   const start = typeof startAt === "string" ? new Date(startAt) : startAt;
   const end = endAt ? (typeof endAt === "string" ? new Date(endAt) : endAt) : undefined;
   const hasValidStart = !Number.isNaN(start.getTime());
@@ -87,6 +88,13 @@ export function EventCard({ title, startAt, endAt, venueName, imageUrl, imageAlt
         </div>
       </Link>
       {action ? <div className="border-t border-border p-3">{action}</div> : null}
+      {viewArtworksHref ? (
+        <div className="border-t border-border px-4 py-2">
+          <Link href={viewArtworksHref} className="text-sm text-muted-foreground underline hover:text-foreground">
+            Browse artworks →
+          </Link>
+        </div>
+      ) : null}
     </article>
   );
 }
