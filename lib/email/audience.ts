@@ -1,4 +1,5 @@
-import { CampaignAudience, ContentStatus, PrismaClient, VenueMembershipRole } from "@prisma/client";
+import { ContentStatus, PrismaClient, VenueMembershipRole } from "@prisma/client";
+import type { CampaignAudience } from "@/lib/email/campaign-enums";
 
 type AudienceFilter = {
   emails?: string[];

@@ -8,6 +8,7 @@ import { generateUnsubscribeToken } from "@/lib/email/unsubscribe-token";
 
 export const runtime = "nodejs";
 
+
 export async function POST(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin();
