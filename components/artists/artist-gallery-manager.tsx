@@ -3,9 +3,8 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
+import ImageUploader from "@/app/my/_components/ImageUploader";
 import { buildLoginRedirectUrl } from "@/lib/auth-redirect";
-import { ALLOWED_IMAGE_MIME_TYPES, MAX_IMAGE_UPLOAD_BYTES } from "@/lib/assets";
 import { enqueueToast } from "@/lib/toast";
 
 type ArtistImage = { id: string; url: string; alt: string | null; sortOrder: number; assetId?: string | null };
@@ -14,7 +13,6 @@ export function ArtistGalleryManager({ initialImages, initialCover }: { initialI
   const router = useRouter();
   const [images, setImages] = useState<ArtistImage[]>(initialImages);
   const [coverImageUrl, setCoverImageUrl] = useState(initialCover);
-  const [isUploading, setIsUploading] = useState(false);
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
   const sorted = useMemo(() => [...images].sort((a, b) => a.sortOrder - b.sortOrder), [images]);
@@ -26,52 +24,6 @@ export function ArtistGalleryManager({ initialImages, initialCover }: { initialI
     }
     if (res.status === 429) enqueueToast({ title: "Too many requests, try again", variant: "error" });
     return false;
-  }
-
-  async function uploadFiles(fileList: FileList | null) {
-    if (!fileList?.length) return;
-    const files = Array.from(fileList);
-    setIsUploading(true);
-
-    try {
-      for (const file of files) {
-        if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_MIME_TYPES)[number])) {
-          enqueueToast({ title: `${file.name}: unsupported file type`, variant: "error" });
-          continue;
-        }
-        if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
-          enqueueToast({ title: `${file.name}: file too large`, variant: "error" });
-          continue;
-        }
-
-        const blob = await upload(`artists/${Date.now()}-${file.name}`, file, {
-          access: "public",
-          handleUploadUrl: "/api/my/artist/images/upload",
-          clientPayload: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
-        });
-
-        const createRes = await fetch("/api/my/artist/images", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url: blob.url, alt: null }),
-        });
-
-        if (handleAuth(createRes)) return;
-        if (!createRes.ok) {
-          enqueueToast({ title: `Failed to save ${file.name}`, variant: "error" });
-          continue;
-        }
-
-        const data = (await createRes.json()) as { image: ArtistImage };
-        setImages((current) => [...current, data.image]);
-      }
-      enqueueToast({ title: "Gallery updated", variant: "success" });
-    } catch {
-      enqueueToast({ title: "Image upload failed", variant: "error" });
-    } finally {
-      setIsUploading(false);
-      router.refresh();
-    }
   }
 
   async function saveAlt(imageId: string, alt: string) {
@@ -202,8 +154,27 @@ export function ArtistGalleryManager({ initialImages, initialCover }: { initialI
         {coverImageUrl ? (
           <button className="rounded border px-2 py-1 text-sm" disabled={Boolean(loadingMap.clearCover)} onClick={clearCover}>Clear cover</button>
         ) : null}
-        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={isUploading} onChange={(event) => uploadFiles(event.target.files)} />
       </div>
+
+      <ImageUploader
+        label="Add gallery image"
+        onUploaded={async ({ url }) => {
+          const createRes = await fetch("/api/my/artist/images", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url, alt: null }),
+          });
+          if (handleAuth(createRes)) return;
+          if (!createRes.ok) {
+            enqueueToast({ title: "Failed to save image", variant: "error" });
+            return;
+          }
+          const data = (await createRes.json()) as { image: ArtistImage };
+          setImages((current) => [...current, data.image]);
+          enqueueToast({ title: "Gallery updated", variant: "success" });
+          router.refresh();
+        }}
+      />
 
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((image, index) => (
