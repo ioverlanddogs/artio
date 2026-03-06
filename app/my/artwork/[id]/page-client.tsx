@@ -99,7 +99,7 @@ export function ArtworkDetailClient({ initialArtwork }: { initialArtwork: Artwor
           <h1 className="text-2xl font-semibold">Edit Artwork</h1>
           <Badge variant={statusLabel === "Live" ? "default" : statusLabel === "Archived" ? "outline" : "secondary"}>{statusLabel}</Badge>
         </div>
-        <Link href="/my/artwork/new" className="rounded-md border px-3 py-1 text-sm">Add artwork</Link>
+        <Link href="/my/artwork" className="rounded-md border px-3 py-1 text-sm">← My artworks</Link>
       </div>
       {!readiness.ready ? <div className="rounded border bg-muted/20 p-3 text-sm">Complete required fields before publishing.</div> : null}
       <div className="grid gap-6 lg:grid-cols-3">

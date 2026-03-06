@@ -18,9 +18,9 @@ const SORTS = [
   ["PRICE_DESC", "Price (high to low)"],
   ["VIEWS_30D_DESC", "Most viewed (30d)"],
 ] as const;
-const MEDIUMS = ["Painting", "Sculpture", "Photography", "Digital", "Mixed Media", "Installation"];
-
-export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
+export function ArtworkBrowser({ signedIn, mediumOptions }: { signedIn: boolean; mediumOptions: string[] }) {
+  const FALLBACK_MEDIUMS = ["Painting", "Sculpture", "Photography", "Digital", "Mixed Media", "Installation"];
+  const availableMediums = mediumOptions.length > 0 ? mediumOptions : FALLBACK_MEDIUMS;
   const sp = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -137,7 +137,7 @@ export function ArtworkBrowser({ signedIn }: { signedIn: boolean }) {
         <div>
           <p className="text-xs font-semibold uppercase">Medium</p>
           <div className="mt-1 space-y-1">
-            {MEDIUMS.map((medium) => <label key={medium} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={mediums.includes(medium)} onChange={() => {
+            {availableMediums.map((medium) => <label key={medium} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={mediums.includes(medium)} onChange={() => {
               const next = mediums.includes(medium) ? mediums.filter((m) => m !== medium) : [...mediums, medium];
               const params = new URLSearchParams(sp?.toString() ?? "");
               params.delete("medium");
