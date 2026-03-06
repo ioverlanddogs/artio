@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildLoginRedirectUrl } from "@/lib/auth-redirect";
 import { ASSOCIATION_ROLES, DEFAULT_ASSOCIATION_ROLE, normalizeAssociationRole, roleLabel } from "@/lib/association-roles";
@@ -23,18 +23,28 @@ export function ArtistVenuesPanel({ initialVenues }: { initialVenues: VenueOptio
   const [role, setRole] = useState(DEFAULT_ASSOCIATION_ROLE);
   const [message, setMessage] = useState("");
   const [associations, setAssociations] = useState<{ pending: Assoc[]; approved: Assoc[]; rejected: Assoc[] } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const filtered = useMemo(() => venues.filter((v) => v.name.toLowerCase().includes(query.toLowerCase())).slice(0, 8), [query, venues]);
 
   async function loadAssociations() {
-    const res = await fetch("/api/my/artist/venues", { cache: "no-store" });
-    if (res.status === 401) {
-      window.location.href = buildLoginRedirectUrl("/my/artist");
-      return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/my/artist/venues", { cache: "no-store" });
+      if (res.status === 401) {
+        window.location.href = buildLoginRedirectUrl("/my/artist");
+        return;
+      }
+      if (!res.ok) return;
+      setAssociations(await res.json());
+    } finally {
+      setLoading(false);
     }
-    if (!res.ok) return;
-    setAssociations(await res.json());
   }
+
+  useEffect(() => {
+    void loadAssociations();
+  }, []);
 
   async function requestAssociation() {
     if (!selectedVenueId) return;
@@ -92,7 +102,9 @@ export function ArtistVenuesPanel({ initialVenues }: { initialVenues: VenueOptio
         </div>
       </div>
 
-      {associations ? (
+      {loading && associations === null ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : associations ? (
         <div className="space-y-3">
           {["pending", "approved", "rejected"].map((group) => (
             <div key={group}>
@@ -113,7 +125,7 @@ export function ArtistVenuesPanel({ initialVenues }: { initialVenues: VenueOptio
             </div>
           ))}
         </div>
-      ) : <p className="text-sm text-muted-foreground">Load your association requests to manage status.</p>}
+      ) : null}
     </section>
   );
 }
