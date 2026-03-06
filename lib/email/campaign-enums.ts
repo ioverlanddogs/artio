@@ -1,0 +1,7 @@
+export const CAMPAIGN_AUDIENCES = ["ALL_USERS", "VENUE_OWNERS", "ARTISTS", "NEW_USERS_7D", "CUSTOM"] as const;
+
+export type CampaignAudience = (typeof CAMPAIGN_AUDIENCES)[number];
+
+export const CAMPAIGN_STATUSES = ["DRAFT", "SCHEDULED", "SENDING", "SENT", "CANCELLED"] as const;
+
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];

@@ -1,4 +1,5 @@
-import { CampaignAudience, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { CAMPAIGN_AUDIENCES } from "@/lib/email/campaign-enums";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
@@ -8,12 +9,13 @@ import { parseBody, zodDetails } from "@/lib/validators";
 
 export const runtime = "nodejs";
 
+
 const campaignCreateSchema = z.object({
   name: z.string().trim().min(1),
   subject: z.string().trim().min(1),
   bodyHtml: z.string().min(1),
   bodyText: z.string().optional().nullable(),
-  audienceType: z.nativeEnum(CampaignAudience),
+  audienceType: z.enum(CAMPAIGN_AUDIENCES),
   audienceFilter: z.record(z.string(), z.unknown()).optional().nullable(),
   scheduledFor: z.string().datetime().optional().nullable(),
 });

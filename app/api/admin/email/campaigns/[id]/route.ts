@@ -1,4 +1,5 @@
-import { CampaignAudience, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { CAMPAIGN_AUDIENCES, CAMPAIGN_STATUSES } from "@/lib/email/campaign-enums";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
@@ -8,15 +9,16 @@ import { parseBody, zodDetails } from "@/lib/validators";
 
 export const runtime = "nodejs";
 
+
 const campaignUpdateSchema = z.object({
   name: z.string().trim().min(1).optional(),
   subject: z.string().trim().min(1).optional(),
   bodyHtml: z.string().min(1).optional(),
   bodyText: z.string().optional().nullable(),
-  audienceType: z.nativeEnum(CampaignAudience).optional(),
+  audienceType: z.enum(CAMPAIGN_AUDIENCES).optional(),
   audienceFilter: z.record(z.string(), z.unknown()).optional().nullable(),
   scheduledFor: z.string().datetime().optional().nullable(),
-  status: z.enum(["DRAFT", "SCHEDULED"]).optional(),
+  status: z.enum(CAMPAIGN_STATUSES).optional(),
 });
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
