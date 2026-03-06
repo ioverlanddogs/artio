@@ -140,7 +140,7 @@ export async function getArtistArtworks(
     forSale: item.priceAmount != null,
     price: item.priceAmount != null ? { amount: item.priceAmount, currency: item.currency ?? "USD" } : null,
     description: item.description,
-    tags: item.medium ? [item.medium] : [],
+    tags: [],
     featured: featuredIds.has(item.id),
     images: item.images.map((image, index) => ({
       id: image.id,

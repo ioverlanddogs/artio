@@ -119,7 +119,7 @@ test("Applies tag filter correctly", async () => {
   try {
     const result = await getArtistArtworks("artist", { tag: "painting", limit: 10 });
     assert.ok(result.artworks.length > 0);
-    assert.ok(result.artworks.every((item) => item.tags.includes("painting")));
+    assert.ok(result.artworks.every((item) => item.medium === "painting"));
   } finally {
     restore();
   }

@@ -11,7 +11,7 @@ export function FeaturedWorksStrip({ artworks, onSelect }: { artworks: ArtworkSu
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="type-h3">Featured Works</h2>
-          <p className="type-caption text-red-500">Highlights from this artist</p>
+          <p className="type-caption text-muted-foreground">Highlights from this artist</p>
         </div>
       </div>
       <div className="flex snap-x gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-4 md:overflow-visible">
