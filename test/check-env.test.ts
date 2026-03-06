@@ -11,6 +11,7 @@ function runCheckEnv(extraEnv: Record<string, string | undefined>) {
       DATABASE_URL: undefined,
       DIRECT_URL: undefined,
       CRON_SECRET: undefined,
+      RESEND_API_KEY: undefined,
       NEXT_PUBLIC_MAPBOX_TOKEN: undefined,
       NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: undefined,
       VERCEL: undefined,
@@ -28,7 +29,7 @@ test("check-env skips strict checks outside deploy context", () => {
 });
 
 test("check-env requires CRON_SECRET in deploy context when vercel crons are configured", () => {
-  const result = runCheckEnv({ CI: "true", AUTH_SECRET: "a", DATABASE_URL: "postgres://db" });
+  const result = runCheckEnv({ CI: "true", AUTH_SECRET: "a", DATABASE_URL: "postgres://db", RESEND_API_KEY: "rk" });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /CRON_SECRET/);
 });
@@ -40,6 +41,7 @@ test("check-env accepts either mapbox token variable", () => {
     DATABASE_URL: "postgres://db",
     CRON_SECRET: "cron",
     NEXT_PUBLIC_MAPBOX_TOKEN: "token",
+    RESEND_API_KEY: "rk",
   });
   assert.equal(withCanonical.status, 0);
 
@@ -49,6 +51,7 @@ test("check-env accepts either mapbox token variable", () => {
     DATABASE_URL: "postgres://db",
     CRON_SECRET: "cron",
     NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: "token",
+    RESEND_API_KEY: "rk",
   });
   assert.equal(withAccessToken.status, 0);
 });

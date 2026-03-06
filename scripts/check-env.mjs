@@ -28,7 +28,7 @@ if (!shouldEnforce) {
   process.exit(0);
 }
 
-const requiredInDeploy = ["AUTH_SECRET", "DATABASE_URL"];
+const requiredInDeploy = ["AUTH_SECRET", "DATABASE_URL", "RESEND_API_KEY"];
 const optional = ["DIRECT_URL"];
 
 if (hasVercelCrons()) {

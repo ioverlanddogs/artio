@@ -28,7 +28,8 @@
     "prisma:safe-deploy": "tsx scripts/prisma-safe-deploy.ts",
     "test:node": "node scripts/run-node-tests.mjs",
     "test:node:ci": "node scripts/run-node-tests.mjs --test-reporter=spec",
-    "backfill:venue-timezones": "node scripts/backfill-venue-timezones.mjs"
+    "backfill:venue-timezones": "node scripts/backfill-venue-timezones.mjs",
+    "email:dev": "email dev --dir lib/email/templates"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.20",
@@ -58,7 +59,10 @@
     "leaflet": "^1.9.4",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2"
+    "@dnd-kit/utilities": "^3.2.2",
+    "resend": "^4.6.0",
+    "@react-email/components": "^0.5.7",
+    "react-email": "^4.0.17"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
