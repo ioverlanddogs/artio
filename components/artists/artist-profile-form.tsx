@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ImageUploader from "@/app/my/_components/ImageUploader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { buildLoginRedirectUrl } from "@/lib/auth-redirect";
 import { enqueueToast } from "@/lib/toast";
 
@@ -88,54 +90,60 @@ export function ArtistProfileForm({ initialProfile }: { initialProfile: ArtistPr
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded border p-4">
       <h2 className="text-lg font-semibold">Profile</h2>
-      <label className="block">
+      <label className="block" htmlFor="artist-name">
         <span className="text-sm">Artist name</span>
-        <input className="w-full rounded border px-2 py-1" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+        <Input id="artist-name" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
       </label>
-      <label className="block">
-        <span className="text-sm">Statement / bio</span>
-        <textarea className="w-full rounded border px-2 py-1" rows={4} value={form.bio ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">Website URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.websiteUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, websiteUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">Instagram URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.instagramUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, instagramUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">Twitter / X URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.twitterUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, twitterUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">LinkedIn URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.linkedinUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, linkedinUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">TikTok URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.tiktokUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, tiktokUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">YouTube URL</span>
-        <input className="w-full rounded border px-2 py-1" value={form.youtubeUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, youtubeUrl: e.target.value || null }))} />
-      </label>
-      <label className="block">
-        <span className="text-sm">Disciplines / mediums</span>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-bio">Statement / bio</label>
+        <textarea
+          id="artist-bio"
+          rows={4}
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          value={form.bio ?? ""}
+          onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value || null }))}
+        />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-website">Website URL</label>
+        <Input id="artist-website" value={form.websiteUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, websiteUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-instagram">Instagram URL</label>
+        <Input id="artist-instagram" value={form.instagramUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, instagramUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-twitter">Twitter / X URL</label>
+        <Input id="artist-twitter" value={form.twitterUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, twitterUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-linkedin">LinkedIn URL</label>
+        <Input id="artist-linkedin" value={form.linkedinUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, linkedinUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-tiktok">TikTok URL</label>
+        <Input id="artist-tiktok" value={form.tiktokUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, tiktokUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-youtube">YouTube URL</label>
+        <Input id="artist-youtube" value={form.youtubeUrl ?? ""} onChange={(e) => setForm((prev) => ({ ...prev, youtubeUrl: e.target.value || null }))} />
+      </div>
+      <div className="block">
+        <label className="text-sm" htmlFor="artist-disciplines">Disciplines / mediums</label>
         <span className="block text-xs text-muted-foreground">Comma-separated, e.g. &quot;Oil painting, Ceramics, Printmaking&quot;</span>
-        <input
-          className="w-full rounded border px-2 py-1"
+        <Input
+          id="artist-disciplines"
           value={mediumsDraft}
           onChange={(e) => setMediumsDraft(e.target.value)}
         />
-      </label>
+      </div>
       <ImageUploader
         label="Avatar image"
         initialUrl={form.featuredAssetUrl ?? form.avatarImageUrl}
         onUploaded={({ assetId, url }) => setForm((prev) => ({ ...prev, featuredAssetId: assetId, avatarImageUrl: null, featuredAssetUrl: url }))}
         onRemove={removeAvatarAsset}
       />
-      <button className="rounded border px-3 py-1" disabled={isSaving}>{isSaving ? "Saving..." : "Save profile"}</button>
+      <Button type="submit" size="sm" disabled={isSaving}>{isSaving ? "Saving..." : "Save profile"}</Button>
     </form>
   );
 }
