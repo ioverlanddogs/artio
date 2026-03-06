@@ -9,13 +9,32 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   try {
     await requireAdmin({ redirectOnFail: false });
     const { id } = await params;
-    const association = await db.artistEventAssociation.findUnique({ where: { id } });
+    const association = await db.artistEventAssociation.findUnique({
+      where: { id },
+      select: { id: true, artistId: true, eventId: true, role: true },
+    });
     if (!association) return apiError(404, "not_found", "Association not found");
 
-    await db.artistEventAssociation.update({
-      where: { id },
-      data: { status: "APPROVED" },
-    });
+    await db.$transaction([
+      db.artistEventAssociation.update({
+        where: { id },
+        data: { status: "APPROVED" },
+      }),
+      db.eventArtist.upsert({
+        where: {
+          eventId_artistId: {
+            eventId: association.eventId,
+            artistId: association.artistId,
+          },
+        },
+        create: {
+          eventId: association.eventId,
+          artistId: association.artistId,
+          role: association.role ?? null,
+        },
+        update: {},
+      }),
+    ]);
 
     return Response.json({ ok: true });
   } catch (error) {
