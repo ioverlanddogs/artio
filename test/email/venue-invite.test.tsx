@@ -6,8 +6,13 @@ import { renderAsync } from "./render-async";
 
 test("venue-invite email snapshot", async (t) => {
   const payload = { inviteId: "inv_42", inviteToken: "token_abc123", venueId: "ven_77", role: "Manager" };
-  const subject = getSubject(payload as never);
-  const html = await renderAsync(createElement(EmailTemplate, payload));
+  const subject = getSubject();
+  const html = await renderAsync(createElement(EmailTemplate, {
+    inviteId: payload.inviteId,
+    inviteToken: payload.inviteToken,
+    venueId: payload.venueId,
+    role: payload.role,
+  }));
 
   assert.match(subject, /invited to manage a venue/i);
   assert.match(html, /Open\ invitation/i);

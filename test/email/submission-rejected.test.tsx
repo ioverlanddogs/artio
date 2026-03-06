@@ -6,8 +6,8 @@ import { renderAsync } from "./render-async";
 
 test("submission-rejected email snapshot", async (t) => {
   const payload = { decisionReason: "Please include operating hours and a public website." };
-  const subject = getSubject(payload as never);
-  const html = await renderAsync(createElement(EmailTemplate, payload));
+  const subject = getSubject();
+  const html = await renderAsync(createElement(EmailTemplate, { decisionReason: payload.decisionReason }));
 
   assert.match(subject, /Submission\ needs\ changes/i);
   assert.match(html, /Please\ include\ operating\ hours/i);

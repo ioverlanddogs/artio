@@ -5,9 +5,9 @@ import { SubmissionSubmittedEmail as EmailTemplate, getSubject } from "@/lib/ema
 import { renderAsync } from "./render-async";
 
 test("submission-submitted email snapshot", async (t) => {
-  const payload = { submissionType: "VENUE" };
-  const subject = getSubject(payload as never);
-  const html = await renderAsync(createElement(EmailTemplate, payload));
+  const payload = { submissionType: "EVENT" as const };
+  const subject = getSubject();
+  const html = await renderAsync(createElement(EmailTemplate, { submissionType: payload.submissionType }));
 
   assert.match(subject, /Submission\ received/i);
   assert.match(html, /pending\ moderation/i);

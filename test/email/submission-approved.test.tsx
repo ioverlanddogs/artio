@@ -6,7 +6,7 @@ import { renderAsync } from "./render-async";
 
 test("submission-approved email snapshot", async (t) => {
   const payload = {};
-  const subject = getSubject(payload as never);
+  const subject = getSubject();
   const html = await renderAsync(createElement(EmailTemplate, payload));
 
   assert.match(subject, /Submission\ approved/i);
