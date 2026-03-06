@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { GetStartedEntryPoint } from "@/components/onboarding/get-started-entry-point";
 import { PageShell } from "@/components/ui/page-shell";
 import { Card } from "@/components/ui/card";
@@ -23,7 +24,16 @@ const authedTiles = [
 
 export default async function Home() {
   const user = await getSessionUser();
+  const artist = user
+    ? await db.artist.findUnique({
+        where: { userId: user.id },
+        select: { slug: true },
+      })
+    : null;
   const tiles = user ? authedTiles : publicTiles;
+  const allTiles = artist
+    ? [...tiles, { title: "My Artist Profile", description: "Manage your profile, artworks, and gallery.", href: "/my/artist" }]
+    : tiles;
   const trending = await getTrendingArtworks30({ limit: 8 });
 
   return (
@@ -34,7 +44,7 @@ export default async function Home() {
       </div>
 
       <section className="card-grid">
-        {tiles.map((tile) => (
+        {allTiles.map((tile) => (
           <Link key={tile.href} href={tile.href} className="block">
             <Card className="h-full p-5 transition ui-hover-lift ui-press">
               <h2 className="type-h3">{tile.title}</h2>
