@@ -147,7 +147,7 @@ export async function handlePostMyEventRegistrationCancel(req: NextRequest, even
     if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload");
 
     const event = await deps.findEventById(eventId);
-    if (!event || !event.slug) return apiError(404, "not_found", "Event not found");
+    if (!event) return apiError(404, "not_found", "Event not found");
 
     const cancelled = await deps.prisma.$transaction((tx) => cancelRegistrationTransaction(tx, { registrationId }));
     if (cancelled.eventId !== eventId) return apiError(404, "not_found", "Registration not found");
