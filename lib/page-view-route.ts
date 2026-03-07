@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
+import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse, requestClientIp } from "@/lib/rate-limit";
 import { isTrackableEntityType } from "@/lib/artwork-analytics";
@@ -27,8 +29,15 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function buildViewerHash(req: NextRequest) {
-  const salt = process.env.ANALYTICS_SALT;
+const getCachedSiteSettings = unstable_cache(
+  async () => db.siteSettings.findUnique({ where: { id: "default" }, select: { analyticsSalt: true } }),
+  ["site-settings"],
+  { revalidate: 30 },
+);
+
+async function buildViewerHash(req: NextRequest) {
+  const settings = await getCachedSiteSettings();
+  const salt = settings?.analyticsSalt ?? process.env.ANALYTICS_SALT;
   if (!salt) return null;
   const ip = requestClientIp(req);
   const userAgent = req.headers.get("user-agent") ?? "unknown";
@@ -53,7 +62,7 @@ export async function handleTrackPageView(req: NextRequest, deps: Deps) {
 
     const day = toUtcDay();
     const user = await deps.getSessionUser();
-    await deps.createEvent({ entityType, entityId, day, viewerHash: buildViewerHash(req), userId: user?.id ?? null });
+    await deps.createEvent({ entityType, entityId, day, viewerHash: await buildViewerHash(req), userId: user?.id ?? null });
     await deps.incrementDaily({ entityType, entityId, day });
 
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });

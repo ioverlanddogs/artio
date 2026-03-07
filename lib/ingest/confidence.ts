@@ -13,19 +13,21 @@ function clampScore(value: number): number {
   return Math.round(value);
 }
 
-function getHighMin() {
+function getHighMin(override?: number | null) {
+  if (typeof override === "number" && Number.isFinite(override)) return override;
   const parsed = Number.parseInt(process.env.AI_INGEST_CONFIDENCE_HIGH_MIN ?? "75", 10);
   return Number.isFinite(parsed) ? parsed : 75;
 }
 
-function getMediumMin() {
+function getMediumMin(override?: number | null) {
+  if (typeof override === "number" && Number.isFinite(override)) return override;
   const parsed = Number.parseInt(process.env.AI_INGEST_CONFIDENCE_MEDIUM_MIN ?? "45", 10);
   return Number.isFinite(parsed) ? parsed : 45;
 }
 
-function getBand(score: number): ConfidenceBand {
-  const highMin = getHighMin();
-  const mediumMin = getMediumMin();
+function getBand(score: number, thresholds?: { highMin?: number | null; mediumMin?: number | null }): ConfidenceBand {
+  const highMin = getHighMin(thresholds?.highMin);
+  const mediumMin = getMediumMin(thresholds?.mediumMin);
   if (score >= highMin) return "HIGH";
   if (score >= mediumMin) return "MEDIUM";
   return "LOW";
@@ -77,7 +79,7 @@ export function sanitizeReasons(reasons: string[]): string[] {
 
 export function computeConfidence(
   candidate: NormalizedExtractedEvent,
-  context: { status?: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE"; inherited?: boolean; venueName?: string | null; extractionMethod?: "json_ld" | "openai" } = {},
+  context: { status?: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE"; inherited?: boolean; venueName?: string | null; extractionMethod?: "json_ld" | "openai"; highMin?: number | null; mediumMin?: number | null } = {},
 ): { score: number; band: ConfidenceBand; reasons: string[] } {
   let score = 40;
   const reasons: string[] = ["base score"];
@@ -157,7 +159,7 @@ export function computeConfidence(
   const boundedScore = clampScore(score);
   return {
     score: boundedScore,
-    band: getBand(boundedScore),
+    band: getBand(boundedScore, { highMin: context.highMin, mediumMin: context.mediumMin }),
     reasons: sanitizeReasons(reasons),
   };
 }

@@ -27,7 +27,11 @@ export async function runVenueGenerationProcessRunJob(args: {
   const geocodeFn = args.geocodeFn ?? forwardGeocodeVenueAddressToLatLng;
   const fetchHtmlFn = args.fetchHtmlFn ?? fetchHtmlWithGuards;
   const concurrency = Math.max(1, args.concurrency ?? 5);
-  const autoPublish = process.env.VENUE_AUTO_PUBLISH === "1";
+  const settings = await appDb.siteSettings.findUnique({
+    where: { id: "default" },
+    select: { venueAutoPublish: true },
+  });
+  const autoPublish = settings?.venueAutoPublish ?? (process.env.VENUE_AUTO_PUBLISH === "1");
 
   const run = await appDb.venueGenerationRun.findUnique({ where: { id: args.runId }, select: { id: true } });
   if (!run) {

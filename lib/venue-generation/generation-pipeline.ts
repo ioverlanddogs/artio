@@ -139,6 +139,12 @@ type PipelineDb = {
   };
   venueImage: AutoSelectDb["venueImage"];
   asset: AutoSelectDb["asset"];
+  siteSettings?: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { venueGenerationModel: true };
+    }) => Promise<{ venueGenerationModel: string | null } | null>;
+  };
 };
 
 type OpenAIClient = {
@@ -442,8 +448,13 @@ export async function runVenueGenerationPhase1(args: {
   });
 
   try {
+    const settings = await args.db.siteSettings?.findUnique({
+      where: { id: "default" },
+      select: { venueGenerationModel: true },
+    });
+
     const response = await args.openai.createResponse({
-      model: args.model?.trim() || process.env.VENUE_GENERATION_MODEL?.trim() || "gpt-4o-mini",
+      model: args.model?.trim() || settings?.venueGenerationModel?.trim() || process.env.VENUE_GENERATION_MODEL?.trim() || "gpt-4o-mini",
       input: [
         { role: "system", content: "You are a cultural directory researcher. Return strict JSON only." },
         { role: "user", content: venuePrompt(args.input) },

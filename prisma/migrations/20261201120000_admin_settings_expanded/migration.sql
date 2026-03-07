@@ -1,0 +1,17 @@
+ALTER TABLE "SiteSettings"
+  ADD COLUMN "analyticsSalt" TEXT,
+  ADD COLUMN "openAiApiKey" TEXT,
+  ADD COLUMN "ingestEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "ingestMaxCandidatesPerVenueRun" INTEGER,
+  ADD COLUMN "ingestDuplicateSimilarityThreshold" INTEGER,
+  ADD COLUMN "ingestDuplicateLookbackDays" INTEGER,
+  ADD COLUMN "ingestConfidenceHighMin" INTEGER,
+  ADD COLUMN "ingestConfidenceMediumMin" INTEGER,
+  ADD COLUMN "ingestImageEnabled" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "venueGenerationModel" TEXT,
+  ADD COLUMN "venueAutoPublish" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "editorialNotifyTo" TEXT,
+  ADD COLUMN "editorialNotificationsWebhookUrl" TEXT,
+  ADD COLUMN "editorialNotificationsEmailEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "alertWebhookUrl" TEXT,
+  ADD COLUMN "alertWebhookSecret" TEXT;

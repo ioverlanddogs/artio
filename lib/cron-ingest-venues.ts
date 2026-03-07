@@ -56,6 +56,12 @@ type IngestVenueDb = {
     }) => Promise<Array<{ status?: "RUNNING" | "SUCCEEDED" | "FAILED" | "PENDING"; errorCode?: string | null; createdAt?: Date }>>;
   };
   $queryRaw?: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+  siteSettings?: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { ingestEnabled: true; ingestImageEnabled: true };
+    }) => Promise<{ ingestEnabled: boolean; ingestImageEnabled: boolean } | null>;
+  };
 };
 
 type IngestExtractionRunner = typeof runVenueIngestExtraction;
@@ -152,8 +158,14 @@ export async function runCronIngestVenues(
   }
 
   try {
+    const settings = await cronDb.siteSettings?.findUnique({
+      where: { id: "default" },
+      select: { ingestEnabled: true, ingestImageEnabled: true },
+    });
+
     return await withSpan("cron:ingest_venues", async () => {
-      if (process.env.AI_INGEST_ENABLED !== "1") {
+      const ingestEnabled = settings?.ingestEnabled ?? (process.env.AI_INGEST_ENABLED === "1");
+      if (!ingestEnabled) {
         const summary = {
           ok: true,
           cronName: CRON_NAME,
@@ -172,6 +184,8 @@ export async function runCronIngestVenues(
         await markCronSuccess(CRON_NAME, summary.finishedAt, cronRunId);
         return noStoreJson(summary);
       }
+
+      process.env.AI_INGEST_IMAGE_PREFETCH_ENABLED = (settings?.ingestImageEnabled ?? (process.env.AI_INGEST_IMAGE_PREFETCH_ENABLED === "1")) ? "1" : "0";
 
       const cbWindowStart = new Date(now() - cbWindowHours * 60 * 60 * 1000);
       const recentRuns = await cronDb.ingestRun.findMany({

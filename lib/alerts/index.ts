@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { db } from "@/lib/db";
 import { captureException, captureMessage } from "@/lib/monitoring";
 
 export type AlertPayload = {
@@ -12,8 +13,20 @@ function signatureFor(payload: string, secret: string) {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
 
+async function getAlertSettings() {
+  const settings = await db.siteSettings.findUnique({
+    where: { id: "default" },
+    select: { alertWebhookUrl: true, alertWebhookSecret: true },
+  });
+
+  return {
+    webhookUrl: settings?.alertWebhookUrl ?? process.env.ALERT_WEBHOOK_URL,
+    webhookSecret: settings?.alertWebhookSecret ?? process.env.ALERT_WEBHOOK_SECRET,
+  };
+}
+
 export async function sendAlert(payload: AlertPayload) {
-  const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+  const { webhookUrl, webhookSecret } = await getAlertSettings();
 
   if (!webhookUrl) {
     captureMessage("alert_fallback_log", { level: payload.severity, ...payload });
@@ -29,8 +42,8 @@ export async function sendAlert(payload: AlertPayload) {
     "Content-Type": "application/json",
   };
 
-  if (process.env.ALERT_WEBHOOK_SECRET) {
-    headers["x-alert-signature"] = signatureFor(body, process.env.ALERT_WEBHOOK_SECRET);
+  if (webhookSecret) {
+    headers["x-alert-signature"] = signatureFor(body, webhookSecret);
   }
 
   try {

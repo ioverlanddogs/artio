@@ -9,8 +9,6 @@ type PaymentsSettingsProps = {
     stripeSecretKeySet: boolean;
     stripeWebhookSecretSet: boolean;
     platformFeePercent: number;
-    googleIndexingEnabled: boolean;
-    googleServiceAccountJsonSet: boolean;
   };
 };
 
@@ -19,8 +17,6 @@ export default function PaymentsSettingsClient(props: PaymentsSettingsProps) {
   const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState("");
   const [platformFeePercent, setPlatformFeePercent] = useState(String(props.initial.platformFeePercent));
-  const [googleIndexingEnabled, setGoogleIndexingEnabled] = useState(Boolean(props.initial.googleIndexingEnabled));
-  const [googleServiceAccountJson, setGoogleServiceAccountJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,8 +35,6 @@ export default function PaymentsSettingsClient(props: PaymentsSettingsProps) {
           Number.isInteger(parsedPlatformFeePercent) && parsedPlatformFeePercent >= 1 && parsedPlatformFeePercent <= 100
             ? parsedPlatformFeePercent
             : null,
-        googleIndexingEnabled,
-        googleServiceAccountJson: googleServiceAccountJson.trim() || null,
       };
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
@@ -56,7 +50,6 @@ export default function PaymentsSettingsClient(props: PaymentsSettingsProps) {
       setStatus("saved");
       setStripeSecretKey("");
       setStripeWebhookSecret("");
-      setGoogleServiceAccountJson("");
     } finally {
       setSaving(false);
     }
@@ -147,44 +140,6 @@ export default function PaymentsSettingsClient(props: PaymentsSettingsProps) {
       </div>
 
 
-      <div className="space-y-3 rounded-md border border-border p-3">
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold">SEO &amp; Syndication</h3>
-          <p className="text-xs text-muted-foreground">Configure Google Event indexing for published event URLs.</p>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm" htmlFor="google-indexing-enabled">
-          <input
-            id="google-indexing-enabled"
-            type="checkbox"
-            checked={googleIndexingEnabled}
-            onChange={(e) => {
-              setGoogleIndexingEnabled(e.target.checked);
-              setStatus("idle");
-            }}
-            disabled={saving}
-          />
-          Enable Google indexing API submissions
-        </label>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium" htmlFor="google-service-account-json">
-            Google Service Account JSON
-          </label>
-          <textarea
-            id="google-service-account-json"
-            className="min-h-36 w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            value={googleServiceAccountJson}
-            onChange={(e) => {
-              setGoogleServiceAccountJson(e.target.value);
-              setStatus("idle");
-            }}
-            placeholder={props.initial.googleServiceAccountJsonSet ? '{ "type": "service_account", ... } (stored)' : '{ "type": "service_account", ... }'}
-            disabled={saving}
-            autoComplete="off"
-          />
-        </div>
-      </div>
       <div className="flex items-center gap-3 pt-2">
         <Button onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save settings"}

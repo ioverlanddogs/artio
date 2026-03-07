@@ -80,16 +80,20 @@ function fingerprintForCandidate(params: { venueId: string; title: string; start
   return createHash("sha256").update(signature).digest("hex");
 }
 
-function getMaxCandidatesPerVenueRun() {
-  const parsed = Number.parseInt(process.env.AI_INGEST_MAX_CANDIDATES_PER_VENUE_RUN ?? "", 10);
+function envInt(name: string, fallback: number) {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
   if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  return DEFAULT_MAX_CANDIDATES_PER_RUN;
+  return fallback;
 }
 
-function getDuplicateLookbackDays() {
-  const parsed = Number.parseInt(process.env.AI_INGEST_DUPLICATE_LOOKBACK_DAYS ?? "", 10);
-  if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  return DEFAULT_DUPLICATE_LOOKBACK_DAYS;
+function getMaxCandidatesPerVenueRun(override?: number | null) {
+  if (typeof override === "number" && Number.isFinite(override) && override > 0) return override;
+  return envInt("AI_INGEST_MAX_CANDIDATES_PER_VENUE_RUN", DEFAULT_MAX_CANDIDATES_PER_RUN);
+}
+
+function getDuplicateLookbackDays(override?: number | null) {
+  if (typeof override === "number" && Number.isFinite(override) && override > 0) return override;
+  return envInt("AI_INGEST_DUPLICATE_LOOKBACK_DAYS", DEFAULT_DUPLICATE_LOOKBACK_DAYS);
 }
 
 function getDefaultDurationMinutes() {
@@ -255,6 +259,23 @@ export async function runVenueIngestExtraction(
       },
     });
 
+    const settings = await store.siteSettings.findUnique({
+      where: { id: "default" },
+      select: {
+        ingestSystemPrompt: true,
+        ingestModel: true,
+        ingestMaxOutputTokens: true,
+        openAiApiKey: true,
+        ingestEnabled: true,
+        ingestMaxCandidatesPerVenueRun: true,
+        ingestDuplicateSimilarityThreshold: true,
+        ingestDuplicateLookbackDays: true,
+        ingestConfidenceHighMin: true,
+        ingestConfidenceMediumMin: true,
+        ingestImageEnabled: true,
+      },
+    });
+
     const jsonLdResult = extractJsonLd(fetched.html, fetched.finalUrl);
 
     let normalized: NormalizedExtractedEvent[];
@@ -272,24 +293,16 @@ export async function runVenueIngestExtraction(
         venueLng: venue?.lng ?? null,
       }));
     } else {
-      if (process.env.AI_INGEST_ENABLED !== "1") {
+      if (!(settings?.ingestEnabled ?? (process.env.AI_INGEST_ENABLED === "1"))) {
         await markRunFailed(store, run.id, startedAtMs, "INGEST_DISABLED", "AI ingest is disabled");
         return { runId: run.id, createdCount: 0, dedupedCount: 0, createdDuplicateCount: 0, stopReason: null };
       }
 
-      if (!process.env.OPENAI_API_KEY) {
+      const openAiApiKey = settings?.openAiApiKey ?? process.env.OPENAI_API_KEY;
+      if (!openAiApiKey) {
         await markRunFailed(store, run.id, startedAtMs, "MISSING_OPENAI_KEY", "OPENAI_API_KEY is not configured");
         return { runId: run.id, createdCount: 0, dedupedCount: 0, createdDuplicateCount: 0, stopReason: null };
       }
-
-      const settings = await store.siteSettings.findUnique({
-        where: { id: "default" },
-        select: {
-          ingestSystemPrompt: true,
-          ingestModel: true,
-          ingestMaxOutputTokens: true,
-        },
-      });
 
       const extracted = await extractWithOpenAI({
         html: fetched.html,
@@ -298,6 +311,7 @@ export async function runVenueIngestExtraction(
         systemPromptOverride: settings?.ingestSystemPrompt ?? null,
         modelOverride: settings?.ingestModel ?? null,
         maxOutputTokensOverride: settings?.ingestMaxOutputTokens ?? null,
+        openAiApiKeyOverride: openAiApiKey,
         platformHint: getPlatformPromptHint(detectedPlatform),
         venueContext: venue
           ? {
@@ -318,7 +332,7 @@ export async function runVenueIngestExtraction(
       extractedVenueSnapshot = extracted.venueSnapshot;
     }
     const totalCandidatesReturned = normalized.length;
-    const maxCandidates = getMaxCandidatesPerVenueRun();
+    const maxCandidates = getMaxCandidatesPerVenueRun(settings?.ingestMaxCandidatesPerVenueRun);
     const cappedCandidates = normalized.slice(0, maxCandidates);
     const stopReason = totalCandidatesReturned > maxCandidates ? CANDIDATE_CAP_STOP_REASON : null;
 
@@ -369,7 +383,7 @@ export async function runVenueIngestExtraction(
 
     const assignmentById = new Map(clustered.assignments.map((assignment) => [assignment.id, assignment]));
 
-    const lookbackStart = new Date(now() - getDuplicateLookbackDays() * 24 * 60 * 60 * 1000);
+    const lookbackStart = new Date(now() - getDuplicateLookbackDays(settings?.ingestDuplicateLookbackDays) * 24 * 60 * 60 * 1000);
     const historicalPrimaries = await store.ingestExtractedEvent.findMany({
       where: {
         venueId: params.venueId,
@@ -408,7 +422,7 @@ export async function runVenueIngestExtraction(
         }
       }
 
-      const threshold = Number.parseInt(process.env.AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD ?? "85", 10) || 85;
+      const threshold = settings?.ingestDuplicateSimilarityThreshold ?? envInt("AI_INGEST_DUPLICATE_SIMILARITY_THRESHOLD", 85);
       if (best && best.score >= threshold) {
         historicalLinkByTempId.set(candidate.tempId, { duplicateOfId: best.id, similarityScore: best.score });
       }
@@ -437,6 +451,8 @@ export async function runVenueIngestExtraction(
         status: "PENDING",
         venueName: venue?.name,
         extractionMethod,
+        highMin: settings?.ingestConfidenceHighMin ?? envInt("AI_INGEST_CONFIDENCE_HIGH_MIN", 75),
+        mediumMin: settings?.ingestConfidenceMediumMin ?? envInt("AI_INGEST_CONFIDENCE_MEDIUM_MIN", 45),
       });
       confidenceByTempId.set(candidate.tempId, confidence);
 
@@ -470,7 +486,7 @@ export async function runVenueIngestExtraction(
       createdCount += 1;
     }
 
-    if (process.env.AI_INGEST_IMAGE_PREFETCH_ENABLED === "1") {
+    if (settings?.ingestImageEnabled ?? (process.env.AI_INGEST_IMAGE_PREFETCH_ENABLED === "1")) {
       const prefetchTasks = candidates
         .filter((candidate) => {
           const assignment = assignmentById.get(candidate.tempId);
@@ -530,6 +546,8 @@ export async function runVenueIngestExtraction(
           status: "DUPLICATE",
           venueName: venue?.name,
           extractionMethod,
+          highMin: settings?.ingestConfidenceHighMin ?? envInt("AI_INGEST_CONFIDENCE_HIGH_MIN", 75),
+          mediumMin: settings?.ingestConfidenceMediumMin ?? envInt("AI_INGEST_CONFIDENCE_MEDIUM_MIN", 45),
         });
 
       const rawJson: Prisma.JsonObject = {
