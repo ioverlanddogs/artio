@@ -14,6 +14,10 @@ const patchSchema = z.object({
   emailFromAddress: z.string().max(200).nullable().optional(),
   resendApiKey: z.string().max(500).nullable().optional(),
   resendFromAddress: z.string().max(200).nullable().optional(),
+  stripePublishableKey: z.string().max(500).nullable().optional(),
+  stripeSecretKey: z.string().max(500).nullable().optional(),
+  stripeWebhookSecret: z.string().max(500).nullable().optional(),
+  platformFeePercent: z.number().int().min(1).max(100).optional(),
   emailOutboxBatchSize: z.number().int().min(1).max(100).nullable().optional(),
 });
 
@@ -31,6 +35,10 @@ export async function handleAdminSettingsGet(_req: Request, deps: {
       emailFromAddress: settings.emailFromAddress,
       resendApiKey: settings.resendApiKey,
       resendFromAddress: settings.resendFromAddress,
+      stripePublishableKey: settings.stripePublishableKey,
+      stripeSecretKeySet: Boolean(settings.stripeSecretKey),
+      stripeWebhookSecretSet: Boolean(settings.stripeWebhookSecret),
+      platformFeePercent: settings.platformFeePercent,
       emailOutboxBatchSize: settings.emailOutboxBatchSize,
     });
   }, { requireAdminFn: deps.requireAdminFn });
@@ -55,6 +63,10 @@ export async function handleAdminSettingsPatch(req: Request, deps: {
         emailFromAddress: updated.emailFromAddress,
         resendApiKey: updated.resendApiKey,
         resendFromAddress: updated.resendFromAddress,
+        stripePublishableKey: updated.stripePublishableKey,
+        stripeSecretKeySet: Boolean(updated.stripeSecretKey),
+        stripeWebhookSecretSet: Boolean(updated.stripeWebhookSecret),
+        platformFeePercent: updated.platformFeePercent,
         emailOutboxBatchSize: updated.emailOutboxBatchSize,
       },
     });

@@ -206,6 +206,13 @@ enum BetaAccessRequestStatus {
   DENIED
 }
 
+enum StripeAccountStatus {
+  PENDING
+  ACTIVE
+  RESTRICTED
+  DEAUTHORIZED
+}
+
 enum AnalyticsEntityType {
   ARTWORK
   ARTIST
@@ -405,6 +412,7 @@ model Venue {
   claimRequests      VenueClaimRequest[]
   generationRunItems VenueGenerationRunItem[]
   homepageImageCandidates VenueHomepageImageCandidate[]
+  stripeAccount      StripeAccount?
 
   @@index([isPublished])
   @@index([status])
@@ -1126,6 +1134,10 @@ model SiteSettings {
   emailFromAddress String?
   resendApiKey String?
   resendFromAddress String?
+  stripePublishableKey String?
+  stripeSecretKey String?
+  stripeWebhookSecret String?
+  platformFeePercent Int @default(5)
   emailOutboxBatchSize Int?
   ingestSystemPrompt String?
   ingestModel String?
@@ -1134,6 +1146,20 @@ model SiteSettings {
   createdAt   DateTime @default(now())
 
   @@index([logoAssetId])
+}
+
+model StripeAccount {
+  id               String              @id @default(uuid()) @db.Uuid
+  venueId          String              @unique @db.Uuid
+  stripeAccountId  String              @unique
+  status           StripeAccountStatus @default(PENDING)
+  chargesEnabled   Boolean             @default(false)
+  payoutsEnabled   Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  venue            Venue               @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([stripeAccountId])
 }
 
 model Artwork {

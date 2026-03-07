@@ -10,6 +10,10 @@ export async function updateSiteSettings(data: {
   emailFromAddress?: string | null;
   resendApiKey?: string | null;
   resendFromAddress?: string | null;
+  stripePublishableKey?: string | null;
+  stripeSecretKey?: string | null;
+  stripeWebhookSecret?: string | null;
+  platformFeePercent?: number;
   emailOutboxBatchSize?: number | null;
 }) {
   return db.siteSettings.upsert({
