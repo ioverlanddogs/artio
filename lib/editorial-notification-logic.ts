@@ -13,6 +13,12 @@ type CollectionRow = {
 };
 
 type RecipientDb = {
+  siteSettings?: {
+    findUnique: (args: {
+      where: { id: string };
+      select: Record<string, true>;
+    }) => Promise<{ editorialNotifyTo: string | null } | null>;
+  };
   user: {
     findMany: (args: {
       where: { role: "ADMIN"; email: { not: null } };
@@ -44,7 +50,12 @@ function utcDateStamp(date: Date) {
 }
 
 export async function resolveEditorialNotificationRecipients(db: RecipientDb) {
-  const override = (process.env.EDITORIAL_NOTIFY_TO ?? "")
+  const settings = await db.siteSettings?.findUnique({
+    where: { id: "default" },
+    select: { editorialNotifyTo: true },
+  });
+
+  const override = (settings?.editorialNotifyTo ?? process.env.EDITORIAL_NOTIFY_TO ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);

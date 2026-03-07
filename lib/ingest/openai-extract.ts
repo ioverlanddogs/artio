@@ -191,8 +191,9 @@ export async function extractEventsWithOpenAI(params: {
     address: string | null;
   };
   _preprocessHtml?: (html: string) => string;
+  openAiApiKeyOverride?: string | null;
 }): Promise<{ model: string; events: ExtractedEvent[]; venueSnapshot: VenueSnapshot; raw: unknown; usage?: ExtractUsage }> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = params.openAiApiKeyOverride ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new IngestError("FETCH_FAILED", "OPENAI_API_KEY is required for extraction");
   }

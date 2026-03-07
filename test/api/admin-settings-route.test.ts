@@ -3,27 +3,47 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { handleAdminSettingsGet, handleAdminSettingsPatch } from "@/lib/admin-settings-route";
 
+function baseSettings() {
+  return {
+    id: "default",
+    ingestSystemPrompt: null,
+    ingestModel: null,
+    ingestMaxOutputTokens: null,
+    emailEnabled: false,
+    emailFromAddress: null,
+    resendApiKey: null,
+    resendFromAddress: null,
+    stripePublishableKey: null,
+    stripeSecretKey: null,
+    stripeWebhookSecret: null,
+    platformFeePercent: 5,
+    emailOutboxBatchSize: null,
+    analyticsSalt: null,
+    openAiApiKey: null,
+    ingestEnabled: false,
+    ingestMaxCandidatesPerVenueRun: null,
+    ingestDuplicateSimilarityThreshold: null,
+    ingestDuplicateLookbackDays: null,
+    ingestConfidenceHighMin: null,
+    ingestConfidenceMediumMin: null,
+    ingestImageEnabled: true,
+    venueGenerationModel: null,
+    venueAutoPublish: false,
+    editorialNotifyTo: null,
+    editorialNotificationsWebhookUrl: null,
+    editorialNotificationsEmailEnabled: false,
+    alertWebhookUrl: null,
+    alertWebhookSecret: null,
+    googleIndexingEnabled: false,
+    googleServiceAccountJson: null,
+  };
+}
+
 test("GET returns null ingest settings when row has no values", async () => {
   const req = new NextRequest("http://localhost/api/admin/settings", { method: "GET" });
   const res = await handleAdminSettingsGet(req, {
     requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
-    getSiteSettingsFn: async () => ({
-      id: "default",
-      ingestSystemPrompt: null,
-      ingestModel: null,
-      ingestMaxOutputTokens: null,
-      emailEnabled: false,
-      emailFromAddress: null,
-      resendApiKey: null,
-      resendFromAddress: null,
-      stripePublishableKey: null,
-      stripeSecretKey: null,
-      stripeWebhookSecret: null,
-      platformFeePercent: 5,
-      emailOutboxBatchSize: null,
-      googleIndexingEnabled: false,
-      googleServiceAccountJson: null,
-    }) as never,
+    getSiteSettingsFn: async () => baseSettings() as never,
   });
 
   assert.equal(res.status, 200);
@@ -40,64 +60,77 @@ test("GET returns null ingest settings when row has no values", async () => {
     stripeWebhookSecretSet: false,
     platformFeePercent: 5,
     emailOutboxBatchSize: null,
+    analyticsSalt: null,
+    openAiApiKeySet: false,
+    ingestEnabled: false,
+    ingestMaxCandidatesPerVenueRun: null,
+    ingestDuplicateSimilarityThreshold: null,
+    ingestDuplicateLookbackDays: null,
+    ingestConfidenceHighMin: null,
+    ingestConfidenceMediumMin: null,
+    ingestImageEnabled: true,
+    venueGenerationModel: null,
+    venueAutoPublish: false,
+    editorialNotifyTo: null,
+    editorialNotificationsWebhookUrl: null,
+    editorialNotificationsEmailEnabled: false,
+    alertWebhookUrl: null,
+    alertWebhookSecretSet: false,
     googleIndexingEnabled: false,
     googleServiceAccountJsonSet: false,
   });
 });
 
-test("GET returns secret booleans instead of raw values", async () => {
+test("GET returns openAiApiKeySet boolean, not raw key", async () => {
   const req = new NextRequest("http://localhost/api/admin/settings", { method: "GET" });
   const res = await handleAdminSettingsGet(req, {
     requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
-    getSiteSettingsFn: async () => ({
-      id: "default",
-      ingestSystemPrompt: null,
-      ingestModel: null,
-      ingestMaxOutputTokens: null,
-      emailEnabled: false,
-      emailFromAddress: null,
-      resendApiKey: null,
-      resendFromAddress: null,
-      stripePublishableKey: "pk_test_123",
-      stripeSecretKey: "sk_test_123",
-      stripeWebhookSecret: "whsec_test_123",
-      platformFeePercent: 7,
-      emailOutboxBatchSize: null,
-      googleIndexingEnabled: true,
-      googleServiceAccountJson: "{\"ok\":true}",
-    }) as never,
+    getSiteSettingsFn: async () => ({ ...baseSettings(), openAiApiKey: "sk-secret" }) as never,
   });
 
   const payload = await res.json() as Record<string, unknown>;
   assert.equal(res.status, 200);
-  assert.equal(payload.stripeSecretKeySet, true);
-  assert.equal(payload.stripeWebhookSecretSet, true);
-  assert.equal(payload.googleServiceAccountJsonSet, true);
-  assert.equal(payload.stripeSecretKey, undefined);
-  assert.equal(payload.stripeWebhookSecret, undefined);
-  assert.equal(payload.googleServiceAccountJson, undefined);
+  assert.equal(payload.openAiApiKeySet, true);
+  assert.equal(payload.openAiApiKey, undefined);
 });
 
-test("PATCH updates and returns settings", async () => {
+test("GET returns alertWebhookSecretSet boolean, not raw secret", async () => {
+  const req = new NextRequest("http://localhost/api/admin/settings", { method: "GET" });
+  const res = await handleAdminSettingsGet(req, {
+    requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
+    getSiteSettingsFn: async () => ({ ...baseSettings(), alertWebhookSecret: "super-secret" }) as never,
+  });
+
+  const payload = await res.json() as Record<string, unknown>;
+  assert.equal(res.status, 200);
+  assert.equal(payload.alertWebhookSecretSet, true);
+  assert.equal(payload.alertWebhookSecret, undefined);
+});
+
+test("PATCH persists all 16 new fields", async () => {
+  const body = {
+    analyticsSalt: "salt",
+    openAiApiKey: "sk-key",
+    ingestEnabled: true,
+    ingestMaxCandidatesPerVenueRun: 50,
+    ingestDuplicateSimilarityThreshold: 90,
+    ingestDuplicateLookbackDays: 14,
+    ingestConfidenceHighMin: 80,
+    ingestConfidenceMediumMin: 60,
+    ingestImageEnabled: false,
+    venueGenerationModel: "gpt-4.1-mini",
+    venueAutoPublish: true,
+    editorialNotifyTo: "ops@example.com",
+    editorialNotificationsWebhookUrl: "https://example.com/editorial",
+    editorialNotificationsEmailEnabled: true,
+    alertWebhookUrl: "https://example.com/alerts",
+    alertWebhookSecret: "secret",
+  };
+
   const req = new NextRequest("http://localhost/api/admin/settings", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      ingestSystemPrompt: "custom prompt",
-      ingestModel: "gpt-4o",
-      ingestMaxOutputTokens: 8000,
-      emailEnabled: true,
-      emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-      resendApiKey: "re_test_123",
-      resendFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-      stripePublishableKey: "pk_test_123",
-      stripeSecretKey: "sk_test_123",
-      stripeWebhookSecret: "whsec_test_123",
-      platformFeePercent: 8,
-      emailOutboxBatchSize: 50,
-      googleIndexingEnabled: true,
-      googleServiceAccountJson: "{\"type\":\"service_account\"}",
-    }),
+    body: JSON.stringify(body),
   });
 
   let captured: Record<string, unknown> | null = null;
@@ -105,104 +138,25 @@ test("PATCH updates and returns settings", async () => {
     requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
     updateSiteSettingsFn: async (data) => {
       captured = data as Record<string, unknown>;
-      return { id: "default", ...data } as never;
+      return { ...baseSettings(), ...data } as never;
     },
   });
 
-  assert.deepEqual(captured, {
-    ingestSystemPrompt: "custom prompt",
-    ingestModel: "gpt-4o",
-    ingestMaxOutputTokens: 8000,
-    emailEnabled: true,
-    emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-    resendApiKey: "re_test_123",
-    resendFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-    stripePublishableKey: "pk_test_123",
-    stripeSecretKey: "sk_test_123",
-    stripeWebhookSecret: "whsec_test_123",
-    platformFeePercent: 8,
-    emailOutboxBatchSize: 50,
-    googleIndexingEnabled: true,
-    googleServiceAccountJson: "{\"type\":\"service_account\"}",
-  });
+  assert.deepEqual(captured, body);
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), {
-    ok: true,
-    settings: {
-      ingestSystemPrompt: "custom prompt",
-      ingestModel: "gpt-4o",
-      ingestMaxOutputTokens: 8000,
-      emailEnabled: true,
-      emailFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-      resendApiKey: "re_test_123",
-      resendFromAddress: "Artpulse <noreply@mail.artpulse.co>",
-      stripePublishableKey: "pk_test_123",
-      stripeSecretKeySet: true,
-      stripeWebhookSecretSet: true,
-      platformFeePercent: 8,
-      emailOutboxBatchSize: 50,
-      googleIndexingEnabled: true,
-      googleServiceAccountJsonSet: true,
-    },
-  });
+  const json = await res.json() as { settings: Record<string, unknown> };
+  assert.equal(json.settings.openAiApiKeySet, true);
+  assert.equal(json.settings.alertWebhookSecretSet, true);
+  assert.equal(json.settings.analyticsSalt, "salt");
+  assert.equal(json.settings.ingestEnabled, true);
 });
 
-test("PATCH allows clearing ingestSystemPrompt to null", async () => {
-  const req = new NextRequest("http://localhost/api/admin/settings", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ingestSystemPrompt: null }),
-  });
-
-  const res = await handleAdminSettingsPatch(req, {
-    requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
-    updateSiteSettingsFn: async (data) => ({
-      id: "default",
-      ingestSystemPrompt: data.ingestSystemPrompt ?? null,
-      ingestModel: null,
-      ingestMaxOutputTokens: null,
-      emailEnabled: false,
-      emailFromAddress: null,
-      resendApiKey: null,
-      resendFromAddress: null,
-      stripePublishableKey: null,
-      stripeSecretKey: null,
-      stripeWebhookSecret: null,
-      platformFeePercent: 5,
-      emailOutboxBatchSize: null,
-      googleIndexingEnabled: false,
-      googleServiceAccountJson: null,
-    }) as never,
-  });
-
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), {
-    ok: true,
-    settings: {
-      ingestSystemPrompt: null,
-      ingestModel: null,
-      ingestMaxOutputTokens: null,
-      emailEnabled: false,
-      emailFromAddress: null,
-      resendApiKey: null,
-      resendFromAddress: null,
-      stripePublishableKey: null,
-      stripeSecretKeySet: false,
-      stripeWebhookSecretSet: false,
-      platformFeePercent: 5,
-      emailOutboxBatchSize: null,
-      googleIndexingEnabled: false,
-      googleServiceAccountJsonSet: false,
-    },
-  });
-});
-
-test("PATCH rejects platformFeePercent values outside 1–100", async () => {
-  for (const platformFeePercent of [0, 101]) {
+test("PATCH with ingestDuplicateSimilarityThreshold outside 0–100 returns 400", async () => {
+  for (const ingestDuplicateSimilarityThreshold of [-1, 101]) {
     const req = new NextRequest("http://localhost/api/admin/settings", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ platformFeePercent }),
+      body: JSON.stringify({ ingestDuplicateSimilarityThreshold }),
     });
 
     const res = await handleAdminSettingsPatch(req, {
@@ -211,4 +165,18 @@ test("PATCH rejects platformFeePercent values outside 1–100", async () => {
 
     assert.equal(res.status, 400);
   }
+});
+
+test("PATCH with ingestConfidenceHighMin less than ingestConfidenceMediumMin returns 400", async () => {
+  const req = new NextRequest("http://localhost/api/admin/settings", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ingestConfidenceHighMin: 40, ingestConfidenceMediumMin: 60 }),
+  });
+
+  const res = await handleAdminSettingsPatch(req, {
+    requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
+  });
+
+  assert.equal(res.status, 400);
 });

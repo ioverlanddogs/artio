@@ -1175,6 +1175,22 @@ model SiteSettings {
   ingestSystemPrompt String?
   ingestModel String?
   ingestMaxOutputTokens Int?
+  analyticsSalt String?
+  openAiApiKey String?
+  ingestEnabled Boolean @default(false)
+  ingestMaxCandidatesPerVenueRun Int?
+  ingestDuplicateSimilarityThreshold Int?
+  ingestDuplicateLookbackDays Int?
+  ingestConfidenceHighMin Int?
+  ingestConfidenceMediumMin Int?
+  ingestImageEnabled Boolean @default(true)
+  venueGenerationModel String?
+  venueAutoPublish Boolean @default(false)
+  editorialNotifyTo String?
+  editorialNotificationsWebhookUrl String?
+  editorialNotificationsEmailEnabled Boolean @default(false)
+  alertWebhookUrl String?
+  alertWebhookSecret String?
   googleServiceAccountJson String?
   googleIndexingEnabled Boolean @default(false)
   updatedAt   DateTime @updatedAt

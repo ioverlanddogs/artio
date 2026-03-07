@@ -29,6 +29,12 @@ type CronDb = {
   };
   $transaction: <T>(input: Promise<T>[]) => Promise<T[]>;
   $queryRaw?: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+  siteSettings?: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { editorialNotificationsWebhookUrl: true; editorialNotificationsEmailEnabled: true; editorialNotifyTo: true };
+    }) => Promise<{ editorialNotificationsWebhookUrl: string | null; editorialNotificationsEmailEnabled: boolean; editorialNotifyTo: string | null } | null>;
+  };
 };
 
 export async function runEditorialNotificationsCron(
@@ -39,7 +45,7 @@ export async function runEditorialNotificationsCron(
   deps: {
     computeCandidates?: typeof computeEditorialNotificationCandidates;
     resolveRecipients?: typeof resolveEditorialNotificationRecipients;
-    sink?: ReturnType<typeof getEditorialNotificationSink>;
+    sink?: Awaited<ReturnType<typeof getEditorialNotificationSink>>;
     logAdminActionFn?: typeof logAdminAction;
   } = {},
 ) {
@@ -56,15 +62,15 @@ export async function runEditorialNotificationsCron(
   }
 
   try {
-    const recipients = await (deps.resolveRecipients ?? resolveEditorialNotificationRecipients)(cronDb);
-    const candidates = await (deps.computeCandidates ?? computeEditorialNotificationCandidates)(now, cronDb);
+    const recipients = await (deps.resolveRecipients ?? resolveEditorialNotificationRecipients)(cronDb as any);
+    const candidates = await (deps.computeCandidates ?? computeEditorialNotificationCandidates)(now, cronDb as any);
     const details: Array<{ fingerprint: string; kind: string; status: "sent" | "skipped_already_sent" | "dry_run" | "skipped_no_recipients" }> = [];
 
     if (recipients.length === 0) {
       return Response.json({ ok: true, cronName: "editorial_notifications", cronRunId, dryRun, sent: 0, skipped: candidates.length, details: candidates.map((c) => ({ fingerprint: c.fingerprint, kind: c.kind, status: "skipped_no_recipients" })) });
     }
 
-    const sink = deps.sink ?? getEditorialNotificationSink();
+    const sink = deps.sink ?? await getEditorialNotificationSink(cronDb as any);
     let sent = 0;
     let skipped = 0;
 

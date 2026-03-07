@@ -9,6 +9,15 @@ export interface NotificationSink {
   send(input: EditorialNotificationMessage): Promise<void>;
 }
 
+type SiteSettingsReader = {
+  siteSettings?: {
+    findUnique: (args: {
+      where: { id: string };
+      select: Record<string, true>;
+    }) => Promise<{ editorialNotificationsWebhookUrl: string | null; editorialNotificationsEmailEnabled: boolean } | null>;
+  };
+};
+
 class LogSink implements NotificationSink {
   async send(input: EditorialNotificationMessage): Promise<void> {
     console.log(JSON.stringify({
@@ -52,10 +61,14 @@ class CompositeSink implements NotificationSink {
   }
 }
 
-export function getEditorialNotificationSink(): NotificationSink {
+export async function getEditorialNotificationSink(db?: SiteSettingsReader): Promise<NotificationSink> {
   const logSink = new LogSink();
-  const webhookUrl = process.env.EDITORIAL_NOTIFICATIONS_WEBHOOK_URL?.trim();
-  const emailEnabled = (process.env.EDITORIAL_NOTIFICATIONS_EMAIL_ENABLED ?? "false").toLowerCase() === "true";
+  const settings = await db?.siteSettings?.findUnique({
+    where: { id: "default" },
+    select: { editorialNotificationsWebhookUrl: true, editorialNotificationsEmailEnabled: true },
+  });
+  const webhookUrl = settings?.editorialNotificationsWebhookUrl?.trim() || process.env.EDITORIAL_NOTIFICATIONS_WEBHOOK_URL?.trim();
+  const emailEnabled = settings?.editorialNotificationsEmailEnabled ?? (process.env.EDITORIAL_NOTIFICATIONS_EMAIL_ENABLED ?? "false").toLowerCase() === "true";
 
   if (webhookUrl) {
     return new CompositeSink([logSink, new WebhookSink(webhookUrl)]);

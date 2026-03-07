@@ -15,6 +15,22 @@ export async function updateSiteSettings(data: {
   stripeWebhookSecret?: string | null;
   platformFeePercent?: number;
   emailOutboxBatchSize?: number | null;
+  analyticsSalt?: string | null;
+  openAiApiKey?: string | null;
+  ingestEnabled?: boolean;
+  ingestMaxCandidatesPerVenueRun?: number | null;
+  ingestDuplicateSimilarityThreshold?: number | null;
+  ingestDuplicateLookbackDays?: number | null;
+  ingestConfidenceHighMin?: number | null;
+  ingestConfidenceMediumMin?: number | null;
+  ingestImageEnabled?: boolean;
+  venueGenerationModel?: string | null;
+  venueAutoPublish?: boolean;
+  editorialNotifyTo?: string | null;
+  editorialNotificationsWebhookUrl?: string | null;
+  editorialNotificationsEmailEnabled?: boolean;
+  alertWebhookUrl?: string | null;
+  alertWebhookSecret?: string | null;
   googleServiceAccountJson?: string | null;
   googleIndexingEnabled?: boolean;
 }) {

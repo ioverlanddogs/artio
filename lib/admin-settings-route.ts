@@ -19,8 +19,36 @@ const patchSchema = z.object({
   stripeWebhookSecret: z.string().max(500).nullable().optional(),
   platformFeePercent: z.number().int().min(1).max(100).optional(),
   emailOutboxBatchSize: z.number().int().min(1).max(100).nullable().optional(),
+  analyticsSalt: z.string().max(500).nullable().optional(),
+  openAiApiKey: z.string().max(500).nullable().optional(),
+  ingestEnabled: z.boolean().optional(),
+  ingestMaxCandidatesPerVenueRun: z.number().int().positive().nullable().optional(),
+  ingestDuplicateSimilarityThreshold: z.number().int().min(0).max(100).nullable().optional(),
+  ingestDuplicateLookbackDays: z.number().int().positive().nullable().optional(),
+  ingestConfidenceHighMin: z.number().int().min(0).max(100).nullable().optional(),
+  ingestConfidenceMediumMin: z.number().int().min(0).max(100).nullable().optional(),
+  ingestImageEnabled: z.boolean().optional(),
+  venueGenerationModel: z.string().max(100).nullable().optional(),
+  venueAutoPublish: z.boolean().optional(),
+  editorialNotifyTo: z.string().max(500).nullable().optional(),
+  editorialNotificationsWebhookUrl: z.string().url().max(500).nullable().optional(),
+  editorialNotificationsEmailEnabled: z.boolean().optional(),
+  alertWebhookUrl: z.string().url().max(500).nullable().optional(),
+  alertWebhookSecret: z.string().max(500).nullable().optional(),
   googleServiceAccountJson: z.string().max(100000).nullable().optional(),
   googleIndexingEnabled: z.boolean().optional(),
+}).superRefine((data, ctx) => {
+  if (
+    data.ingestConfidenceHighMin != null
+    && data.ingestConfidenceMediumMin != null
+    && data.ingestConfidenceHighMin <= data.ingestConfidenceMediumMin
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["ingestConfidenceHighMin"],
+      message: "ingestConfidenceHighMin must be greater than ingestConfidenceMediumMin",
+    });
+  }
 });
 
 export async function handleAdminSettingsGet(_req: Request, deps: {
@@ -42,6 +70,22 @@ export async function handleAdminSettingsGet(_req: Request, deps: {
       stripeWebhookSecretSet: Boolean(settings.stripeWebhookSecret),
       platformFeePercent: settings.platformFeePercent,
       emailOutboxBatchSize: settings.emailOutboxBatchSize,
+      analyticsSalt: settings.analyticsSalt,
+      openAiApiKeySet: Boolean(settings.openAiApiKey),
+      ingestEnabled: settings.ingestEnabled,
+      ingestMaxCandidatesPerVenueRun: settings.ingestMaxCandidatesPerVenueRun,
+      ingestDuplicateSimilarityThreshold: settings.ingestDuplicateSimilarityThreshold,
+      ingestDuplicateLookbackDays: settings.ingestDuplicateLookbackDays,
+      ingestConfidenceHighMin: settings.ingestConfidenceHighMin,
+      ingestConfidenceMediumMin: settings.ingestConfidenceMediumMin,
+      ingestImageEnabled: settings.ingestImageEnabled,
+      venueGenerationModel: settings.venueGenerationModel,
+      venueAutoPublish: settings.venueAutoPublish,
+      editorialNotifyTo: settings.editorialNotifyTo,
+      editorialNotificationsWebhookUrl: settings.editorialNotificationsWebhookUrl,
+      editorialNotificationsEmailEnabled: settings.editorialNotificationsEmailEnabled,
+      alertWebhookUrl: settings.alertWebhookUrl,
+      alertWebhookSecretSet: Boolean(settings.alertWebhookSecret),
       googleIndexingEnabled: settings.googleIndexingEnabled,
       googleServiceAccountJsonSet: Boolean(settings.googleServiceAccountJson),
     });
@@ -72,6 +116,22 @@ export async function handleAdminSettingsPatch(req: Request, deps: {
         stripeWebhookSecretSet: Boolean(updated.stripeWebhookSecret),
         platformFeePercent: updated.platformFeePercent,
         emailOutboxBatchSize: updated.emailOutboxBatchSize,
+        analyticsSalt: updated.analyticsSalt,
+        openAiApiKeySet: Boolean(updated.openAiApiKey),
+        ingestEnabled: updated.ingestEnabled,
+        ingestMaxCandidatesPerVenueRun: updated.ingestMaxCandidatesPerVenueRun,
+        ingestDuplicateSimilarityThreshold: updated.ingestDuplicateSimilarityThreshold,
+        ingestDuplicateLookbackDays: updated.ingestDuplicateLookbackDays,
+        ingestConfidenceHighMin: updated.ingestConfidenceHighMin,
+        ingestConfidenceMediumMin: updated.ingestConfidenceMediumMin,
+        ingestImageEnabled: updated.ingestImageEnabled,
+        venueGenerationModel: updated.venueGenerationModel,
+        venueAutoPublish: updated.venueAutoPublish,
+        editorialNotifyTo: updated.editorialNotifyTo,
+        editorialNotificationsWebhookUrl: updated.editorialNotificationsWebhookUrl,
+        editorialNotificationsEmailEnabled: updated.editorialNotificationsEmailEnabled,
+        alertWebhookUrl: updated.alertWebhookUrl,
+        alertWebhookSecretSet: Boolean(updated.alertWebhookSecret),
         googleIndexingEnabled: updated.googleIndexingEnabled,
         googleServiceAccountJsonSet: Boolean(updated.googleServiceAccountJson),
       },
