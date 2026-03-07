@@ -27,18 +27,18 @@ export function redactEmail(email: string) {
 }
 
 type VenueRow = { id: string; slug: string; name: string; contactEmail: string | null; claimStatus: VenueClaimStatus };
-type ClaimRow = { id: string; venueId: string; userId?: string; status: VenueClaimRequestStatus; expiresAt: Date | null };
+type ClaimRow = { id: string; venueId: string; userId?: string; status: VenueClaimRequestStatus; expiresAt: Date | null; updatedAt?: Date };
 
 type ClaimsDb = {
   venue: {
     findUnique: (args: unknown) => Promise<VenueRow | null>;
-    update: (args: unknown) => Promise<{ id: string }>;
+    update: (args: unknown) => Promise<{ id: string; expiresAt?: Date | null }>;
   };
   venueClaimRequest: {
     findUnique?: (args: unknown) => Promise<ClaimRow | null>;
     findFirst: (args: unknown) => Promise<ClaimRow | null>;
     create: (args: unknown) => Promise<ClaimRow>;
-    update: (args: unknown) => Promise<{ id: string }>;
+    update: (args: unknown) => Promise<{ id: string; expiresAt?: Date | null }>;
   };
   venueMembership: {
     upsert: (args: unknown) => Promise<{ id: string }>;
@@ -154,6 +154,35 @@ export async function verifyVenueClaim(args: { db: ClaimsDb; slug: string; token
   });
 
   return { venueId: approved.venueId, redirectTo: `/my/venues/${approved.venueId}`, status: VenueClaimRequestStatus.VERIFIED };
+}
+
+export async function resendClaimToken(args: { db: ClaimsDb; slug: string; userId: string; now?: Date }) {
+  const now = args.now ?? new Date();
+  const venue = await args.db.venue.findUnique({ where: { slug: args.slug }, select: { id: true, contactEmail: true } });
+  if (!venue?.contactEmail) return { error: "not_found" as const };
+
+  const claim = await args.db.venueClaimRequest.findFirst({
+    where: {
+      venueId: venue.id,
+      userId: args.userId,
+      status: VenueClaimRequestStatus.PENDING_VERIFICATION,
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    select: { id: true, venueId: true, userId: true, status: true, expiresAt: true, updatedAt: true },
+  });
+
+  if (!claim) return { error: "not_found" as const };
+  if (claim.updatedAt && now.getTime() - claim.updatedAt.getTime() < 5 * 60_000) return { error: "cooldown" as const };
+
+  const { token, tokenHash } = createClaimToken();
+  const expiresAt = plusMinutes(now, CLAIM_TOKEN_TTL_MINUTES);
+  const updated = await args.db.venueClaimRequest.update({
+    where: { id: claim.id },
+    data: { tokenHash, expiresAt },
+    select: { id: true, expiresAt: true },
+  });
+
+  return { claimId: updated.id, expiresAt: updated.expiresAt ?? expiresAt, token, toEmail: venue.contactEmail };
 }
 
 export async function approveClaim(db: ClaimsDb, claimId: string, now: Date) {

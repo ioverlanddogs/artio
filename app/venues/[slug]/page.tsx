@@ -22,6 +22,7 @@ import { buildVenueJsonLd, getDetailUrl } from "@/lib/seo.public-profiles";
 import { getVenueDescriptionExcerpt } from "@/lib/venues";
 import { resolveEntityPrimaryImage } from "@/lib/public-images";
 import { ArtworkCountBadge } from "@/components/artwork/artwork-count-badge";
+import { shouldShowVenueClaimCta } from "@/lib/venue-claims/cta";
 
 import Link from "next/link";
 import { countPublishedArtworksByVenue, listPublishedArtworksByVenue } from "@/lib/artworks";
@@ -59,6 +60,8 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
       lat: true,
       lng: true,
       claimStatus: true,
+      aiGenerated: true,
+      _count: { select: { memberships: true } },
       featuredImageUrl: true,
       images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { url: true, alt: true, sortOrder: true, isPrimary: true, width: true, height: true, asset: { select: { url: true } } } },
       events: {
@@ -80,9 +83,10 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
 
   if (!venue) notFound();
 
-  const [followersCount, existingFollow, artworks, artworkCount, pastEventsRaw] = await Promise.all([
+  const [followersCount, existingFollow, existingMembership, artworks, artworkCount, pastEventsRaw] = await Promise.all([
     db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }),
     user ? db.follow.findUnique({ where: { userId_targetType_targetId: { userId: user.id, targetType: "VENUE", targetId: venue.id } }, select: { id: true } }) : Promise.resolve(null),
+    user ? db.venueMembership.findUnique({ where: { userId_venueId: { userId: user.id, venueId: venue.id } }, select: { id: true } }) : Promise.resolve(null),
     listPublishedArtworksByVenue(venue.id, 6),
     countPublishedArtworksByVenue(venue.id),
     db.event.findMany({
@@ -130,6 +134,13 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
     tags: event.eventTags.map(({ tag }) => tag.slug),
   }));
 
+  const showClaimCta = shouldShowVenueClaimCta({
+    claimStatus: venue.claimStatus,
+    aiGenerated: venue.aiGenerated,
+    membershipsCount: venue._count.memberships,
+    isCurrentUserMember: Boolean(existingMembership),
+  });
+
   const detailUrl = getDetailUrl("venue", slug);
   const jsonLd = buildVenueJsonLd({ name: venue.name, description: venue.description, detailUrl, imageUrl: coverUrl, websiteUrl: venue.websiteUrl, address: venue.addressLine1 });
 
@@ -137,7 +148,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
     <PageShell className="page-stack">
       <PageViewTracker name="entity_viewed" props={{ type: "venue", slug }} />
       <EntityPageViewTracker entityType="VENUE" entityId={venue.id} />
-      {venue.claimStatus !== "CLAIMED" ? (
+      {showClaimCta ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
           Own or run this venue? <Link className="underline" href={`/venues/${venue.slug}/claim`}>Claim this venue</Link>.
         </div>

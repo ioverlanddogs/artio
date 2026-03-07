@@ -232,3 +232,88 @@ test("createVenueClaim keeps blocking when active claim is not expired", async (
     /claim_pending/
   );
 });
+
+test("resendClaimToken returns new token", async () => {
+  const { resendClaimToken } = await import("../lib/venue-claims/service");
+  let updatedTokenHash: string | null = null;
+  let updatedExpiresAt: Date | null = null;
+
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const result = await resendClaimToken({
+    slug: "venue-resend",
+    userId: "user-r",
+    now,
+    db: {
+      venue: {
+        findUnique: async () => ({ id: "venue-r", slug: "venue-resend", name: "Venue Resend", contactEmail: "owner@example.com", claimStatus: "PENDING" as const }),
+        update: async () => ({ id: "venue-r" }),
+      },
+      venueClaimRequest: {
+        findFirst: async () => ({ id: "claim-r", venueId: "venue-r", userId: "user-r", status: "PENDING_VERIFICATION" as const, expiresAt: null, updatedAt: new Date(now.getTime() - 10 * 60_000) }),
+        create: async () => ({ id: "claim-r", venueId: "venue-r", status: "PENDING_VERIFICATION" as const, expiresAt: null }),
+        update: async ({ data }: { data: { tokenHash: string; expiresAt: Date } }) => {
+          updatedTokenHash = data.tokenHash;
+          updatedExpiresAt = data.expiresAt;
+          return { id: "claim-r", expiresAt: data.expiresAt };
+        },
+      },
+      venueMembership: { upsert: async () => ({ id: "m-r" }) },
+      $transaction: async (fn) => fn({} as never),
+    } as never,
+  });
+
+  assert.equal("error" in result, false);
+  assert.equal(result.claimId, "claim-r");
+  assert.equal(result.toEmail, "owner@example.com");
+  assert.ok(typeof result.token === "string" && result.token.length > 10);
+  assert.ok(updatedTokenHash);
+  assert.ok(updatedExpiresAt);
+});
+
+test("resendClaimToken returns cooldown error within 5 minutes", async () => {
+  const { resendClaimToken } = await import("../lib/venue-claims/service");
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const result = await resendClaimToken({
+    slug: "venue-resend",
+    userId: "user-r",
+    now,
+    db: {
+      venue: {
+        findUnique: async () => ({ id: "venue-r", slug: "venue-resend", name: "Venue Resend", contactEmail: "owner@example.com", claimStatus: "PENDING" as const }),
+        update: async () => ({ id: "venue-r" }),
+      },
+      venueClaimRequest: {
+        findFirst: async () => ({ id: "claim-r", venueId: "venue-r", userId: "user-r", status: "PENDING_VERIFICATION" as const, expiresAt: null, updatedAt: new Date(now.getTime() - 2 * 60_000) }),
+        create: async () => ({ id: "claim-r", venueId: "venue-r", status: "PENDING_VERIFICATION" as const, expiresAt: null }),
+        update: async () => ({ id: "claim-r", expiresAt: now }),
+      },
+      venueMembership: { upsert: async () => ({ id: "m-r" }) },
+      $transaction: async (fn) => fn({} as never),
+    } as never,
+  });
+
+  assert.deepEqual(result, { error: "cooldown" });
+});
+
+test("resendClaimToken returns not_found when no pending claim", async () => {
+  const { resendClaimToken } = await import("../lib/venue-claims/service");
+  const result = await resendClaimToken({
+    slug: "venue-resend",
+    userId: "user-r",
+    db: {
+      venue: {
+        findUnique: async () => ({ id: "venue-r", slug: "venue-resend", name: "Venue Resend", contactEmail: "owner@example.com", claimStatus: "PENDING" as const }),
+        update: async () => ({ id: "venue-r" }),
+      },
+      venueClaimRequest: {
+        findFirst: async () => null,
+        create: async () => ({ id: "claim-r", venueId: "venue-r", status: "PENDING_VERIFICATION" as const, expiresAt: null }),
+        update: async () => ({ id: "claim-r", expiresAt: new Date() }),
+      },
+      venueMembership: { upsert: async () => ({ id: "m-r" }) },
+      $transaction: async (fn) => fn({} as never),
+    } as never,
+  });
+
+  assert.deepEqual(result, { error: "not_found" });
+});
