@@ -121,6 +121,12 @@ export default async function MyEventEditPage({ params }: { params: Promise<{ ev
             <Link className="mt-2 inline-block underline" href="#publish-panel">{canPublishDirectly ? "Open moderation controls" : "Publish"}</Link>
           </div>
 
+          <div className="rounded-md border p-4 text-sm">
+            <p className="font-medium">Attendee management</p>
+            <p className="mt-1 text-muted-foreground">View confirmed attendees and process cancellations or refunds.</p>
+            <Link className="mt-2 inline-block underline" href={`/my/events/${event.id}/attendees`}>Open attendee list</Link>
+          </div>
+
           {event.isPublished ? <EventAnalyticsSummary eventId={event.id} /> : null}
         </section>
 

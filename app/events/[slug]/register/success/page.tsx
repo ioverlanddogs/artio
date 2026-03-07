@@ -39,7 +39,7 @@ export default async function CheckoutSuccessPage(
       where: { id: registrationId },
       select: { id: true, status: true, confirmationCode: true, guestEmail: true },
     }),
-    updateRegistrationStatus: (registrationId, status) => db.registration.update({ where: { id: registrationId }, data: { status } }),
+    updateRegistrationStatus: (registrationId, data) => db.registration.update({ where: { id: registrationId }, data }),
     enqueueNotification: (payload) => enqueueNotification(payload as never),
   });
 

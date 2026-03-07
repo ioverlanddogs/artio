@@ -707,7 +707,10 @@ model Registration {
   status                RegistrationStatus @default(PENDING)
   confirmationCode      String             @unique
   stripePaymentIntentId String?
+  amountPaidGbp         Int?
   cancelledAt           DateTime?
+  refundedAt            DateTime?
+  refundedAmountGbp     Int?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   event                 Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)

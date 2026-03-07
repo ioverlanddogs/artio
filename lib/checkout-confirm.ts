@@ -2,6 +2,7 @@ type RegistrationStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED";
 
 type CheckoutSession = {
   payment_status: string;
+  amount_total?: number | null;
   metadata?: {
     registrationId?: string;
     confirmationCode?: string;
@@ -17,7 +18,7 @@ type Deps = {
     confirmationCode: string;
     guestEmail: string;
   } | null>;
-  updateRegistrationStatus: (registrationId: string, status: "CONFIRMED") => Promise<unknown>;
+  updateRegistrationStatus: (registrationId: string, data: { status: "CONFIRMED"; amountPaidGbp: number | null }) => Promise<unknown>;
   enqueueNotification: (params: {
     type: "REGISTRATION_CONFIRMED";
     toEmail: string;
@@ -54,7 +55,7 @@ export async function confirmCheckoutSession(sessionId: string, slug: string, de
   }
 
   if (registration.status === "PENDING") {
-    await deps.updateRegistrationStatus(registration.id, "CONFIRMED");
+    await deps.updateRegistrationStatus(registration.id, { status: "CONFIRMED", amountPaidGbp: session.amount_total ?? null });
     await deps.enqueueNotification({
       type: "REGISTRATION_CONFIRMED",
       toEmail: registration.guestEmail,
