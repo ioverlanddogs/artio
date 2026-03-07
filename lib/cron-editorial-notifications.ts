@@ -5,6 +5,10 @@ import { computeEditorialNotificationCandidates, resolveEditorialNotificationRec
 import { getEditorialNotificationSink } from "@/lib/editorial-notify";
 import { logAdminAction } from "@/lib/admin-audit";
 
+type EditorialRecipientsDb = Parameters<typeof resolveEditorialNotificationRecipients>[0];
+type EditorialCandidatesDb = Parameters<typeof computeEditorialNotificationCandidates>[1];
+type EditorialSinkDb = Parameters<typeof getEditorialNotificationSink>[0];
+
 type CronDb = {
   user: {
     findMany: (args: {
@@ -62,15 +66,15 @@ export async function runEditorialNotificationsCron(
   }
 
   try {
-    const recipients = await (deps.resolveRecipients ?? resolveEditorialNotificationRecipients)(cronDb as any);
-    const candidates = await (deps.computeCandidates ?? computeEditorialNotificationCandidates)(now, cronDb as any);
+    const recipients = await (deps.resolveRecipients ?? resolveEditorialNotificationRecipients)(cronDb as EditorialRecipientsDb);
+    const candidates = await (deps.computeCandidates ?? computeEditorialNotificationCandidates)(now, cronDb as EditorialCandidatesDb);
     const details: Array<{ fingerprint: string; kind: string; status: "sent" | "skipped_already_sent" | "dry_run" | "skipped_no_recipients" }> = [];
 
     if (recipients.length === 0) {
       return Response.json({ ok: true, cronName: "editorial_notifications", cronRunId, dryRun, sent: 0, skipped: candidates.length, details: candidates.map((c) => ({ fingerprint: c.fingerprint, kind: c.kind, status: "skipped_no_recipients" })) });
     }
 
-    const sink = deps.sink ?? await getEditorialNotificationSink(cronDb as any);
+    const sink = deps.sink ?? await getEditorialNotificationSink(cronDb as EditorialSinkDb);
     let sent = 0;
     let skipped = 0;
 
