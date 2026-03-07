@@ -715,7 +715,7 @@ model Registration {
   confirmationCode      String             @unique
   stripePaymentIntentId String?
   amountPaidGbp         Int?
-  discountAppliedGbp    Int?
+
   checkedInAt           DateTime?
   cancelledAt           DateTime?
   refundedAt            DateTime?
