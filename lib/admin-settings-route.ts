@@ -19,6 +19,8 @@ const patchSchema = z.object({
   stripeWebhookSecret: z.string().max(500).nullable().optional(),
   platformFeePercent: z.number().int().min(1).max(100).optional(),
   emailOutboxBatchSize: z.number().int().min(1).max(100).nullable().optional(),
+  googleServiceAccountJson: z.string().max(100000).nullable().optional(),
+  googleIndexingEnabled: z.boolean().optional(),
 });
 
 export async function handleAdminSettingsGet(_req: Request, deps: {
@@ -40,6 +42,8 @@ export async function handleAdminSettingsGet(_req: Request, deps: {
       stripeWebhookSecretSet: Boolean(settings.stripeWebhookSecret),
       platformFeePercent: settings.platformFeePercent,
       emailOutboxBatchSize: settings.emailOutboxBatchSize,
+      googleIndexingEnabled: settings.googleIndexingEnabled,
+      googleServiceAccountJsonSet: Boolean(settings.googleServiceAccountJson),
     });
   }, { requireAdminFn: deps.requireAdminFn });
 }
@@ -68,6 +72,8 @@ export async function handleAdminSettingsPatch(req: Request, deps: {
         stripeWebhookSecretSet: Boolean(updated.stripeWebhookSecret),
         platformFeePercent: updated.platformFeePercent,
         emailOutboxBatchSize: updated.emailOutboxBatchSize,
+        googleIndexingEnabled: updated.googleIndexingEnabled,
+        googleServiceAccountJsonSet: Boolean(updated.googleServiceAccountJson),
       },
     });
   }, { requireAdminFn: deps.requireAdminFn });

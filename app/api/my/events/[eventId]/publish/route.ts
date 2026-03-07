@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth";
 import { eventIdParamSchema, zodDetails } from "@/lib/validators";
 import { apiError } from "@/lib/api";
 import { handleEventSelfPublish } from "@/lib/my-event-self-publish-route";
+import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
       return Boolean(membership);
     },
     findEventForPublish: (eventId) => db.event.findUnique({ where: { id: eventId }, select: { id: true, title: true, startAt: true, endAt: true, timezone: true, venueId: true, ticketUrl: true, isPublished: true, deletedAt: true, status: true, venue: { select: { status: true, isPublished: true } } } }),
-    updateEventPublishState: (eventId, isPublished) => db.event.update({ where: { id: eventId }, data: { isPublished, status: isPublished ? "PUBLISHED" : "DRAFT", publishedAt: isPublished ? new Date() : null, deletedAt: null, deletedByAdminId: null, deletedReason: null }, select: { id: true, title: true, startAt: true, endAt: true, timezone: true, venueId: true, ticketUrl: true, isPublished: true, deletedAt: true, status: true } }),
+    updateEventPublishState: (eventId, isPublished) => db.event.update({ where: { id: eventId }, data: { isPublished, status: isPublished ? "PUBLISHED" : "DRAFT", publishedAt: isPublished ? new Date() : null, deletedAt: null, deletedByAdminId: null, deletedReason: null }, select: { id: true, title: true, slug: true, startAt: true, endAt: true, timezone: true, venueId: true, ticketUrl: true, isPublished: true, deletedAt: true, status: true } }),
     logAdminAction,
+    onPublished: async (event) => {
+      if (event.slug) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        await notifyGoogleIndexing(`${appUrl}/events/${event.slug}`, "URL_UPDATED");
+      }
+    },
   });
 }

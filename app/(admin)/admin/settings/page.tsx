@@ -25,6 +25,8 @@ export default async function AdminSettingsPage() {
           stripeSecretKeySet: Boolean(settings.stripeSecretKey),
           stripeWebhookSecretSet: Boolean(settings.stripeWebhookSecret),
           platformFeePercent: settings.platformFeePercent,
+          googleIndexingEnabled: settings.googleIndexingEnabled,
+          googleServiceAccountJsonSet: Boolean(settings.googleServiceAccountJson),
         }}
       />
       <EmailSettingsClient

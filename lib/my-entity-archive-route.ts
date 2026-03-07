@@ -12,6 +12,7 @@ type Deps = {
   requireAuth: () => Promise<SessionUser>;
   getEntityForUser: (entityId: string, userId: string) => Promise<EntityRecord | null>;
   updateEntity: (entityId: string, data: Partial<EntityRecord>) => Promise<EntityRecord>;
+  onArchived?: (entity: EntityRecord) => Promise<void>;
 };
 
 function getReason(payload: unknown) {
@@ -35,6 +36,7 @@ export async function handleMyEntityArchive(req: NextRequest, params: { id: stri
       deletedReason: getReason(payload),
       deletedByAdminId: null,
     });
+    if (deps.onArchived) await deps.onArchived(item);
     return NextResponse.json({ item });
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");

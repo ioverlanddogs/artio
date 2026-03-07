@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EventRailCard } from "@/components/events/event-rail-card";
 import { formatEventDateRange } from "@/components/events/event-format";
-import { buildDetailMetadata, buildEventJsonLd, getDetailUrl } from "@/lib/seo.public-profiles";
+import { buildDetailMetadata, getDetailUrl } from "@/lib/seo.public-profiles";
 import { getSessionUser } from "@/lib/auth";
 import { PageShell } from "@/components/ui/page-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -58,7 +58,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
         ticketTiers: {
           where: { isActive: true },
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          select: { id: true, name: true, description: true, priceAmount: true, currency: true },
+          select: { id: true, name: true, description: true, priceAmount: true, currency: true, capacity: true, registrations: { where: { status: { in: ["PENDING", "CONFIRMED", "WAITLISTED"] } }, select: { quantity: true } } },
         },
       },
     }),
@@ -84,15 +84,50 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
   const initialSaved = user ? Boolean(await db.favorite.findUnique({ where: { userId_targetType_targetId: { userId: user.id, targetType: "EVENT", targetId: event.id } }, select: { id: true } })) : false;
   const primaryImage = resolveEntityPrimaryImage(event);
   const detailUrl = getDetailUrl("event", slug);
-  const jsonLd = buildEventJsonLd({
-    title: event.title,
-    description: event.description,
-    startAt: event.startAt,
-    endAt: event.endAt,
-    detailUrl,
-    imageUrl: primaryImage?.url ?? null,
-    venue: event.venue ? { name: event.venue.name, address: event.venue.addressLine1 } : undefined,
+  const offers = event.ticketTiers.map((tier) => {
+    const registered = tier.registrations.reduce((sum, registration) => sum + registration.quantity, 0);
+    const availability = tier.capacity == null || registered < tier.capacity ? "https://schema.org/InStock" : "https://schema.org/SoldOut";
+    const offerUrl = event.ticketingMode === "EXTERNAL" && event.ticketUrl ? event.ticketUrl : detailUrl;
+    return {
+      "@type": "Offer",
+      price: tier.priceAmount / 100,
+      priceCurrency: tier.currency,
+      availability,
+      url: offerUrl,
+    };
   });
+
+  if (offers.length === 0 && event.isFree) {
+    offers.push({
+      "@type": "Offer",
+      price: 0,
+      priceCurrency: "GBP",
+      availability: "https://schema.org/InStock",
+      url: event.ticketingMode === "EXTERNAL" && event.ticketUrl ? event.ticketUrl : detailUrl,
+    });
+  }
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title,
+    startDate: event.startAt.toISOString(),
+    ...(event.endAt ? { endDate: event.endAt.toISOString() } : {}),
+    ...(event.description ? { description: event.description } : {}),
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: {
+      "@type": "Place",
+      name: event.venue?.name ?? "Venue TBA",
+      ...(event.venue?.addressLine1 ? { address: event.venue.addressLine1 } : {}),
+    },
+    organizer: {
+      "@type": "Organization",
+      name: event.venue?.name ?? "Artpulse",
+    },
+    ...(offers.length > 0 ? { offers } : {}),
+    ...(primaryImage?.url ? { image: [primaryImage.url] } : {}),
+  };
 
   const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${new Date(event.startAt).toISOString().replace(/[-:]|\.\d{3}/g, "")}/${new Date(event.endAt ?? event.startAt).toISOString().replace(/[-:]|\.\d{3}/g, "")}`;
 
@@ -197,7 +232,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
         </section>
       ) : null}
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/<\/script>/gi, '<\\/script>') }} />
     </PageShell>
   );
 }

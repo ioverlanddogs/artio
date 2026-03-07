@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { eventIdParamSchema, zodDetails } from "@/lib/validators";
 import { apiError } from "@/lib/api";
 import { handleMyEntityArchive } from "@/lib/my-entity-archive-route";
+import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 
 export const runtime = "nodejs";
 
@@ -21,8 +22,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
           { submissions: { some: { submitterUserId: userId, type: "EVENT", OR: [{ kind: "PUBLISH" }, { kind: null }] } } },
         ],
       },
-      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
+      select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
     }),
-    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    onArchived: async (item) => {
+      const slug = (item as { slug?: string | null }).slug;
+      if (!slug) return;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      await notifyGoogleIndexing(`${appUrl}/events/${slug}`, "URL_DELETED");
+    },
   });
 }

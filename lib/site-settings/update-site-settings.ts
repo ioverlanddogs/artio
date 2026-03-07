@@ -15,6 +15,8 @@ export async function updateSiteSettings(data: {
   stripeWebhookSecret?: string | null;
   platformFeePercent?: number;
   emailOutboxBatchSize?: number | null;
+  googleServiceAccountJson?: string | null;
+  googleIndexingEnabled?: boolean;
 }) {
   return db.siteSettings.upsert({
     where: { id: SITE_SETTINGS_ID },

@@ -25,8 +25,9 @@ type Deps = {
   requireAuth: () => Promise<SessionUser>;
   canEditEvent: (eventId: string, user: SessionUser) => Promise<boolean>;
   findEventForPublish: (eventId: string) => Promise<EventRecord | null>;
-  updateEventPublishState: (eventId: string, isPublished: boolean) => Promise<EventRecord>;
+  updateEventPublishState: (eventId: string, isPublished: boolean) => Promise<EventRecord & { slug?: string | null }>;
   logAdminAction: (input: AdminAuditInput) => Promise<void>;
+  onPublished?: (event: EventRecord & { slug?: string | null }) => Promise<void>;
 };
 
 export async function handleEventSelfPublish(req: NextRequest, input: { eventId: string; isPublished: boolean }, deps: Deps) {
@@ -52,6 +53,7 @@ export async function handleEventSelfPublish(req: NextRequest, input: { eventId:
     }
 
     const updated = await deps.updateEventPublishState(input.eventId, input.isPublished);
+    if (input.isPublished && deps.onPublished) await deps.onPublished(updated);
     await deps.logAdminAction({
       actorEmail: user.email,
       action: "EVENT_SELF_PUBLISH_TOGGLED",

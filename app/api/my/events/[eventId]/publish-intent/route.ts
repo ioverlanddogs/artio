@@ -8,6 +8,7 @@ import { eventIdParamSchema, zodDetails } from "@/lib/validators";
 import { evaluateEventReadiness } from "@/lib/publish-readiness";
 import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 import { toPublishBlockingIssues, type PublishIntentResponse } from "@/lib/publish-intent";
+import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,10 @@ export async function POST(_: Request, { params }: { params: Promise<{ eventId: 
 
     if (canSelfPublish(user)) {
       const updated = await db.event.update({ where: { id: event.id }, data: { isPublished: true, status: "PUBLISHED", publishedAt: new Date(), deletedAt: null, deletedByAdminId: null, deletedReason: null }, select: { status: true, slug: true } });
+      if (updated.slug) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        await notifyGoogleIndexing(`${appUrl}/events/${updated.slug}`, "URL_UPDATED");
+      }
       return NextResponse.json({ outcome: "published", status: updated.status, message: "Event published successfully.", publicUrl: updated.slug ? `/events/${updated.slug}` : undefined } satisfies PublishIntentResponse);
     }
 

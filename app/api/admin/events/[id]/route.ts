@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { requireAdmin, isAuthError } from "@/lib/auth";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { handleAdminEntityPatch } from "@/lib/admin-entities-route";
+import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 
 export const runtime = "nodejs";
 
@@ -18,11 +19,15 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     if (!parsedId.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedId.error));
     const event = await db.event.findUnique({
       where: { id: parsedId.data.id },
-      select: { deletedAt: true },
+      select: { deletedAt: true, slug: true },
     });
     if (!event) return apiError(404, "not_found", "Event not found");
     if (!event.deletedAt) {
       return apiError(409, "invalid_state", "Event must be archived before it can be permanently deleted");
+    }
+    if (event.slug) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      await notifyGoogleIndexing(`${appUrl}/events/${event.slug}`, "URL_DELETED");
     }
     await db.event.delete({ where: { id: parsedId.data.id } });
     return Response.json({ ok: true });

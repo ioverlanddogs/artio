@@ -18,6 +18,7 @@ type Deps = {
   findEvent: (id: string) => Promise<EventRecord | null>;
   updateEvent: (id: string, data: Record<string, unknown>) => Promise<void>;
   onPublished?: (eventId: string) => Promise<void>;
+  onArchived?: (eventId: string) => Promise<void>;
 };
 
 export async function handleEventModerationIntent(req: Request, params: { id: string }, deps: Deps) {
@@ -69,5 +70,6 @@ export async function handleEventModerationIntent(req: Request, params: { id: st
     return ok({ ok: true, status: "APPROVED", message: "Event restored." });
   }
   await deps.updateEvent(event.id, { status: "ARCHIVED", isPublished: false, deletedAt: event.deletedAt ?? new Date() });
+  if (deps.onArchived) await deps.onArchived(event.id);
   return ok({ ok: true, status: "ARCHIVED", message: "Event archived." });
 }

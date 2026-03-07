@@ -45,6 +45,7 @@ export function getSubject({ eventTitle, venueName }: RsvpConfirmationPayload) {
 
 export default function RsvpConfirmationEmail({ eventTitle, venueName, eventSlug, startAt, venueAddress, confirmationCode }: RsvpConfirmationPayload) {
   const eventUrl = `${APP_URL}/events/${eventSlug}`;
+  const shareOnXUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(`I'm going to ${eventTitle}`)}&url=${encodeURIComponent(eventUrl)}`;
   const starts = new Date(startAt);
   const calendarLink = buildCalendarDataUri({ eventTitle, venueName, eventSlug, startAt, venueAddress, confirmationCode });
   const qrCodeDataUri = qrcode.toDataURL(confirmationCode);
@@ -62,6 +63,12 @@ export default function RsvpConfirmationEmail({ eventTitle, venueName, eventSlug
           <tr><td><p style={{ margin: "0 0 6px" }}><strong>Venue:</strong> {venueName}</p></td></tr>
           {venueAddress ? <tr><td><p style={{ margin: "0 0 16px" }}><strong>Address:</strong> {venueAddress}</p></td></tr> : null}
           <tr><td><p style={{ margin: "0 0 16px" }}>Add to calendar: <a href={calendarLink}>BEGIN:VCALENDAR</a></p></td></tr>
+          <tr>
+            <td>
+              <p style={{ margin: "0 0 4px" }}><strong>Share this event</strong></p>
+              <p style={{ margin: "0 0 16px" }}><a href={shareOnXUrl}>Share on X</a>{" "}<a href={eventUrl}>Copy link</a></p>
+            </td>
+          </tr>
           <tr>
             <td>
               <a href={eventUrl} style={{ backgroundColor: BRAND_RED, color: "#ffffff", textDecoration: "none", padding: "12px 20px", borderRadius: "4px", display: "inline-block", fontWeight: "bold" }}>View event</a>

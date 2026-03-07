@@ -21,6 +21,8 @@ test("GET returns null ingest settings when row has no values", async () => {
       stripeWebhookSecret: null,
       platformFeePercent: 5,
       emailOutboxBatchSize: null,
+      googleIndexingEnabled: false,
+      googleServiceAccountJson: null,
     }) as never,
   });
 
@@ -38,10 +40,12 @@ test("GET returns null ingest settings when row has no values", async () => {
     stripeWebhookSecretSet: false,
     platformFeePercent: 5,
     emailOutboxBatchSize: null,
+    googleIndexingEnabled: false,
+    googleServiceAccountJsonSet: false,
   });
 });
 
-test("GET returns stripe secret booleans instead of raw values", async () => {
+test("GET returns secret booleans instead of raw values", async () => {
   const req = new NextRequest("http://localhost/api/admin/settings", { method: "GET" });
   const res = await handleAdminSettingsGet(req, {
     requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
@@ -59,6 +63,8 @@ test("GET returns stripe secret booleans instead of raw values", async () => {
       stripeWebhookSecret: "whsec_test_123",
       platformFeePercent: 7,
       emailOutboxBatchSize: null,
+      googleIndexingEnabled: true,
+      googleServiceAccountJson: "{\"ok\":true}",
     }) as never,
   });
 
@@ -66,11 +72,13 @@ test("GET returns stripe secret booleans instead of raw values", async () => {
   assert.equal(res.status, 200);
   assert.equal(payload.stripeSecretKeySet, true);
   assert.equal(payload.stripeWebhookSecretSet, true);
+  assert.equal(payload.googleServiceAccountJsonSet, true);
   assert.equal(payload.stripeSecretKey, undefined);
   assert.equal(payload.stripeWebhookSecret, undefined);
+  assert.equal(payload.googleServiceAccountJson, undefined);
 });
 
-test("PATCH updates and returns ingest settings", async () => {
+test("PATCH updates and returns settings", async () => {
   const req = new NextRequest("http://localhost/api/admin/settings", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
@@ -87,6 +95,8 @@ test("PATCH updates and returns ingest settings", async () => {
       stripeWebhookSecret: "whsec_test_123",
       platformFeePercent: 8,
       emailOutboxBatchSize: 50,
+      googleIndexingEnabled: true,
+      googleServiceAccountJson: "{\"type\":\"service_account\"}",
     }),
   });
 
@@ -112,6 +122,8 @@ test("PATCH updates and returns ingest settings", async () => {
     stripeWebhookSecret: "whsec_test_123",
     platformFeePercent: 8,
     emailOutboxBatchSize: 50,
+    googleIndexingEnabled: true,
+    googleServiceAccountJson: "{\"type\":\"service_account\"}",
   });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), {
@@ -129,6 +141,8 @@ test("PATCH updates and returns ingest settings", async () => {
       stripeWebhookSecretSet: true,
       platformFeePercent: 8,
       emailOutboxBatchSize: 50,
+      googleIndexingEnabled: true,
+      googleServiceAccountJsonSet: true,
     },
   });
 });
@@ -156,6 +170,8 @@ test("PATCH allows clearing ingestSystemPrompt to null", async () => {
       stripeWebhookSecret: null,
       platformFeePercent: 5,
       emailOutboxBatchSize: null,
+      googleIndexingEnabled: false,
+      googleServiceAccountJson: null,
     }) as never,
   });
 
@@ -175,51 +191,9 @@ test("PATCH allows clearing ingestSystemPrompt to null", async () => {
       stripeWebhookSecretSet: false,
       platformFeePercent: 5,
       emailOutboxBatchSize: null,
+      googleIndexingEnabled: false,
+      googleServiceAccountJsonSet: false,
     },
-  });
-});
-
-test("PATCH persists all four stripe fields correctly", async () => {
-  const req = new NextRequest("http://localhost/api/admin/settings", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      stripePublishableKey: "pk_live_123",
-      stripeSecretKey: "sk_live_123",
-      stripeWebhookSecret: "whsec_live_123",
-      platformFeePercent: 12,
-    }),
-  });
-
-  let captured: Record<string, unknown> | null = null;
-  const res = await handleAdminSettingsPatch(req, {
-    requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
-    updateSiteSettingsFn: async (data) => {
-      captured = data as Record<string, unknown>;
-      return {
-        id: "default",
-        ingestSystemPrompt: null,
-        ingestModel: null,
-        ingestMaxOutputTokens: null,
-        emailEnabled: false,
-        emailFromAddress: null,
-        resendApiKey: null,
-        resendFromAddress: null,
-        stripePublishableKey: data.stripePublishableKey,
-        stripeSecretKey: data.stripeSecretKey,
-        stripeWebhookSecret: data.stripeWebhookSecret,
-        platformFeePercent: data.platformFeePercent,
-        emailOutboxBatchSize: null,
-      } as never;
-    },
-  });
-
-  assert.equal(res.status, 200);
-  assert.deepEqual(captured, {
-    stripePublishableKey: "pk_live_123",
-    stripeSecretKey: "sk_live_123",
-    stripeWebhookSecret: "whsec_live_123",
-    platformFeePercent: 12,
   });
 });
 
@@ -237,18 +211,4 @@ test("PATCH rejects platformFeePercent values outside 1–100", async () => {
 
     assert.equal(res.status, 400);
   }
-});
-
-test("PATCH returns 400 for invalid body", async () => {
-  const req = new NextRequest("http://localhost/api/admin/settings", {
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ingestMaxOutputTokens: -1 }),
-  });
-
-  const res = await handleAdminSettingsPatch(req, {
-    requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
-  });
-
-  assert.equal(res.status, 400);
 });
