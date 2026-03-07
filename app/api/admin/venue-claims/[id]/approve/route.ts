@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api";
 import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
+import { approveClaim } from "@/lib/venue-claims/service";
 
 export const runtime = "nodejs";
 
@@ -9,19 +10,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   try {
     await requireAdmin({ redirectOnFail: false });
     const { id } = await params;
-    const claim = await db.venueClaimRequest.findUnique({ where: { id } });
+    const claim = await approveClaim(db as never, id, new Date());
     if (!claim) return apiError(404, "not_found", "Claim not found");
-
-    await db.$transaction([
-      db.venueClaimRequest.update({
-        where: { id },
-        data: { status: "VERIFIED" },
-      }),
-      db.venue.update({
-        where: { id: claim.venueId },
-        data: { claimStatus: "CLAIMED" },
-      }),
-    ]);
 
     return Response.json({ ok: true });
   } catch (error) {

@@ -35,6 +35,7 @@ type ClaimsDb = {
     update: (args: unknown) => Promise<{ id: string }>;
   };
   venueClaimRequest: {
+    findUnique?: (args: unknown) => Promise<ClaimRow | null>;
     findFirst: (args: unknown) => Promise<ClaimRow | null>;
     create: (args: unknown) => Promise<ClaimRow>;
     update: (args: unknown) => Promise<{ id: string }>;
@@ -75,7 +76,20 @@ export async function createVenueClaim(args: {
     where: { venueId: venue.id, status: VenueClaimRequestStatus.PENDING_VERIFICATION },
     select: { id: true, venueId: true, status: true, expiresAt: true },
   });
-  if (activeForVenue) throw new Error("claim_pending");
+  if (activeForVenue) {
+    const isExpired = activeForVenue.expiresAt !== null && activeForVenue.expiresAt < now;
+    if (isExpired) {
+      await args.db.$transaction(async (tx) => {
+        await tx.venueClaimRequest.update({
+          where: { id: activeForVenue.id },
+          data: { status: VenueClaimRequestStatus.EXPIRED },
+        });
+        await tx.venue.update({ where: { id: venue.id }, data: { claimStatus: VenueClaimStatus.UNCLAIMED } });
+      });
+    } else {
+      throw new Error("claim_pending");
+    }
+  }
 
   if (!venue.contactEmail) {
     const claim = await args.db.venueClaimRequest.create({
@@ -131,27 +145,39 @@ export async function verifyVenueClaim(args: { db: ClaimsDb; slug: string; token
   });
   if (!claim?.venueId) throw new Error("invalid_token");
 
-  return args.db.$transaction(async (tx) => {
-    const found = await tx.venueClaimRequest.findFirst({
-      where: {
-        id: claim.id,
-        status: VenueClaimRequestStatus.PENDING_VERIFICATION,
-        expiresAt: { gt: now },
-      },
+  const approved = await approveClaim(args.db, claim.id, now);
+  if (!approved) throw new Error("invalid_token");
+
+  await args.db.venueClaimRequest.update({
+    where: { id: claim.id },
+    data: { tokenHash: null },
+  });
+
+  return { venueId: approved.venueId, redirectTo: `/my/venues/${approved.venueId}`, status: VenueClaimRequestStatus.VERIFIED };
+}
+
+export async function approveClaim(db: ClaimsDb, claimId: string, now: Date) {
+  return db.$transaction(async (tx) => {
+    const lookup = tx.venueClaimRequest.findUnique ?? tx.venueClaimRequest.findFirst;
+    const claim = await lookup({
+      where: { id: claimId },
       select: { id: true, venueId: true, userId: true, status: true, expiresAt: true },
     });
 
-    if (!found?.userId) throw new Error("invalid_token");
+    if (!claim?.userId) return null;
 
     await tx.venueMembership.upsert({
-      where: { userId_venueId: { userId: found.userId, venueId: found.venueId } },
+      where: { userId_venueId: { userId: claim.userId, venueId: claim.venueId } },
       update: { role: VenueMembershipRole.OWNER },
-      create: { userId: found.userId, venueId: found.venueId, role: VenueMembershipRole.OWNER },
+      create: { userId: claim.userId, venueId: claim.venueId, role: VenueMembershipRole.OWNER },
     });
 
-    await tx.venue.update({ where: { id: found.venueId }, data: { claimStatus: VenueClaimStatus.CLAIMED } });
-    await tx.venueClaimRequest.update({ where: { id: found.id }, data: { status: VenueClaimRequestStatus.VERIFIED, verifiedAt: now, tokenHash: null } });
+    await tx.venue.update({ where: { id: claim.venueId }, data: { claimStatus: VenueClaimStatus.CLAIMED } });
+    await tx.venueClaimRequest.update({
+      where: { id: claim.id },
+      data: { status: VenueClaimRequestStatus.VERIFIED, verifiedAt: now },
+    });
 
-    return { venueId: found.venueId, redirectTo: `/my/venues/${found.venueId}`, status: VenueClaimRequestStatus.VERIFIED };
+    return claim;
   });
 }
