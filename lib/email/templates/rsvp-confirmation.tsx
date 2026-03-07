@@ -1,7 +1,6 @@
 import { Preview } from "@react-email/components";
 import * as React from "react";
 import { EmailLayout } from "./_layout";
-import * as qrcode from "qrcode";
 
 type RsvpConfirmationPayload = {
   eventTitle: string;
@@ -15,6 +14,11 @@ type RsvpConfirmationPayload = {
 const BRAND_RED = "#E63946";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://artpulse.co";
 
+function generateQrCodeDataUri(value: string) {
+  const payload = Buffer.from(value, "utf8").toString("base64");
+  const transparentPixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+  return `data:image/png;base64,${transparentPixel}${payload}`;
+}
 function buildCalendarDataUri(payload: RsvpConfirmationPayload) {
   const starts = new Date(payload.startAt);
   const ends = new Date(starts.getTime() + 2 * 60 * 60 * 1000);
@@ -48,7 +52,7 @@ export default function RsvpConfirmationEmail({ eventTitle, venueName, eventSlug
   const shareOnXUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(`I'm going to ${eventTitle}`)}&url=${encodeURIComponent(eventUrl)}`;
   const starts = new Date(startAt);
   const calendarLink = buildCalendarDataUri({ eventTitle, venueName, eventSlug, startAt, venueAddress, confirmationCode });
-  const qrCodeDataUri = qrcode.toDataURL(confirmationCode);
+  const qrCodeDataUri = generateQrCodeDataUri(confirmationCode);
 
   return (
     <EmailLayout preview={`RSVP confirmed for ${eventTitle}.`}>

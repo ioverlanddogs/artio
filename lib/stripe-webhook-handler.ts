@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
 
-type StripeEvent = {
-  type: string;
-  data: {
-    object: {
-      id?: string;
-      charges_enabled?: boolean;
-      payouts_enabled?: boolean;
-      deleted?: boolean;
-      payment_intent?: string | null;
-      metadata?: { registrationId?: string };
-    };
-  };
-};
+import type { StripeWebhookEvent } from "@/lib/stripe";
 
 type Deps = {
   getWebhookSecret: () => Promise<string | null | undefined>;
-  constructEvent: (payload: string, signature: string, secret: string) => StripeEvent;
+  constructEvent: (payload: string, signature: string, secret: string) => StripeWebhookEvent;
   findStripeAccountByStripeAccountId: (stripeAccountId: string) => Promise<{ id: string } | null>;
   updateStripeAccount: (id: string, data: { chargesEnabled?: boolean; payoutsEnabled?: boolean; status: "ACTIVE" | "RESTRICTED" | "DEAUTHORIZED" }) => Promise<unknown>;
   findRegistrationByPaymentIntentId: (paymentIntentId: string) => Promise<{ id: string; status: "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED" } | null>;
@@ -34,7 +22,7 @@ export async function handleStripeWebhook(req: Request, deps: Deps) {
   if (!signature) return apiError(400, "invalid_signature", "Missing Stripe signature header");
 
   const payload = await req.text();
-  let event: StripeEvent;
+  let event: StripeWebhookEvent;
   try {
     event = deps.constructEvent(payload, signature, webhookSecret);
   } catch {

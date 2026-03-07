@@ -48,7 +48,6 @@ type Deps = {
     status: RegistrationStatus;
     confirmationCode: string;
     promoCodeId: string | null;
-    discountAppliedGbp: number | null;
     incrementPromoCodeUsageBy: number | null;
   }) => Promise<{ id: string; confirmationCode: string }>;
   createCheckoutSession: (params: {
@@ -141,7 +140,6 @@ export async function handlePostCheckoutSession(req: NextRequest, slug: string, 
     status: "PENDING",
     confirmationCode: deps.generateConfirmationCode(),
     promoCodeId,
-    discountAppliedGbp,
     incrementPromoCodeUsageBy: promoCodeId ? parsedBody.data.quantity : null,
   });
 

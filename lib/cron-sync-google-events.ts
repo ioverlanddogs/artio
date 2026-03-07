@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { validateCronRequest } from "@/lib/cron-auth";
 import { createCronRunId } from "@/lib/cron-runtime";
 import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
@@ -6,7 +7,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 type DbLike = {
   event: {
-    findMany: (args: any) => Promise<Array<{ slug: string }>>;
+    findMany: (args?: Prisma.EventFindManyArgs) => Promise<Array<{ slug: string }>>;
   };
 };
 

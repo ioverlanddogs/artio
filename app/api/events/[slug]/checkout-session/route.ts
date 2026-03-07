@@ -54,7 +54,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
           status: data.status,
           confirmationCode: data.confirmationCode,
           promoCodeId: data.promoCodeId,
-          discountAppliedGbp: data.discountAppliedGbp,
         },
         select: { id: true, confirmationCode: true },
       });
