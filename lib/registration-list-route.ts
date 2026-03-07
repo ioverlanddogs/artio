@@ -16,6 +16,9 @@ type RegistrationRow = {
   tierName: string | null;
   status: "PENDING" | "CONFIRMED" | "WAITLISTED" | "CANCELLED";
   quantity: number;
+  stripePaymentIntentId?: string | null;
+  refundedAt?: Date | null;
+  refundedAmountGbp?: number | null;
   createdAt: Date;
 };
 

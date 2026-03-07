@@ -13,6 +13,7 @@ function makeDeps(options?: {
   const deps: Parameters<typeof confirmCheckoutSession>[2] = {
     retrieveCheckoutSession: async () => ({
       payment_status: options?.paymentStatus ?? "paid",
+      amount_total: 3200,
       metadata: { registrationId: "reg-1", confirmationCode: "AP-ABC123" },
     }),
     findPublishedEventBySlug: async () => ({ slug: "spring-open", title: "Spring Open" }),
@@ -25,7 +26,7 @@ function makeDeps(options?: {
         guestEmail: "jane@example.com",
       };
     },
-    updateRegistrationStatus: async () => {
+    updateRegistrationStatus: async (_registrationId, _data) => {
       updatedToConfirmed = true;
     },
     enqueueNotification: async () => {
