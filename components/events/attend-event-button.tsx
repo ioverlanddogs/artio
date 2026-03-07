@@ -11,13 +11,16 @@ type AttendEventButtonProps = {
   eventId: string;
   nextUrl: string;
   isAuthenticated: boolean;
+  ticketingMode?: "EXTERNAL" | "RSVP" | "PAID" | null;
   analytics?: {
     eventSlug?: string;
     ui?: "detail" | "calendar_panel";
   };
 };
 
-export function AttendEventButton({ eventId, nextUrl, isAuthenticated, analytics }: AttendEventButtonProps) {
+export function AttendEventButton({ eventId, nextUrl, isAuthenticated, analytics, ticketingMode }: AttendEventButtonProps) {
+  if (ticketingMode === "RSVP") return null;
+
   const router = useRouter();
   const [count, setCount] = useState(0);
   const [isGoing, setIsGoing] = useState(false);

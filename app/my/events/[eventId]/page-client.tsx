@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { enqueueToast } from "@/lib/toast";
 import { FeaturedEventImagePanel } from "@/app/my/events/_components/FeaturedEventImagePanel";
 import { EVENT_TYPE_OPTIONS, type EventTypeOption, getEventTypeLabel } from "@/lib/event-types";
@@ -13,6 +14,8 @@ function toUtcDatetimeLocal(isoString: string): string {
 
 type VenueOption = { id: string; name: string };
 type SeriesOption = { id: string; title: string; slug: string };
+type TicketingMode = "EXTERNAL" | "RSVP" | "PAID" | null;
+type Tier = { id: string; name: string; capacity: number | null; sortOrder: number; isActive: boolean };
 
 type EventEditorProps = {
   event: {
@@ -27,6 +30,9 @@ type EventEditorProps = {
     eventType: EventTypeOption | null;
     featuredAssetId: string | null;
     featuredAsset: { url: string | null } | null;
+    ticketingMode: TicketingMode;
+    capacity: number | null;
+    rsvpClosesAt: string | null;
   };
   venues: VenueOption[];
 };
@@ -44,6 +50,12 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
   const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
   const [description, setDescription] = useState(event.description ?? "");
   const [eventType, setEventType] = useState<EventTypeOption>(event.eventType ?? "OTHER");
+  const [ticketingMode, setTicketingMode] = useState<"EXTERNAL" | "RSVP">(event.ticketingMode === "RSVP" ? "RSVP" : "EXTERNAL");
+  const [capacity, setCapacity] = useState(event.capacity != null ? String(event.capacity) : "");
+  const [rsvpClosesAt, setRsvpClosesAt] = useState(event.rsvpClosesAt ? toUtcDatetimeLocal(event.rsvpClosesAt) : "");
+  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [tierName, setTierName] = useState("");
+  const [tierCapacity, setTierCapacity] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +82,33 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
     }
     void loadSeries();
   }, [venueId]);
+
+  async function loadTiers() {
+    const res = await fetch(`/api/my/events/${event.id}/ticket-tiers`, { cache: "no-store" });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) setTiers(Array.isArray(body.tiers) ? body.tiers : []);
+  }
+
+  useEffect(() => {
+    if (ticketingMode !== "RSVP") return;
+    void loadTiers();
+  }, [event.id, ticketingMode]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void fetch(`/api/my/events/${event.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ticketingMode,
+          capacity: ticketingMode === "RSVP" ? (capacity.trim() ? Number(capacity) : null) : null,
+          rsvpClosesAt: ticketingMode === "RSVP" ? (rsvpClosesAt ? new Date(`${rsvpClosesAt}:00Z`).toISOString() : null) : null,
+        }),
+      });
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [capacity, event.id, rsvpClosesAt, ticketingMode]);
 
   async function onCreateSeries() {
     if (!venueId || !newSeriesTitle.trim()) return;
@@ -108,6 +147,9 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
         ticketUrl: ticketUrl || null,
         description: description || null,
         eventType,
+        ticketingMode,
+        capacity: ticketingMode === "RSVP" ? (capacity.trim() ? Number(capacity) : null) : null,
+        rsvpClosesAt: ticketingMode === "RSVP" ? (rsvpClosesAt ? new Date(`${rsvpClosesAt}:00Z`).toISOString() : null) : null,
       }),
     });
 
@@ -121,6 +163,30 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
     enqueueToast({ title: "Event saved", variant: "success" });
     router.refresh();
     setSaving(false);
+  }
+
+  async function addTier() {
+    const res = await fetch(`/api/my/events/${event.id}/ticket-tiers`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: tierName, capacity: tierCapacity.trim() ? Number(tierCapacity) : null, priceAmount: 0, currency: "GBP", isActive: true }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    await loadTiers();
+    setTierName("");
+    setTierCapacity("");
+  }
+
+  async function updateTier(tierId: string, patch: Partial<Tier>) {
+    const res = await fetch(`/api/my/events/${event.id}/ticket-tiers/${tierId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    await loadTiers();
   }
 
   return (
@@ -150,29 +216,61 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
           </label>
           {venueId ? (
             <div className="flex gap-2">
-              <input
-                className="w-full rounded border p-2"
-                value={newSeriesTitle}
-                onChange={(e) => setNewSeriesTitle(e.target.value)}
-                placeholder="Create new series title"
-              />
-              <Button type="button" variant="outline" onClick={() => void onCreateSeries()} disabled={isCreatingSeries || !newSeriesTitle.trim()}>
-                {isCreatingSeries ? "Creating..." : "Create"}
-              </Button>
+              <input className="w-full rounded border p-2" value={newSeriesTitle} onChange={(e) => setNewSeriesTitle(e.target.value)} placeholder="Create new series title" />
+              <Button type="button" variant="outline" onClick={() => void onCreateSeries()} disabled={isCreatingSeries || !newSeriesTitle.trim()}>{isCreatingSeries ? "Creating..." : "Create"}</Button>
             </div>
           ) : null}
         </div>
       </section>
 
       <section className="space-y-3 rounded border p-4">
-        {/* Dates stored and displayed in UTC */}
         <label className="block" id="startAt"><span className="text-sm">Start at (UTC)</span><input className="w-full rounded border p-2" type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></label>
         <label className="block" id="endAt"><span className="text-sm">End at (UTC, optional)</span><input className="w-full rounded border p-2" type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></label>
       </section>
 
       <section className="space-y-3 rounded border p-4">
         <label className="block" id="description"><span className="text-sm">Description</span><textarea className="w-full rounded border p-2" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
-        <label className="block" id="ticketUrl"><span className="text-sm">Ticket URL</span><input className="w-full rounded border p-2" type="url" value={ticketUrl} onChange={(e) => setTicketUrl(e.target.value)} /></label>
+      </section>
+
+      <section className="space-y-3 rounded border p-4">
+        <h3 className="text-sm font-semibold">Ticketing</h3>
+        <Tabs value={ticketingMode} onValueChange={(value) => setTicketingMode(value as "EXTERNAL" | "RSVP")}>
+          <TabsList>
+            <TabsTrigger value="EXTERNAL">External URL</TabsTrigger>
+            <TabsTrigger value="RSVP">Free RSVP</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {ticketingMode === "EXTERNAL" ? (
+          <label className="block" id="ticketUrl"><span className="text-sm">Ticket URL</span><input className="w-full rounded border p-2" type="url" value={ticketUrl} onChange={(e) => setTicketUrl(e.target.value)} /></label>
+        ) : (
+          <div className="space-y-3">
+            <label className="block text-sm">Capacity (blank = unlimited)<input className="mt-1 w-full rounded border p-2" type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
+            <label className="block text-sm">RSVP close at (UTC)<input className="mt-1 w-full rounded border p-2" type="datetime-local" value={rsvpClosesAt} onChange={(e) => setRsvpClosesAt(e.target.value)} /></label>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Tiers</p>
+              <div className="flex gap-2">
+                <input className="w-full rounded border p-2" placeholder="Tier name" value={tierName} onChange={(e) => setTierName(e.target.value)} />
+                <input className="w-40 rounded border p-2" placeholder="Capacity" type="number" min={1} value={tierCapacity} onChange={(e) => setTierCapacity(e.target.value)} />
+                <Button type="button" variant="outline" onClick={() => void addTier()} disabled={!tierName.trim()}>Add tier</Button>
+              </div>
+
+              <ul className="space-y-2">
+                {tiers.map((tier, index) => (
+                  <li key={tier.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                    <span>{tier.name} {tier.capacity != null ? `(${tier.capacity})` : "(unlimited)"}</span>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => void updateTier(tier.id, { isActive: !tier.isActive })}>{tier.isActive ? "Active" : "Inactive"}</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => void updateTier(tier.id, { sortOrder: Math.max(0, tier.sortOrder - 1) })}>↑</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => void updateTier(tier.id, { sortOrder: tier.sortOrder + 1 })}>↓</Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3 rounded border p-4">

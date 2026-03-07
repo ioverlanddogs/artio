@@ -38,6 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ev
             }
           : {}),
         ...(data.eventType !== undefined ? { eventType: data.eventType } : {}),
+        ...(data.ticketingMode !== undefined ? { ticketingMode: data.ticketingMode } : {}),
+        ...(Object.prototype.hasOwnProperty.call(data, "capacity") ? { capacity: data.capacity ?? null } : {}),
+        ...(Object.prototype.hasOwnProperty.call(data, "rsvpClosesAt") ? { rsvpClosesAt: data.rsvpClosesAt ?? null } : {}),
         ...(data.seriesId !== undefined
           ? {
               series: data.seriesId

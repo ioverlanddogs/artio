@@ -22,6 +22,7 @@ import { ArtworkCountBadge } from "@/components/artwork/artwork-count-badge";
 import { countPublishedArtworksByEvent, listPublishedArtworksByEvent } from "@/lib/artworks";
 import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
 import { listPublishedEventsInSeriesWithDeps } from "@/lib/series-events";
+import { RsvpWidget } from "@/components/events/rsvp-widget";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
               <ArtworkCountBadge count={artworkCount} href={`/artwork?eventId=${event.id}`} badgeClassName="border-white/40 bg-white/10 text-white" />
             </div>
             <p className="type-caption text-white/90">{formatEventDateRange(event.startAt, event.endAt)} · {event.venue?.name ?? "Venue TBA"}</p>
-            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} subscribeFeedLink={event.venue?.slug ? `/api/venues/${event.venue.slug}/calendar` : null} />
+            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} subscribeFeedLink={event.venue?.slug ? `/api/venues/${event.venue.slug}/calendar` : null} ticketingMode={event.ticketingMode} />
             {isAuthenticated && (event.venue?.slug || event.eventArtists[0]?.artist.slug) ? (
               <ContextualNudgeSlot
                 page="event_detail"
@@ -141,6 +142,11 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
           <p className="type-caption">{formatEventDateRange(event.startAt, event.endAt)}</p>
           <p className="type-caption">{event.venue?.name ?? "Venue TBA"}</p>
           <p className="type-caption">{event.venue?.addressLine1 ?? "Address unavailable"}</p>
+          {event.ticketingMode === "RSVP" ? (
+            <RsvpWidget eventSlug={event.slug} initialAvailability={{ available: null, isSoldOut: false, isRsvpClosed: false, tiers: [] }} />
+          ) : event.ticketUrl ? (
+            <Link href={event.ticketUrl} className="text-sm underline" target="_blank" rel="noreferrer">Get tickets</Link>
+          ) : null}
           {event.venue?.slug ? <Link href={`/venues/${event.venue.slug}`} className="text-sm underline">View details</Link> : null}
         </Card>
       </section>

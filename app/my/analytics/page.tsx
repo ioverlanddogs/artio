@@ -3,6 +3,7 @@ import { redirectToLogin } from "@/lib/auth-redirect";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeArtworkAnalytics } from "@/lib/artwork-analytics";
+import { RegistrationsAnalyticsSection } from "@/app/my/analytics/registrations-section";
 
 export default async function MyAnalyticsPage() {
   const user = await getSessionUser();
@@ -54,6 +55,8 @@ export default async function MyAnalyticsPage() {
           </ul>
         )}
       </section>
+
+      <RegistrationsAnalyticsSection />
     </main>
   );
 }

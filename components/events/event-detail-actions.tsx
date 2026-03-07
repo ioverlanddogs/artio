@@ -15,6 +15,7 @@ export function EventDetailActions({
   initialSaved,
   calendarLink,
   subscribeFeedLink,
+  ticketingMode,
 }: {
   eventId: string;
   eventSlug: string;
@@ -23,6 +24,7 @@ export function EventDetailActions({
   initialSaved: boolean;
   calendarLink: string;
   subscribeFeedLink?: string | null;
+  ticketingMode?: "EXTERNAL" | "RSVP" | "PAID" | null;
 }) {
   useEffect(() => {
     track("event_viewed", { eventSlug, source: "events" });
@@ -31,7 +33,7 @@ export function EventDetailActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SaveEventButton eventId={eventId} initialSaved={initialSaved} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} />
-      <AttendEventButton eventId={eventId} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} />
+      <AttendEventButton eventId={eventId} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} ticketingMode={ticketingMode} />
       <Button asChild variant="secondary" size="sm">
         <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => track("event_add_to_calendar_clicked", { eventSlug })}>Add to Calendar</a>
       </Button>
