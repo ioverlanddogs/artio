@@ -23,6 +23,7 @@ import { countPublishedArtworksByEvent, listPublishedArtworksByEvent } from "@/l
 import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
 import { listPublishedEventsInSeriesWithDeps } from "@/lib/series-events";
 import { RsvpWidget } from "@/components/events/rsvp-widget";
+import { PaidTicketWidget } from "@/components/events/paid-ticket-widget";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,11 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
         eventTags: { include: { tag: true } },
         eventArtists: { include: { artist: { select: { id: true, slug: true, name: true } } } },
         images: { include: { asset: { select: { url: true } } }, orderBy: { sortOrder: "asc" } },
+        ticketTiers: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: { id: true, name: true, description: true, priceAmount: true, currency: true },
+        },
       },
     }),
     getSessionUser(),
@@ -144,6 +150,8 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
           <p className="type-caption">{event.venue?.addressLine1 ?? "Address unavailable"}</p>
           {event.ticketingMode === "RSVP" ? (
             <RsvpWidget eventSlug={event.slug} initialAvailability={{ available: null, isSoldOut: false, isRsvpClosed: false, tiers: [] }} />
+          ) : event.ticketingMode === "PAID" ? (
+            <PaidTicketWidget eventSlug={event.slug} tiers={event.ticketTiers} />
           ) : event.ticketUrl ? (
             <Link href={event.ticketUrl} className="text-sm underline" target="_blank" rel="noreferrer">Get tickets</Link>
           ) : null}
