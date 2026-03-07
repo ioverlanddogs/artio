@@ -4,6 +4,8 @@ import { canEditSubmission } from "@/lib/ownership";
 import { eventIdParamSchema, myEventPatchSchema, parseBody, zodDetails } from "@/lib/validators";
 import type { EventTypeOption } from "@/lib/event-types";
 
+type TicketingModeOption = "EXTERNAL" | "RSVP" | "PAID";
+
 type SessionUser = { id: string };
 
 type SubmissionRecord = {
@@ -24,6 +26,9 @@ type UpdateEventInput = {
   venueId?: string | null;
   featuredAssetId?: string | null;
   eventType?: EventTypeOption | null;
+  ticketingMode?: TicketingModeOption;
+  capacity?: number | null;
+  rsvpClosesAt?: Date | null;
   seriesId?: string | null;
   images?: Array<{ assetId?: string | null; url?: string | null; alt?: string | null; sortOrder: number }>;
 };
@@ -79,6 +84,9 @@ export async function handlePatchMyEvent(req: NextRequest, params: Promise<{ eve
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "venueId") ? { venueId: parsed.data.venueId ?? null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "featuredAssetId") ? { featuredAssetId: parsed.data.featuredAssetId ?? null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "eventType") ? { eventType: parsed.data.eventType ?? null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(parsed.data, "ticketingMode") ? { ticketingMode: parsed.data.ticketingMode } : {}),
+      ...(Object.prototype.hasOwnProperty.call(parsed.data, "capacity") ? { capacity: parsed.data.capacity ?? null } : {}),
+      ...(Object.prototype.hasOwnProperty.call(parsed.data, "rsvpClosesAt") ? { rsvpClosesAt: parsed.data.rsvpClosesAt ? new Date(parsed.data.rsvpClosesAt) : null } : {}),
       ...(Object.prototype.hasOwnProperty.call(parsed.data, "seriesId") ? { seriesId: parsed.data.seriesId ?? null } : {}),
       ...(images ? { images } : {}),
     };

@@ -644,6 +644,9 @@ export const myEventPatchSchema = z.object({
   images: z.array(eventImageSchema).optional(),
   featuredAssetId: z.string().uuid().optional().nullable(),
   eventType: z.enum(EVENT_TYPE_OPTIONS).optional().nullable(),
+  ticketingMode: z.enum(["EXTERNAL", "RSVP", "PAID"]).optional(),
+  capacity: z.number().int().positive().optional().nullable(),
+  rsvpClosesAt: isoDatetimeSchema.optional().nullable(),
   seriesId: z.string().uuid().optional().nullable(),
   note: z.string().trim().max(2000).optional().nullable(),
 }).superRefine((data, ctx) => {

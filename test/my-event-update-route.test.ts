@@ -189,3 +189,174 @@ test("PATCH my event assigns seriesId", async () => {
   assert.equal(updatedSeriesId, seriesId);
   assert.equal(body.seriesId, seriesId);
 });
+
+test("PATCH my event sets ticketingMode to RSVP", async () => {
+  let updatedTicketingMode: string | undefined;
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ticketingMode: "RSVP" }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedTicketingMode = data.ticketingMode;
+      return { id: eventId, ticketingMode: data.ticketingMode };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedTicketingMode, "RSVP");
+  assert.equal(body.ticketingMode, "RSVP");
+});
+
+test("PATCH my event sets capacity to a positive integer", async () => {
+  let updatedCapacity: number | null | undefined;
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ capacity: 125 }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedCapacity = data.capacity;
+      return { id: eventId, capacity: data.capacity ?? null };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedCapacity, 125);
+  assert.equal(body.capacity, 125);
+});
+
+test("PATCH my event clears capacity", async () => {
+  let updatedCapacity: number | null | undefined = 10;
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ capacity: null }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedCapacity = data.capacity;
+      return { id: eventId, capacity: data.capacity ?? null };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedCapacity, null);
+  assert.equal(body.capacity, null);
+});
+
+test("PATCH my event sets rsvpClosesAt to a valid datetime", async () => {
+  let updatedRsvpClosesAt: Date | null | undefined;
+  const rsvpClosesAt = "2026-03-10T12:00:00.000Z";
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ rsvpClosesAt }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedRsvpClosesAt = data.rsvpClosesAt;
+      return { id: eventId, rsvpClosesAt: data.rsvpClosesAt?.toISOString() ?? null };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedRsvpClosesAt?.toISOString(), rsvpClosesAt);
+  assert.equal(body.rsvpClosesAt, rsvpClosesAt);
+});
+
+test("PATCH my event clears rsvpClosesAt", async () => {
+  let updatedRsvpClosesAt: Date | null | undefined = new Date("2026-03-01T00:00:00Z");
+
+  const req = new NextRequest(`http://localhost/api/my/events/${eventId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ rsvpClosesAt: null }),
+  });
+
+  const res = await handlePatchMyEvent(req, Promise.resolve({ eventId }), {
+    requireAuth: async () => ({ id: "user-1" }),
+    findSubmission: async () => ({
+      id: "submission-1",
+      submitterUserId: "user-1",
+      status: "DRAFT",
+      venue: { memberships: [{ id: "membership-1" }] },
+      targetEvent: { isPublished: false },
+    }),
+    countOwnedAssets: async () => 0,
+    hasVenueMembership: async () => true,
+    updateEvent: async (_, data) => {
+      updatedRsvpClosesAt = data.rsvpClosesAt;
+      return { id: eventId, rsvpClosesAt: data.rsvpClosesAt?.toISOString() ?? null };
+    },
+    updateSubmissionVenue: async () => undefined,
+    updateSubmissionNote: async () => undefined,
+  });
+
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(updatedRsvpClosesAt, null);
+  assert.equal(body.rsvpClosesAt, null);
+});
