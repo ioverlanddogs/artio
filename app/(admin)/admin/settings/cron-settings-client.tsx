@@ -90,7 +90,7 @@ export default function CronSettingsClient() {
     <section className="space-y-4 rounded-lg border bg-background p-4">
       <h2 className="text-base font-semibold">Scheduled Jobs</h2>
       <div className="rounded-md border p-3 text-sm">{tickBanner}</div>
-      <p className="text-xs text-muted-foreground">The tick endpoint /api/cron/tick must be called every minute by an external service (e.g. UptimeRobot) with Authorization: Bearer &lt;CRON_SECRET&gt;. On Vercel Pro/Team this is handled automatically via vercel.json.</p>
+      <p className="text-xs text-muted-foreground">The tick endpoint /api/cron/tick must be called every minute by an external ping service. Set up a free UptimeRobot monitor (POST to /api/cron/tick with Authorization: Bearer &lt;CRON_SECRET&gt;, interval 5 minutes) or Better Uptime for 1-minute resolution. Vercel cron scheduling is not used.</p>
       <Table>
         <TableHeader>
           <TableRow>
