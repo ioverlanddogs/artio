@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export function CalendarHeaderActions() {
+export function CalendarHeaderActions({ isAuthenticated }: { isAuthenticated: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,6 +21,11 @@ export function CalendarHeaderActions() {
         <button type="button" className={`rounded px-2 py-1 ${mode === "agenda" ? "bg-foreground text-background" : "text-foreground"}`} onClick={() => setMode("agenda")} aria-pressed={mode === "agenda"}>List</button>
       </div>
       <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => window.dispatchEvent(new Event("calendar:today"))}>Today</button>
+      {isAuthenticated ? (
+        <a href="/api/calendar-events/saved" className="rounded border px-3 py-1 text-sm" title="Subscribe to your saved events calendar feed">
+          Subscribe
+        </a>
+      ) : null}
     </div>
   );
 }

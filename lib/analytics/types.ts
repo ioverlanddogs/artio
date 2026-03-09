@@ -133,6 +133,7 @@ export type AnalyticsProps = {
   saveRate?: number;
   followRate?: number;
   explorationCtr?: number;
+  provider?: "google" | "ical" | "outlook" | string;
 };
 
 export type AnalyticsPayload = {

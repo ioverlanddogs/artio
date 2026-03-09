@@ -129,7 +129,10 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
     ...(primaryImage?.url ? { image: [primaryImage.url] } : {}),
   };
 
-  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${new Date(event.startAt).toISOString().replace(/[-:]|\.\d{3}/g, "")}/${new Date(event.endAt ?? event.startAt).toISOString().replace(/[-:]|\.\d{3}/g, "")}`;
+  const endForCalendar = event.endAt ?? new Date(new Date(event.startAt).getTime() + 60 * 60 * 1000);
+  const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${new Date(event.startAt).toISOString().replace(/[-:]|\.\d{3}/g, "")}/${new Date(endForCalendar).toISOString().replace(/[-:]|\.\d{3}/g, "")}`;
+  const outlookCalendarLink = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(event.title)}&startdt=${new Date(event.startAt).toISOString()}&enddt=${endForCalendar.toISOString()}${event.venue?.name ? `&location=${encodeURIComponent(event.venue.name)}` : ""}&path=%2Fcalendar%2Faction%2Fcompose&rru=addevent`;
+  const icalLink = `/api/events/${event.slug}/ical`;
 
   return (
     <PageShell className="page-stack">
@@ -146,7 +149,7 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
               <ArtworkCountBadge count={artworkCount} href={`/artwork?eventId=${event.id}`} badgeClassName="border-white/40 bg-white/10 text-white" />
             </div>
             <p className="type-caption text-white/90">{formatEventDateRange(event.startAt, event.endAt)} · {event.venue?.name ?? "Venue TBA"}</p>
-            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} subscribeFeedLink={event.venue?.slug ? `/api/venues/${event.venue.slug}/calendar` : null} ticketingMode={event.ticketingMode} />
+            <EventDetailActions eventId={event.id} eventSlug={event.slug} nextUrl={`/events/${slug}`} isAuthenticated={isAuthenticated} initialSaved={initialSaved} calendarLink={calendarLink} outlookCalendarLink={outlookCalendarLink} icalLink={icalLink} subscribeFeedLink={event.venue?.slug ? `/api/venues/${event.venue.slug}/calendar` : null} ticketingMode={event.ticketingMode} />
             {isAuthenticated && (event.venue?.slug || event.eventArtists[0]?.artist.slug) ? (
               <ContextualNudgeSlot
                 page="event_detail"
