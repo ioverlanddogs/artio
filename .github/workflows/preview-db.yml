@@ -210,10 +210,40 @@ jobs:
           DATABASE_URL: ${{ steps.normalize-urls.outputs.database_url }}
           DIRECT_URL: ${{ steps.normalize-urls.outputs.direct_url }}
         run: |
-          pnpm dlx vercel env rm DATABASE_URL preview --yes --git-branch "$PR_GIT_BRANCH" --token "$VERCEL_TOKEN" >/dev/null 2>&1 || true
-          pnpm dlx vercel env rm DIRECT_URL preview --yes --git-branch "$PR_GIT_BRANCH" --token "$VERCEL_TOKEN" >/dev/null 2>&1 || true
-          printf "%s" "$DATABASE_URL" | pnpm dlx vercel env add DATABASE_URL preview --git-branch "$PR_GIT_BRANCH" --token "$VERCEL_TOKEN"
-          printf "%s" "$DIRECT_URL" | pnpm dlx vercel env add DIRECT_URL preview --git-branch "$PR_GIT_BRANCH" --token "$VERCEL_TOKEN"
+          VERCEL_ENV_LIST_URL="https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?gitBranch=$PR_GIT_BRANCH&teamId=$VERCEL_ORG_ID"
+          VERCEL_ENV_CREATE_URL="https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID"
+
+          ENV_ID=$(curl -sf \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "$VERCEL_ENV_LIST_URL" \
+            | jq -r '.envs[] | select(.key == "DATABASE_URL" and .gitBranch == env.PR_GIT_BRANCH) | .id' || true)
+          if [ -n "$ENV_ID" ]; then
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$ENV_ID?teamId=$VERCEL_ORG_ID" > /dev/null
+          fi
+
+          curl -sf -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\":\"DATABASE_URL\",\"value\":\"$DATABASE_URL\",\"type\":\"encrypted\",\"target\":[\"preview\"],\"gitBranch\":\"$PR_GIT_BRANCH\"}" \
+            "$VERCEL_ENV_CREATE_URL" > /dev/null
+
+          ENV_ID=$(curl -sf \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "$VERCEL_ENV_LIST_URL" \
+            | jq -r '.envs[] | select(.key == "DIRECT_URL" and .gitBranch == env.PR_GIT_BRANCH) | .id' || true)
+          if [ -n "$ENV_ID" ]; then
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$ENV_ID?teamId=$VERCEL_ORG_ID" > /dev/null
+          fi
+
+          curl -sf -X POST \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\":\"DIRECT_URL\",\"value\":\"$DIRECT_URL\",\"type\":\"encrypted\",\"target\":[\"preview\"],\"gitBranch\":\"$PR_GIT_BRANCH\"}" \
+            "$VERCEL_ENV_CREATE_URL" > /dev/null
           echo "set-env OK: Vercel preview env vars updated for branch $PR_GIT_BRANCH"
 
       - name: Skip Vercel steps (missing secrets)

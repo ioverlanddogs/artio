@@ -31,6 +31,16 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Check Vercel secrets
+        id: vercel_secrets
+        shell: bash
+        run: |
+          ok=true
+          [ -n "${{ secrets.VERCEL_TOKEN }}" ] || ok=false
+          [ -n "${{ secrets.VERCEL_ORG_ID }}" ] || ok=false
+          [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ] || ok=false
+          echo "has_vercel_secrets=$ok" >> "$GITHUB_OUTPUT"
+
       - name: Skip when Neon secrets are unavailable
         run: |
           if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
@@ -40,3 +50,32 @@ jobs:
 
       - name: Delete preview Neon branch
         run: node scripts/neon/delete-branch.mjs --branch-name "$PR_BRANCH_NAME" --parent-branch "$PARENT_NEON_BRANCH"
+
+      - name: Remove Vercel Preview env vars for this git branch
+        if: ${{ steps.vercel_secrets.outputs.has_vercel_secrets == 'true' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PR_GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          VERCEL_ENV_LIST_URL="https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?gitBranch=$PR_GIT_BRANCH&teamId=$VERCEL_ORG_ID"
+
+          for ENV_KEY in DATABASE_URL DIRECT_URL; do
+            ENV_ID=$(curl -sf \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "$VERCEL_ENV_LIST_URL" \
+              | jq -r --arg key "$ENV_KEY" '.envs[] | select(.key == $key and .gitBranch == env.PR_GIT_BRANCH) | .id' || true)
+
+            if [ -n "$ENV_ID" ]; then
+              curl -sf -X DELETE \
+                -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$ENV_ID?teamId=$VERCEL_ORG_ID" > /dev/null
+            fi
+          done
+
+          echo "cleanup-env OK: Vercel preview env vars removed for branch $PR_GIT_BRANCH"
+
+      - name: Skip Vercel cleanup (missing secrets)
+        if: ${{ steps.vercel_secrets.outputs.has_vercel_secrets != 'true' }}
+        run: echo "Skipping Vercel env cleanup because Vercel secrets are not available."
