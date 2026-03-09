@@ -16,7 +16,7 @@ export default async function CalendarPage() {
   if (!hasDatabaseUrl() && !fixturesEnabled) {
     return (
       <PageShell className="page-stack">
-        <PageHeader title="Calendar" subtitle="Your saved and followed events" actions={<CalendarHeaderActions isAuthenticated={Boolean(user)} />} />
+        <PageHeader title="Calendar" subtitle="Your saved and followed events" actions={user ? <CalendarHeaderActions isAuthenticated /> : undefined} />
         <DataSourceEmptyState isAdmin={user?.role === "ADMIN"} showDevHint={process.env.NODE_ENV === "development"} />
       </PageShell>
     );
@@ -24,7 +24,7 @@ export default async function CalendarPage() {
 
   return (
     <PageShell className="page-stack">
-      <PageHeader title="Calendar" subtitle="Your saved and followed events" actions={<CalendarHeaderActions isAuthenticated={Boolean(user)} />} />
+      <PageHeader title="Calendar" subtitle="Your saved and followed events" actions={user ? <CalendarHeaderActions isAuthenticated /> : undefined} />
       <CalendarClient isAuthenticated={Boolean(user)} fixtureItems={fixturesEnabled && !hasDatabaseUrl() ? uiFixtureEvents.map((event) => ({ id: event.id, title: event.title, slug: event.slug, start: event.startAt, end: event.endAt, venue: event.venue, artistIds: event.artistIds })) : undefined} fallbackFixtureItems={fixturesEnabled ? uiFixtureEvents.map((event) => ({ id: event.id, title: event.title, slug: event.slug, start: event.startAt, end: event.endAt, venue: event.venue, artistIds: event.artistIds })) : undefined} />
     </PageShell>
   );

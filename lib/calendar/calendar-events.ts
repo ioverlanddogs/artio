@@ -32,6 +32,7 @@ type CalendarEventRow = {
   venue: { id: string; name: string } | null;
   eventArtists: Array<{ artistId: string }>;
   images: Array<{ url?: string | null; alt?: string | null; sortOrder?: number | null; isPrimary?: boolean | null; asset?: { url?: string | null } | null }>;
+  description: string | null;
 };
 
 export type CalendarEventDeps = {
@@ -47,6 +48,7 @@ const eventSelect = {
   slug: true,
   startAt: true,
   endAt: true,
+  description: true,
   venue: { select: { id: true, name: true } },
   eventArtists: { select: { artistId: true } },
   images: { orderBy: { sortOrder: "asc" }, include: { asset: { select: { url: true } } } },
@@ -73,6 +75,7 @@ function mapCalendarItems(items: CalendarEventRow[]) {
       venue: event.venue,
       artistIds: event.eventArtists.map((eventArtist) => eventArtist.artistId),
       featuredImageUrl: image?.url ?? null,
+      description: event.description ?? null,
     };
   });
 }

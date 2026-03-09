@@ -13,6 +13,7 @@ const sampleRows = [
     venue: { id: "venue-2", name: "Venue 2" },
     eventArtists: [{ artistId: "artist-2" }],
     images: [],
+    description: null,
     featuredImageUrl: null,
   },
   {
@@ -24,6 +25,7 @@ const sampleRows = [
     venue: { id: "venue-1", name: "Venue 1" },
     eventArtists: [{ artistId: "artist-1" }],
     images: [],
+    description: null,
     featuredImageUrl: null,
   },
 ];
@@ -43,6 +45,7 @@ test("GET /api/calendar-events scope=all does not require auth and requests rang
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(body.items.map((item: { id: string }) => item.id), ["b", "a"]);
+  assert.equal(body.items[0].description, null);
   assert.deepEqual(capturedArgs.orderBy, [{ startAt: "asc" }, { id: "asc" }]);
   assert.equal(capturedArgs.where.isPublished, true);
 });
