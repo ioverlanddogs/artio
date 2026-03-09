@@ -16,7 +16,6 @@ import { EventCard } from "@/components/events/event-card";
 import { EventCardSkeleton } from "@/components/events/event-card-skeleton";
 import { EventRow } from "@/components/events/event-row";
 import { InlineBanner } from "@/components/ui/inline-banner";
-import { Section } from "@/components/ui/section";
 import { SaveEventButton } from "@/components/events/save-event-button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buildEventQueryString, parseEventFilters } from "@/lib/events-filters";
@@ -30,6 +29,8 @@ type CalendarItem = {
   end: string | null;
   venue?: { id?: string | null; name?: string | null } | null;
   artistIds?: string[];
+  featuredImageUrl?: string | null;
+  description?: string | null;
 };
 
 type EventsResponse = { items: CalendarItem[]; truncated?: boolean };
@@ -47,6 +48,16 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   const scope = parseCalendarScope(searchParams?.get("scope"));
   const viewMode = searchParams?.get("view") === "agenda" ? "agenda" : "calendar";
 
+  function setViewMode(next: "calendar" | "agenda") {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (next === "agenda") {
+      params.set("view", "agenda");
+    } else {
+      params.delete("view");
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   const [events, setEvents] = useState<CalendarItem[]>(fixtureItems ?? []);
   const [isLoading, setIsLoading] = useState(!fixtureItems);
   const [error, setError] = useState<string | null>(null);
@@ -61,18 +72,15 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
 
   useEffect(() => {
     track("calendar_viewed");
-    const onToday = () => calendarRef.current?.getApi().today();
     const onFollowToggled = () => {
       if (scope === "following") refetchEvents();
     };
     const onSaveToggled = () => {
       if (scope === "saved") refetchEvents();
     };
-    window.addEventListener("calendar:today", onToday);
     window.addEventListener("artpulse:follow_toggled", onFollowToggled);
     window.addEventListener("artpulse:event_saved_toggled", onSaveToggled);
     return () => {
-      window.removeEventListener("calendar:today", onToday);
       window.removeEventListener("artpulse:follow_toggled", onFollowToggled);
       window.removeEventListener("artpulse:event_saved_toggled", onSaveToggled);
     };
@@ -125,13 +133,23 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   useEffect(() => { void fetchEvents(); }, [fetchEvents, reloadToken]);
 
   const activeTags = useMemo(() => parsedTags.map((tag) => tag.trim()).filter(Boolean), [parsedTags]);
-  const hasActiveFilters = Boolean(filters.query || activeTags.length || filters.from || filters.to);
   const filtersQueryString = useMemo(() => buildEventQueryString(stableSearchParams, { scope: null }), [stableSearchParams]);
   const eventsHref = filtersQueryString ? `/events?${filtersQueryString}` : "/events";
   const calendarEvents = useMemo(
     () => events.map((event) => ({ id: event.id, title: event.title, start: event.start, end: event.end ?? undefined, url: `/events/${event.slug}` })),
     [events],
   );
+  const agendaGroups = useMemo(() => {
+    const groups = new Map<string, CalendarItem[]>();
+    for (const event of events) {
+      const dateKey = new Date(event.start).toLocaleDateString("en-GB", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      });
+      if (!groups.has(dateKey)) groups.set(dateKey, []);
+      groups.get(dateKey)!.push(event);
+    }
+    return Array.from(groups.entries());
+  }, [events]);
 
   function openEventPanel(clickInfo: EventClickArg) {
     clickInfo.jsEvent.preventDefault();
@@ -144,56 +162,97 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
 
   return (
     <section className="space-y-4">
-      <Section title="Controls" subtitle="Change scope, filters, and view mode.">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
           <CalendarScopeToggle scope={scope} />
-          <Link className="text-sm underline" href={eventsHref}>Go to Events</Link>
+          <div className="flex items-center gap-2">
+            <div className="rounded-md border p-0.5 text-sm">
+              <button
+                type="button"
+                className={`rounded px-2 py-1 ${viewMode === "calendar" ? "bg-foreground text-background" : "text-foreground"}`}
+                onClick={() => setViewMode("calendar")}
+                aria-pressed={viewMode === "calendar"}
+              >
+                Month/Week
+              </button>
+              <button
+                type="button"
+                className={`rounded px-2 py-1 ${viewMode === "agenda" ? "bg-foreground text-background" : "text-foreground"}`}
+                onClick={() => setViewMode("agenda")}
+                aria-pressed={viewMode === "agenda"}
+              >
+                List
+              </button>
+            </div>
+            <button
+              type="button"
+              className="rounded border px-3 py-1 text-sm"
+              onClick={() => calendarRef.current?.getApi().today()}
+            >
+              Today
+            </button>
+          </div>
         </div>
         <EventFilterChips filters={{ query: filters.query, tags: activeTags, from: filters.from, to: filters.to }} onRemove={replaceSearch} onClearAll={() => replaceSearch({ query: null, tags: null, from: null, to: null })} />
-        {hasActiveFilters ? <InlineBanner>Filtered calendar view</InlineBanner> : null}
-      </Section>
+      </div>
 
-      <Section title="Calendar view">
-        {error ? <ErrorCard message={error} onRetry={() => void fetchEvents()} /> : null}
-        {isTruncated ? <InlineBanner>Showing first 1,000 events — narrow your date range to see all results.</InlineBanner> : null}
-        {viewMode === "agenda" ? (
-          events.length === 0 ? <EmptyState title="No agenda items" description="Switch back to calendar view or update filters." /> : (
-            <ul className="space-y-2">
-              {events.map((event) => (
-                <li key={`agenda-${event.id}`}><EventCard href={`/events/${event.slug}`} title={event.title} startAt={event.start} endAt={event.end} venueName={event.venue?.name ?? undefined} /></li>
-              ))}
-            </ul>
-          )
-        ) : (
-          <>
-            <div className="relative min-h-[600px] w-full overflow-x-hidden rounded-lg border bg-card p-2">
-              <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
-                initialView="dayGridMonth"
-                headerToolbar={{ left: "prev,next", center: "title", right: "dayGridMonth,timeGridWeek,listWeek" }}
-                height="auto"
-                datesSet={(info) => {
-                  const from = info.startStr.slice(0, 10);
-                  const to = info.endStr.slice(0, 10);
-                  setRange((prev) => (prev?.from === from && prev?.to === to ? prev : { from, to }));
-                }}
-                events={calendarEvents}
-                eventClick={openEventPanel}
-              />
-              {isLoading ? (
-                <div className="pointer-events-none absolute inset-2 z-10 space-y-2 rounded-md bg-background/70 p-2">
-                  {Array.from({ length: 3 }).map((_, i) => <EventCardSkeleton key={`calendar-loading-${i}`} />)}
-                </div>
-              ) : null}
-            </div>
-            {!isLoading && !error && events.length === 0 ? <EmptyState title="No events match these filters" description="Try broadening your filters or moving to a different date range." actions={[{ label: "Go to Events", href: eventsHref }]} /> : null}
-          </>
-        )}
-      </Section>
+      {error ? <ErrorCard message={error} onRetry={() => void fetchEvents()} /> : null}
+      {isTruncated ? <InlineBanner>Showing first 1,000 events — narrow your date range to see all results.</InlineBanner> : null}
+      {viewMode === "agenda" ? (
+        events.length === 0 ? <EmptyState title="No agenda items" description="Switch back to calendar view or update filters." /> : (
+          <div className="space-y-4">
+            {agendaGroups.map(([dateLabel, groupEvents]) => (
+              <div key={dateLabel}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {dateLabel}
+                </p>
+                <ul className="space-y-2">
+                  {groupEvents.map((event) => (
+                    <li key={`agenda-${event.id}`}>
+                      <EventCard
+                        href={`/events/${event.slug}`}
+                        title={event.title}
+                        startAt={event.start}
+                        endAt={event.end}
+                        venueName={event.venue?.name ?? undefined}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        <>
+          <div className="relative min-h-[600px] w-full overflow-x-hidden rounded-lg border bg-card p-2">
+            <FullCalendar
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
+              initialView="dayGridMonth"
+              headerToolbar={{ left: "prev,next", center: "title", right: "dayGridMonth,timeGridWeek,listWeek" }}
+              height="auto"
+              datesSet={(info) => {
+                const from = info.startStr.slice(0, 10);
+                const to = info.endStr.slice(0, 10);
+                setRange((prev) => (prev?.from === from && prev?.to === to ? prev : { from, to }));
+              }}
+              events={calendarEvents}
+              eventClick={openEventPanel}
+            />
+            {isLoading ? (
+              <div className="pointer-events-none absolute inset-2 z-10 space-y-2 rounded-md bg-background/70 p-2">
+                {Array.from({ length: 3 }).map((_, i) => <EventCardSkeleton key={`calendar-loading-${i}`} />)}
+              </div>
+            ) : null}
+          </div>
+          {!isLoading && !error && events.length === 0 ? <EmptyState title="No events match these filters" description="Try broadening your filters or moving to a different date range." actions={[{ label: "Go to Events", href: eventsHref }]} /> : null}
+        </>
+      )}
 
       <Dialog open={Boolean(selectedEvent)} onOpenChange={(isOpen) => !isOpen && setSelectedEvent(null)}>
-        <DialogContent className="left-auto right-0 top-0 h-full max-w-md translate-x-0 translate-y-0 rounded-none p-4 sm:max-w-md" aria-describedby="calendar-event-panel-description">
+        <DialogContent className="fixed inset-x-0 bottom-0 top-auto h-auto max-h-[85vh] w-full translate-x-0 translate-y-0 overflow-y-auto rounded-t-xl rounded-b-none p-4 sm:inset-x-auto sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:max-h-none sm:w-full sm:max-w-md sm:rounded-none" aria-describedby="calendar-event-panel-description">
+          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-muted sm:hidden" />
           {selectedEvent ? (
             <>
               <DialogHeader>
@@ -201,7 +260,21 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
                 <DialogDescription id="calendar-event-panel-description">Quick actions for this selected event.</DialogDescription>
               </DialogHeader>
               <div className="mt-2 flex flex-col gap-3">
+                {selectedEvent.featuredImageUrl ? (
+                  <div className="relative h-36 w-full overflow-hidden rounded-lg bg-muted">
+                    <img
+                      src={selectedEvent.featuredImageUrl}
+                      alt={selectedEvent.title}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null}
                 <EventRow href={`/events/${selectedEvent.slug}`} title={selectedEvent.title} startAt={selectedEvent.start} endAt={selectedEvent.end} venueName={selectedEvent.venue?.name ?? undefined} />
+                {selectedEvent.description ? (
+                  <p className="line-clamp-3 text-sm text-muted-foreground">
+                    {selectedEvent.description}
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   <SaveEventButton eventId={selectedEvent.id} initialSaved={scope === "saved"} nextUrl="/calendar" isAuthenticated={isAuthenticated} analytics={{ eventSlug: selectedEvent.slug, ui: "calendar_panel" }} />
                   <Link href={`/events/${selectedEvent.slug}`} className="rounded border px-3 py-2 text-sm">View details</Link>
