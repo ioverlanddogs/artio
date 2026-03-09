@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SaveEventButton } from "@/components/events/save-event-button";
 import { AttendEventButton } from "@/components/events/attend-event-button";
 import { ShareButton } from "@/components/share-button";
@@ -14,6 +16,8 @@ export function EventDetailActions({
   isAuthenticated,
   initialSaved,
   calendarLink,
+  outlookCalendarLink,
+  icalLink,
   subscribeFeedLink,
   ticketingMode,
 }: {
@@ -23,6 +27,8 @@ export function EventDetailActions({
   isAuthenticated: boolean;
   initialSaved: boolean;
   calendarLink: string;
+  outlookCalendarLink: string;
+  icalLink: string;
   subscribeFeedLink?: string | null;
   ticketingMode?: "EXTERNAL" | "RSVP" | "PAID" | null;
 }) {
@@ -34,9 +40,25 @@ export function EventDetailActions({
     <div className="flex flex-wrap items-center gap-2">
       <SaveEventButton eventId={eventId} initialSaved={initialSaved} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} />
       <AttendEventButton eventId={eventId} nextUrl={nextUrl} isAuthenticated={isAuthenticated} analytics={{ eventSlug, ui: "detail" }} ticketingMode={ticketingMode} />
-      <Button asChild variant="secondary" size="sm">
-        <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => track("event_add_to_calendar_clicked", { eventSlug })}>Add to Calendar</a>
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="secondary" size="sm">
+            Add to Calendar
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-44">
+          <DropdownMenuItem asChild>
+            <a href={calendarLink} target="_blank" rel="noreferrer" onClick={() => track("event_add_to_calendar_clicked", { eventSlug, provider: "google" })}>Google Calendar</a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={icalLink} onClick={() => track("event_add_to_calendar_clicked", { eventSlug, provider: "ical" })}>Apple / iCal</a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={outlookCalendarLink} target="_blank" rel="noreferrer" onClick={() => track("event_add_to_calendar_clicked", { eventSlug, provider: "outlook" })}>Outlook</a>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <ShareButton eventSlug={eventSlug} ui="detail" />
       {subscribeFeedLink ? (
         <Button asChild variant="ghost" size="sm">
