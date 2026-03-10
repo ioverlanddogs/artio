@@ -40,7 +40,15 @@ type FavoriteItem = { targetType: string; targetId: string };
 
 const EVENT_LIMIT = 24;
 
-export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureItems }: { isAuthenticated: boolean; fixtureItems?: UiFixtureEvent[]; fallbackFixtureItems?: UiFixtureEvent[] }) {
+export function EventsClient({
+  isAuthenticated,
+  fixtureItems,
+  fallbackFixtureItems,
+}: {
+  isAuthenticated: boolean;
+  fixtureItems?: UiFixtureEvent[];
+  fallbackFixtureItems?: UiFixtureEvent[];
+}) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<EventListItem[]>(fixtureItems ?? []);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -50,45 +58,52 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const latestFetchIdRef = useRef(0);
 
-  const fetchEvents = useCallback(async (cursor?: string | null) => {
-    if (fixtureItems) return;
-    const fetchId = latestFetchIdRef.current + 1;
-    latestFetchIdRef.current = fetchId;
-    if (cursor) setIsLoadingMore(true);
-    else {
-      setIsLoading(true);
-      setItems([]);
-    }
-    setError(null);
-
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    params.delete("cursor");
-    params.set("limit", String(EVENT_LIMIT));
-    if (cursor) params.set("cursor", cursor);
-
-    try {
-      const response = await fetch(`/api/events?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error("request_failed");
-      const data = (await response.json()) as EventsResponse;
-      if (latestFetchIdRef.current !== fetchId) return;
-      setItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
-      setNextCursor(data.nextCursor);
-    } catch {
-      if (latestFetchIdRef.current !== fetchId) return;
-      if (fallbackFixtureItems?.length && !cursor) {
-        setItems(fallbackFixtureItems);
-      } else {
-        setError("Unable to load events right now.");
+  const fetchEvents = useCallback(
+    async (cursor?: string | null) => {
+      if (fixtureItems) return;
+      const fetchId = latestFetchIdRef.current + 1;
+      latestFetchIdRef.current = fetchId;
+      if (cursor) setIsLoadingMore(true);
+      else {
+        setIsLoading(true);
+        setItems([]);
       }
-      setNextCursor(null);
-    } finally {
-      if (latestFetchIdRef.current !== fetchId) return;
-      if (cursor) setIsLoadingMore(false);
-      else setIsLoading(false);
-    }
-  }, [fallbackFixtureItems, fixtureItems, searchParams]);
+      setError(null);
 
-  useEffect(() => { void fetchEvents(null); }, [fetchEvents]);
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      params.delete("cursor");
+      params.set("limit", String(EVENT_LIMIT));
+      if (cursor) params.set("cursor", cursor);
+
+      try {
+        const response = await fetch(`/api/events?${params.toString()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("request_failed");
+        const data = (await response.json()) as EventsResponse;
+        if (latestFetchIdRef.current !== fetchId) return;
+        setItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
+        setNextCursor(data.nextCursor);
+      } catch {
+        if (latestFetchIdRef.current !== fetchId) return;
+        if (fallbackFixtureItems?.length && !cursor) {
+          setItems(fallbackFixtureItems);
+        } else {
+          setError("Unable to load events right now.");
+        }
+        setNextCursor(null);
+      } finally {
+        if (latestFetchIdRef.current !== fetchId) return;
+        if (cursor) setIsLoadingMore(false);
+        else setIsLoading(false);
+      }
+    },
+    [fallbackFixtureItems, fixtureItems, searchParams],
+  );
+
+  useEffect(() => {
+    void fetchEvents(null);
+  }, [fetchEvents]);
 
   useEffect(() => {
     track("events_list_viewed", { source: "events" });
@@ -102,7 +117,13 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
       const tags = (searchParams?.get("tags") ?? "").split(",").filter(Boolean);
       const sortParam = searchParams?.get("sort") ?? "soonest";
       const datePreset = from && to ? (from === to ? "today" : "range") : "all";
-      const filtersAppliedCount = [query.trim(), from, to, tags.length ? "tags" : "", sortParam !== "soonest" ? sortParam : ""].filter(Boolean).length;
+      const filtersAppliedCount = [
+        query.trim(),
+        from,
+        to,
+        tags.length ? "tags" : "",
+        sortParam !== "soonest" ? sortParam : "",
+      ].filter(Boolean).length;
       track("events_filters_changed", {
         hasQuery: Boolean(query.trim()),
         queryLength: query.trim().length,
@@ -127,15 +148,22 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
         if (!response.ok) return;
         const data = (await response.json()) as { items?: FavoriteItem[] };
         if (cancelled) return;
-        setFavoriteIds(new Set((data.items ?? []).filter((item) => item.targetType === "EVENT").map((item) => item.targetId)));
+        setFavoriteIds(
+          new Set(
+            (data.items ?? [])
+              .filter((item) => item.targetType === "EVENT")
+              .map((item) => item.targetId),
+          ),
+        );
       } catch {
         if (!cancelled) setFavoriteIds(new Set());
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated]);
 
-  const allTags = useMemo(() => Array.from(new Set(items.flatMap((item) => (item.tags ?? []).map((tag) => tag.slug)))).slice(0, 8), [items]);
   const sort = searchParams?.get("sort") ?? "soonest";
 
   const visibleItems = useMemo(() => {
@@ -169,20 +197,32 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
 
   return (
     <section className="space-y-6">
-      <EventsFiltersBar availableTags={allTags} />
+      <EventsFiltersBar />
       {isAuthenticated && favoriteIds.size === 0 ? (
-        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">Tip: Save events to build your calendar.</p>
+        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+          Tip: Save events to build your calendar.
+        </p>
       ) : null}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Trending now</h2>
-        <div className="overflow-x-auto pb-2"><TrendingEvents /></div>
+        <div className="overflow-x-auto pb-2">
+          <TrendingEvents />
+        </div>
       </section>
 
-      {error ? <ErrorCard message={error} onRetry={() => void fetchEvents(null)} /> : null}
+      {error ? (
+        <ErrorCard message={error} onRetry={() => void fetchEvents(null)} />
+      ) : null}
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-live="polite">
-          {Array.from({ length: 6 }).map((_, index) => <EventCardSkeleton key={`event-skeleton-${index}`} />)}
+        <div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          {Array.from({ length: 6 }).map((_, index) => (
+            <EventCardSkeleton key={`event-skeleton-${index}`} />
+          ))}
         </div>
       ) : null}
 
@@ -190,7 +230,9 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
         <EmptyState
           title="No events match your filters"
           description="Try changing dates, removing tags, or exploring nearby events."
-          actions={[{ label: "Browse Nearby", href: "/nearby", variant: "secondary" }]}
+          actions={[
+            { label: "Browse Nearby", href: "/nearby", variant: "secondary" },
+          ]}
         />
       ) : null}
 
@@ -198,34 +240,74 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleItems.map((event) => (
-              <div key={event.id} onClick={() => track("event_viewed", { eventSlug: event.slug, source: "events", ui: "card" })}><EventCard
-                href={`/events/${event.slug}`}
-                title={event.title}
-                startAt={event.startAt}
-                endAt={event.endAt}
-                venueName={event.venue?.name}
-                imageUrl={resolveEntityPrimaryImage(event)?.url ?? null}
-                imageAlt={resolveEntityPrimaryImage(event)?.alt}
-                badges={(event.tags ?? []).map((tag) => tag.slug)}
-                action={<SaveEventButton eventId={event.id} initialSaved={favoriteIds.has(event.id)} nextUrl={`/events?${searchParams?.toString() ?? ""}`} isAuthenticated={isAuthenticated} analytics={{ eventSlug: event.slug }} />}
-                artworkCount={event.artworkCount ?? 0}
-              /></div>
+              <div
+                key={event.id}
+                onClick={() =>
+                  track("event_viewed", {
+                    eventSlug: event.slug,
+                    source: "events",
+                    ui: "card",
+                  })
+                }
+              >
+                <EventCard
+                  href={`/events/${event.slug}`}
+                  title={event.title}
+                  startAt={event.startAt}
+                  endAt={event.endAt}
+                  venueName={event.venue?.name}
+                  imageUrl={resolveEntityPrimaryImage(event)?.url ?? null}
+                  imageAlt={resolveEntityPrimaryImage(event)?.alt}
+                  badges={(event.tags ?? []).map((tag) => tag.slug)}
+                  action={
+                    <SaveEventButton
+                      eventId={event.id}
+                      initialSaved={favoriteIds.has(event.id)}
+                      nextUrl={`/events?${searchParams?.toString() ?? ""}`}
+                      isAuthenticated={isAuthenticated}
+                      analytics={{ eventSlug: event.slug }}
+                    />
+                  }
+                  artworkCount={event.artworkCount ?? 0}
+                />
+              </div>
             ))}
           </div>
 
           {thisWeekendEvents.length >= 2 ? (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold tracking-tight">This weekend</h3>
+              <h3 className="text-base font-semibold tracking-tight">
+                This weekend
+              </h3>
               <div className="grid gap-2">
                 {thisWeekendEvents.map((event) => (
-                  <div key={`row-${event.id}`} onClick={() => track("event_viewed", { eventSlug: event.slug, source: "events", ui: "row" })}><EventRow
-                    href={`/events/${event.slug}`}
-                    title={event.title}
-                    startAt={event.startAt}
-                    endAt={event.endAt}
-                    venueName={event.venue?.name}
-                    action={<SaveEventButton eventId={event.id} initialSaved={favoriteIds.has(event.id)} nextUrl={`/events?${searchParams?.toString() ?? ""}`} isAuthenticated={isAuthenticated} analytics={{ eventSlug: event.slug }} />}
-                  /></div>
+                  <div
+                    key={`row-${event.id}`}
+                    onClick={() =>
+                      track("event_viewed", {
+                        eventSlug: event.slug,
+                        source: "events",
+                        ui: "row",
+                      })
+                    }
+                  >
+                    <EventRow
+                      href={`/events/${event.slug}`}
+                      title={event.title}
+                      startAt={event.startAt}
+                      endAt={event.endAt}
+                      venueName={event.venue?.name}
+                      action={
+                        <SaveEventButton
+                          eventId={event.id}
+                          initialSaved={favoriteIds.has(event.id)}
+                          nextUrl={`/events?${searchParams?.toString() ?? ""}`}
+                          isAuthenticated={isAuthenticated}
+                          analytics={{ eventSlug: event.slug }}
+                        />
+                      }
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -233,18 +315,31 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
 
           {quickPickEvents.length >= 2 ? (
             <div className="space-y-3">
-              <h3 className="text-base font-semibold tracking-tight">Quick picks</h3>
+              <h3 className="text-base font-semibold tracking-tight">
+                Quick picks
+              </h3>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {quickPickEvents.map((event) => (
-                  <div key={`rail-${event.id}`} onClick={() => track("event_viewed", { eventSlug: event.slug, source: "events", ui: "rail" })}><EventRailCard
-                    href={`/events/${event.slug}`}
-                    title={event.title}
-                    startAt={event.startAt}
-                    endAt={event.endAt}
-                    venueName={event.venue?.name}
-                    imageUrl={resolveEntityPrimaryImage(event)?.url ?? null}
-                    imageAlt={resolveEntityPrimaryImage(event)?.alt}
-                  /></div>
+                  <div
+                    key={`rail-${event.id}`}
+                    onClick={() =>
+                      track("event_viewed", {
+                        eventSlug: event.slug,
+                        source: "events",
+                        ui: "rail",
+                      })
+                    }
+                  >
+                    <EventRailCard
+                      href={`/events/${event.slug}`}
+                      title={event.title}
+                      startAt={event.startAt}
+                      endAt={event.endAt}
+                      venueName={event.venue?.name}
+                      imageUrl={resolveEntityPrimaryImage(event)?.url ?? null}
+                      imageAlt={resolveEntityPrimaryImage(event)?.alt}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -254,7 +349,12 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
 
       {!isLoading && !error && nextCursor ? (
         <div>
-          <Button type="button" variant="outline" onClick={() => void fetchEvents(nextCursor)} disabled={isLoadingMore}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void fetchEvents(nextCursor)}
+            disabled={isLoadingMore}
+          >
             {isLoadingMore ? "Loading..." : "Load more"}
           </Button>
         </div>

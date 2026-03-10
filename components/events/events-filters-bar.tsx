@@ -1,16 +1,21 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { buildEventQueryString } from "@/lib/events-filters";
 import { track } from "@/lib/analytics/client";
 
 type EventsFiltersBarProps = {
-  availableTags?: string[];
   defaultSort?: "soonest" | "popular" | "nearby";
   queryParamName?: "query" | "q";
   sortOptions?: Array<"soonest" | "popular" | "nearby" | "distance">;
@@ -28,7 +33,10 @@ function dateRangeForPreset(preset: string) {
     saturday.setDate(now.getDate() + toSaturday);
     const sunday = new Date(saturday);
     sunday.setDate(saturday.getDate() + 1);
-    return { from: saturday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
+    return {
+      from: saturday.toISOString().slice(0, 10),
+      to: sunday.toISOString().slice(0, 10),
+    };
   }
   if (preset === "next7") {
     const end = new Date(now);
@@ -38,7 +46,12 @@ function dateRangeForPreset(preset: string) {
   return { from: "", to: "" };
 }
 
-export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", queryParamName = "query", sortOptions = ["soonest", "popular", "nearby"], dayOptions }: EventsFiltersBarProps) {
+export function EventsFiltersBar({
+  defaultSort = "soonest",
+  queryParamName = "query",
+  sortOptions = ["soonest", "popular", "nearby"],
+  dayOptions,
+}: EventsFiltersBarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,6 +60,54 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
   const [isPending, startTransition] = useTransition();
   const [frequency, setFrequency] = useState<"WEEKLY" | "OFF">("WEEKLY");
   const [savedSearchId, setSavedSearchId] = useState<string | null>(null);
+
+  const [availableTags, setAvailableTags] = useState<
+    Array<{ id: string; name: string; slug: string; category: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTags = async () => {
+      try {
+        const response = await fetch("/api/tags");
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          items?: Array<{
+            id: string;
+            name: string;
+            slug: string;
+            category: string;
+          }>;
+        };
+        if (!cancelled)
+          setAvailableTags(Array.isArray(data.items) ? data.items : []);
+      } catch {
+        if (!cancelled) setAvailableTags([]);
+      }
+    };
+
+    void loadTags();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const groupedTags = useMemo(() => {
+    const categories = [
+      { key: "medium", label: "Medium" },
+      { key: "genre", label: "Genre" },
+      { key: "movement", label: "Movement" },
+      { key: "mood", label: "Mood" },
+    ] as const;
+
+    return categories
+      .map((category) => ({
+        ...category,
+        tags: availableTags.filter((tag) => tag.category === category.key),
+      }))
+      .filter((group) => group.tags.length > 0);
+  }, [availableTags]);
 
   const query = searchParams?.get(queryParamName) ?? "";
   const from = searchParams?.get("from") ?? "";
@@ -65,25 +126,43 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
     return from || to ? "range" : "all";
   }, [from, to]);
 
-  const hasFilters = Boolean(query || from || to || tags.length || days || sort !== defaultSort);
-  const canSaveSearch = Boolean(query.trim() || tags.length || datePreset !== "all" || days || sort !== defaultSort);
+  const hasFilters = Boolean(
+    query || from || to || tags.length || days || sort !== defaultSort,
+  );
+  const canSaveSearch = Boolean(
+    query.trim() ||
+    tags.length ||
+    datePreset !== "all" ||
+    days ||
+    sort !== defaultSort,
+  );
 
   const updateQuery = (updates: Record<string, string | null>) => {
     const next = buildEventQueryString(searchParams, updates);
     startTransition(() => {
-      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
     });
   };
 
   const toggleTag = (tag: string) => {
-    const nextTags = tags.includes(tag) ? tags.filter((entry) => entry !== tag) : [...tags, tag];
+    const nextTags = tags.includes(tag)
+      ? tags.filter((entry) => entry !== tag)
+      : [...tags, tag];
     updateQuery({ tags: nextTags.length ? nextTags.join(",") : null });
   };
 
   const onOpenSave = () => {
     setSavedSearchId(null);
     setIsSaveOpen(true);
-    track("events_save_search_opened", { hasQuery: Boolean(query.trim()), queryLength: query.trim().length, tagsCount: tags.length, datePreset, sort });
+    track("events_save_search_opened", {
+      hasQuery: Boolean(query.trim()),
+      queryLength: query.trim().length,
+      tagsCount: tags.length,
+      datePreset,
+      sort,
+    });
   };
 
   const onCreateSavedSearch = async () => {
@@ -94,7 +173,9 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
       frequency: frequency === "WEEKLY" ? "WEEKLY" : undefined,
       params: {
         q: query.trim() || undefined,
-        from: from ? new Date(`${from}T00:00:00.000Z`).toISOString() : undefined,
+        from: from
+          ? new Date(`${from}T00:00:00.000Z`).toISOString()
+          : undefined,
         to: to ? new Date(`${to}T23:59:59.000Z`).toISOString() : undefined,
         tags,
       },
@@ -106,7 +187,7 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
       body: JSON.stringify(payload),
     });
     if (!response.ok) return;
-    const item = await response.json() as { id?: string };
+    const item = (await response.json()) as { id?: string };
     setSavedSearchId(item.id ?? "saved");
     track("events_save_search_created", { method: "events_filters" });
   };
@@ -116,23 +197,88 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
   const bar = (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3">
       <div className="grid gap-2 md:grid-cols-[1fr_auto_auto_auto]">
-        <Input value={query} onChange={(event) => updateQuery({ [queryParamName]: event.target.value || null })} placeholder="Search events" aria-label="Search events" className="ui-trans focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
-        <select className="h-10 rounded-md border border-input bg-background px-3 text-sm ui-trans hover:border-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" value={sort} onChange={(event) => updateQuery({ sort: event.target.value || null })} aria-label="Sort events">
-          {sortOptions.includes("soonest") ? <option value="soonest">Soonest</option> : null}
-          {sortOptions.includes("distance") ? <option value="distance">Distance</option> : null}
-          {sortOptions.includes("popular") ? <option value="popular">Popular</option> : null}
-          {sortOptions.includes("nearby") ? <option value="nearby">Nearby</option> : null}
+        <Input
+          value={query}
+          onChange={(event) =>
+            updateQuery({ [queryParamName]: event.target.value || null })
+          }
+          placeholder="Search events"
+          aria-label="Search events"
+          className="ui-trans focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm ui-trans hover:border-ring/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={sort}
+          onChange={(event) =>
+            updateQuery({ sort: event.target.value || null })
+          }
+          aria-label="Sort events"
+        >
+          {sortOptions.includes("soonest") ? (
+            <option value="soonest">Soonest</option>
+          ) : null}
+          {sortOptions.includes("distance") ? (
+            <option value="distance">Distance</option>
+          ) : null}
+          {sortOptions.includes("popular") ? (
+            <option value="popular">Popular</option>
+          ) : null}
+          {sortOptions.includes("nearby") ? (
+            <option value="nearby">Nearby</option>
+          ) : null}
         </select>
-        <Button type="button" variant="outline" onClick={onOpenSave}>Save search</Button>
-        {hasFilters ? <Button type="button" variant="ghost" className="ui-trans ui-press" onClick={() => updateQuery({ [queryParamName]: null, from: null, to: null, tags: null, days: null, sort: null })}>Clear</Button> : null}
+        <Button type="button" variant="outline" onClick={onOpenSave}>
+          Save search
+        </Button>
+        {hasFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="ui-trans ui-press"
+            onClick={() =>
+              updateQuery({
+                [queryParamName]: null,
+                from: null,
+                to: null,
+                tags: null,
+                days: null,
+                sort: null,
+              })
+            }
+          >
+            Clear
+          </Button>
+        ) : null}
       </div>
 
-      {dayOptions?.length ? <Tabs value={days || "30"} onValueChange={(value) => updateQuery({ days: value, from: null, to: null })}><TabsList className="grid w-full grid-cols-3">{dayOptions.map((option) => <TabsTrigger key={option} value={String(option)}>Next {option}d</TabsTrigger>)}</TabsList></Tabs> : null}
+      {dayOptions?.length ? (
+        <Tabs
+          value={days || "30"}
+          onValueChange={(value) =>
+            updateQuery({ days: value, from: null, to: null })
+          }
+        >
+          <TabsList className="grid w-full grid-cols-3">
+            {dayOptions.map((option) => (
+              <TabsTrigger key={option} value={String(option)}>
+                Next {option}d
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      ) : null}
 
-      <Tabs value={datePreset} onValueChange={(value) => {
-        const range = dateRangeForPreset(value);
-        updateQuery({ from: range.from || null, to: range.to || null, days: null });
-      }}>
+      <Tabs
+        value={datePreset}
+        onValueChange={(value) => {
+          const range = dateRangeForPreset(value);
+          updateQuery({
+            from: range.from || null,
+            to: range.to || null,
+            days: null,
+          });
+        }}
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="all">Any day</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
@@ -141,33 +287,166 @@ export function EventsFiltersBar({ availableTags = [], defaultSort = "soonest", 
         </TabsList>
       </Tabs>
 
-      {availableTags.length ? <div className="flex flex-wrap gap-2">{availableTags.slice(0, 8).map((tag) => <Button key={tag} type="button" size="sm" className={`ui-trans ui-press focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${tags.includes(tag) ? "shadow-sm" : ""}`} variant={tags.includes(tag) ? "default" : "outline"} onClick={() => toggleTag(tag)} aria-label={`Filter by tag ${tag}`}>{tag}</Button>)}</div> : null}
-      <div className="h-4" aria-live="polite">{isPending ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" aria-hidden="true" />Updating filters…</span> : null}</div>
+      {groupedTags.length ? (
+        <div className="space-y-3">
+          {groupedTags.map((group) => (
+            <section key={group.key} className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {group.tags.map((tag) => (
+                  <Button
+                    key={tag.id}
+                    type="button"
+                    size="sm"
+                    className={`ui-trans ui-press focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${tags.includes(tag.slug) ? "shadow-sm" : ""}`}
+                    variant={tags.includes(tag.slug) ? "default" : "outline"}
+                    onClick={() => toggleTag(tag.slug)}
+                    aria-label={`Filter by tag ${tag.name}`}
+                  >
+                    {tag.name}
+                  </Button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : null}
+      <div className="h-4" aria-live="polite">
+        {isPending ? (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <span
+              className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"
+              aria-hidden="true"
+            />
+            Updating filters…
+          </span>
+        ) : null}
+      </div>
 
       <Dialog open={isSaveOpen} onOpenChange={setIsSaveOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save current filters</DialogTitle>
-            <DialogDescription>Turn this filter set into a saved search.</DialogDescription>
+            <DialogDescription>
+              Turn this filter set into a saved search.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <p>Query: {query.trim() ? `“${query.trim()}”` : "None"}</p>
-            <p>Date: {datePreset === "all" ? "Any day" : datePreset === "today" ? "Today" : datePreset === "weekend" ? "This weekend" : datePreset === "next7" ? "Next 7 days" : "Custom range"}</p>
+            <p>
+              Date:{" "}
+              {datePreset === "all"
+                ? "Any day"
+                : datePreset === "today"
+                  ? "Today"
+                  : datePreset === "weekend"
+                    ? "This weekend"
+                    : datePreset === "next7"
+                      ? "Next 7 days"
+                      : "Custom range"}
+            </p>
             <p>Sort: {sort}</p>
-            <div className="flex flex-wrap gap-1">{summaryChips.map((tag) => <span key={tag} className="rounded-full border px-2 py-0.5 text-xs">{tag}</span>)}{tags.length > 3 ? <span className="rounded-full border px-2 py-0.5 text-xs">+{tags.length - 3}</span> : null}</div>
-            <label className="text-xs text-muted-foreground" htmlFor="events-save-frequency">Digest frequency</label>
-            <select id="events-save-frequency" value={frequency} onChange={(event) => setFrequency(event.target.value as "WEEKLY" | "OFF")} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
+            <div className="flex flex-wrap gap-1">
+              {summaryChips.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border px-2 py-0.5 text-xs"
+                >
+                  {tag}
+                </span>
+              ))}
+              {tags.length > 3 ? (
+                <span className="rounded-full border px-2 py-0.5 text-xs">
+                  +{tags.length - 3}
+                </span>
+              ) : null}
+            </div>
+            <label
+              className="text-xs text-muted-foreground"
+              htmlFor="events-save-frequency"
+            >
+              Digest frequency
+            </label>
+            <select
+              id="events-save-frequency"
+              value={frequency}
+              onChange={(event) =>
+                setFrequency(event.target.value as "WEEKLY" | "OFF")
+              }
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
               <option value="WEEKLY">Weekly</option>
               <option value="OFF">Off</option>
             </select>
-            {!canSaveSearch ? <p className="text-xs text-muted-foreground">Add a query, date preset, tags, or sort change to save this search.</p> : null}
-            {savedSearchId ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs">Saved ✓ <div className="mt-2 flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { track("events_save_search_preview_clicked"); router.push("/saved-searches"); }}>Preview digest</Button><Button type="button" size="sm" variant="ghost" onClick={() => router.push("/saved-searches")}>Manage saved searches</Button></div></div> : null}
+            {!canSaveSearch ? (
+              <p className="text-xs text-muted-foreground">
+                Add a query, date preset, tags, or sort change to save this
+                search.
+              </p>
+            ) : null}
+            {savedSearchId ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs">
+                Saved ✓{" "}
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      track("events_save_search_preview_clicked");
+                      router.push("/saved-searches");
+                    }}
+                  >
+                    Preview digest
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => router.push("/saved-searches")}
+                  >
+                    Manage saved searches
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="pt-2"><Button type="button" onClick={() => void onCreateSavedSearch()} disabled={!canSaveSearch}>Save</Button></div>
+          <div className="pt-2">
+            <Button
+              type="button"
+              onClick={() => void onCreateSavedSearch()}
+              disabled={!canSaveSearch}
+            >
+              Save
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 
-  return <><div className="md:hidden"><Button type="button" variant="outline" className="ui-trans ui-press" onClick={() => setIsMobileOpen((value) => !value)} aria-expanded={isMobileOpen} aria-controls="events-filters-mobile">Filters</Button>{isMobileOpen ? <div id="events-filters-mobile" className="mt-2">{bar}</div> : null}</div><div className="hidden md:block">{bar}</div></>;
+  return (
+    <>
+      <div className="md:hidden">
+        <Button
+          type="button"
+          variant="outline"
+          className="ui-trans ui-press"
+          onClick={() => setIsMobileOpen((value) => !value)}
+          aria-expanded={isMobileOpen}
+          aria-controls="events-filters-mobile"
+        >
+          Filters
+        </Button>
+        {isMobileOpen ? (
+          <div id="events-filters-mobile" className="mt-2">
+            {bar}
+          </div>
+        ) : null}
+      </div>
+      <div className="hidden md:block">{bar}</div>
+    </>
+  );
 }
