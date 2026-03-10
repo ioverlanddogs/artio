@@ -13,6 +13,7 @@ import { parseExtractedEventsFromModel, type NormalizedExtractedEvent } from "@/
 import { clusterCandidates, computeSimilarityKey, scoreSimilarity } from "@/lib/ingest/similarity";
 import { inferTimezoneFromLatLng } from "@/lib/timezone";
 import { detectPlatform, getPlatformPromptHint, isJsRenderedPlatform, type Platform } from "@/lib/ingest/detect-platform";
+import { enrichVenueFromSnapshot } from "@/lib/ingest/enrich-venue-from-snapshot";
 
 
 function resolveRelativeImageUrl(imageUrl: string | null | undefined, baseUrl: string): string | null {
@@ -612,6 +613,18 @@ export async function runVenueIngestExtraction(
         stopReason,
       },
     });
+
+    if (
+      process.env.AI_VENUE_ENRICHMENT_ENABLED === "1" &&
+      Object.keys(extractedVenueSnapshot).length > 0
+    ) {
+      enrichVenueFromSnapshot({
+        db,
+        venueId: params.venueId,
+        runId: run.id,
+        snapshot: extractedVenueSnapshot,
+      }).catch((err) => console.error("[venue-enrichment] failed", err));
+    }
 
     return { runId: run.id, createdCount, dedupedCount, createdDuplicateCount, stopReason };
   } catch (error) {

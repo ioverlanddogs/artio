@@ -408,6 +408,8 @@ model Venue {
   contactEmail       String?
   contactPhone       String?
   openingHours       Json?
+  lastEnrichedAt     DateTime?                @db.Timestamptz
+  enrichmentSource   String?
   featuredImageUrl   String?
   featuredAssetId    String?                  @db.Uuid
   /// @deprecated Use `status` (ContentStatus) as canonical publish lifecycle state.
@@ -439,6 +441,7 @@ model Venue {
   claimRequests      VenueClaimRequest[]
   generationRunItems VenueGenerationRunItem[]
   homepageImageCandidates VenueHomepageImageCandidate[]
+  enrichmentLogs     VenueEnrichmentLog[]
   stripeAccount      StripeAccount?
 
   @@index([isPublished])
@@ -808,11 +811,26 @@ model IngestRun {
   venue            Venue                 @relation(fields: [venueId], references: [id], onDelete: Cascade)
   extractedEvents  IngestExtractedEvent[]
   events           Event[]               @relation("EventIngestSourceRun")
+  enrichmentLogs   VenueEnrichmentLog[]
 
   @@index([venueId, createdAt])
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([errorCode, createdAt])
+}
+
+model VenueEnrichmentLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  venueId       String    @db.Uuid
+  runId         String    @db.Uuid
+  changedFields String[]
+  before        Json      @default("{}")
+  after         Json      @default("{}")
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  venue         Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  run           IngestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, createdAt(sort: Desc)])
 }
 
 model IngestExtractedEvent {
