@@ -216,6 +216,27 @@ export async function revokeClaim(db: ClaimsDb, claimId: string, now: Date) {
     return claim;
   });
 }
+
+export async function rejectClaim(db: ClaimsDb, claimId: string, rejectionReason: string | null, now: Date) {
+  return db.$transaction(async (tx) => {
+    const lookup = tx.venueClaimRequest.findUnique ?? tx.venueClaimRequest.findFirst;
+    const claim = await lookup({
+      where: { id: claimId },
+      select: { id: true, venueId: true, userId: true, status: true, expiresAt: true },
+    });
+
+    if (!claim) return null;
+
+    await tx.venueClaimRequest.update({
+      where: { id: claim.id },
+      data: { status: VenueClaimRequestStatus.REJECTED, rejectionReason },
+    });
+    await tx.venue.update({ where: { id: claim.venueId }, data: { claimStatus: VenueClaimStatus.UNCLAIMED } });
+
+    return claim;
+  });
+}
+
 export async function approveClaim(db: ClaimsDb, claimId: string, now: Date) {
   return db.$transaction(async (tx) => {
     const lookup = tx.venueClaimRequest.findUnique ?? tx.venueClaimRequest.findFirst;

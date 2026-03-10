@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { approveClaim, createVenueClaim, revokeClaim, verifyVenueClaim } from "../lib/venue-claims/service";
+import { approveClaim, createVenueClaim, rejectClaim, revokeClaim, verifyVenueClaim } from "../lib/venue-claims/service";
 
 test("createVenueClaim uses manual review when contact email missing", async () => {
   const createdClaims: Array<Record<string, unknown>> = [];
@@ -377,5 +377,85 @@ test("revokeClaim on non-existent claim returns null", async () => {
   };
 
   const result = await revokeClaim(tx as never, "missing-claim", new Date());
+  assert.equal(result, null);
+});
+
+
+test("rejectClaim sets status to REJECTED and resets venue claimStatus to UNCLAIMED", async () => {
+  let venueReset = false;
+  let claimRejected = false;
+
+  const tx = {
+    venueClaimRequest: {
+      findUnique: async () => ({ id: "claim-rj", venueId: "venue-rj", userId: "user-rj", status: "PENDING_VERIFICATION", expiresAt: null }),
+      findFirst: async () => null,
+      create: async () => ({ id: "claim-rj", venueId: "venue-rj", status: "PENDING_VERIFICATION", expiresAt: null }),
+      update: async ({ data }: { data: { status: string } }) => {
+        if (data.status === "REJECTED") claimRejected = true;
+        return { id: "claim-rj" };
+      },
+    },
+    venueMembership: {
+      upsert: async () => ({ id: "membership-rj" }),
+      deleteMany: async () => ({ count: 0 }),
+    },
+    venue: {
+      findUnique: async () => null,
+      update: async ({ data }: { data: { claimStatus: string } }) => {
+        if (data.claimStatus === "UNCLAIMED") venueReset = true;
+        return { id: "venue-rj" };
+      },
+    },
+    $transaction: async (fn: (inner: never) => Promise<unknown>) => fn(tx as never),
+  };
+
+  const result = await rejectClaim(tx as never, "claim-rj", null, new Date());
+  assert.equal(result?.id, "claim-rj");
+  assert.equal(claimRejected, true);
+  assert.equal(venueReset, true);
+});
+
+test("rejectClaim persists the rejectionReason string", async () => {
+  let savedReason: string | null = null;
+
+  const tx = {
+    venueClaimRequest: {
+      findUnique: async () => ({ id: "claim-rj2", venueId: "venue-rj2", userId: "user-rj2", status: "PENDING_VERIFICATION", expiresAt: null }),
+      findFirst: async () => null,
+      create: async () => ({ id: "claim-rj2", venueId: "venue-rj2", status: "PENDING_VERIFICATION", expiresAt: null }),
+      update: async ({ data }: { data: { rejectionReason: string | null } }) => {
+        savedReason = data.rejectionReason;
+        return { id: "claim-rj2" };
+      },
+    },
+    venueMembership: {
+      upsert: async () => ({ id: "membership-rj2" }),
+      deleteMany: async () => ({ count: 0 }),
+    },
+    venue: { findUnique: async () => null, update: async () => ({ id: "venue-rj2" }) },
+    $transaction: async (fn: (inner: never) => Promise<unknown>) => fn(tx as never),
+  };
+
+  await rejectClaim(tx as never, "claim-rj2", "Insufficient evidence", new Date());
+  assert.equal(savedReason, "Insufficient evidence");
+});
+
+test("rejectClaim on a non-existent claim returns null", async () => {
+  const tx = {
+    venueClaimRequest: {
+      findUnique: async () => null,
+      findFirst: async () => null,
+      create: async () => ({ id: "claim-none", venueId: "venue-none", status: "PENDING_VERIFICATION", expiresAt: null }),
+      update: async () => ({ id: "claim-none" }),
+    },
+    venueMembership: {
+      upsert: async () => ({ id: "membership-none" }),
+      deleteMany: async () => ({ count: 0 }),
+    },
+    venue: { findUnique: async () => null, update: async () => ({ id: "venue-none" }) },
+    $transaction: async (fn: (inner: never) => Promise<unknown>) => fn(tx as never),
+  };
+
+  const result = await rejectClaim(tx as never, "missing-claim", null, new Date());
   assert.equal(result, null);
 });
