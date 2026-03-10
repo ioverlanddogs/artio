@@ -14,6 +14,7 @@ const ADMIN_LINKS = [
   { href: "/admin/artists", label: "Artists" },
   { href: "/admin/artist-event-associations", label: "Artist Event Assoc." },
   { href: "/admin/artwork", label: "Artwork" },
+  { href: "/admin/artwork-inquiries", label: "Enquiries" },
   { href: "/admin/ingest", label: "Ingest" },
   { href: "/admin/submissions", label: "Submissions" },
   { href: "/admin/perf", label: "Performance" },
