@@ -54,7 +54,7 @@ export async function handleVenueGenerationPost(req: NextRequest, deps?: Partial
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
-    if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
+    if (error instanceof Error && (error.message === "forbidden" || error.message === "unauthorized")) return apiError(403, "forbidden", "Forbidden");
     if (error instanceof VenueGenerationError) {
       if (error.code === "OPENAI_HTTP_ERROR") return apiError(502, "OPENAI_HTTP_ERROR", error.message, error.details);
       if (error.code === "OPENAI_BAD_OUTPUT") return apiError(502, "OPENAI_BAD_OUTPUT", error.message, error.details);

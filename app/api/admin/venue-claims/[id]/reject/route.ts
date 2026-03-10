@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { VenueClaimRequestStatus, VenueClaimStatus } from "@prisma/client";
 import { apiError } from "@/lib/api";
 import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { enqueueNotification } from "@/lib/notifications";
+import { rejectClaim } from "@/lib/venue-claims/service";
 
 export const runtime = "nodejs";
 
@@ -18,13 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const claim = await db.venueClaimRequest.findUnique({ where: { id }, select: { id: true, userId: true, venueId: true } });
     if (!claim) return apiError(404, "not_found", "Claim not found");
 
-    await db.$transaction(async (tx) => {
-      await tx.venueClaimRequest.update({
-        where: { id },
-        data: { status: VenueClaimRequestStatus.REJECTED, rejectionReason },
-      });
-      await tx.venue.update({ where: { id: claim.venueId }, data: { claimStatus: VenueClaimStatus.UNCLAIMED } });
-    });
+    await rejectClaim(db as never, id, rejectionReason, new Date());
 
     if (claim.userId) {
       const user = await db.user.findUnique({ where: { id: claim.userId }, select: { email: true } });
