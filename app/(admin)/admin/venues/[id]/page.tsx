@@ -8,6 +8,7 @@ import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDele
 import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
 import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
 import VenueImagePicker from "@/app/(admin)/admin/venues/[id]/venue-image-picker";
+import VenueEnrichmentLogPanel from "@/components/admin/venue-enrichment-log-panel";
 
 export default async function AdminVenue({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -91,6 +92,7 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
         initialHomepageCandidates={homepageCandidates}
       />
       <ModerationPanel resource="venues" id={venue.id} status={venue.status} blockers={blockers.map((item) => item.message)} />
+      <VenueEnrichmentLogPanel venueId={venue.id} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
         <h2 className="text-base font-semibold">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">Archive or restore first. Permanent delete is irreversible.</p>
