@@ -107,9 +107,9 @@ export function PersonalEventFeed({
   if (hasNoFollows) {
     return (
       <EmptyState
-        title="Start following to unlock your feed"
-        description="Follow a few to populate your feed."
-        actions={[{ label: "Follow artists", href: "/artists", variant: "secondary" }, { label: "Follow venues", href: "/venues", variant: "secondary" }]}
+        title="Your following feed is empty"
+        description="Follow artists and venues to see their upcoming events here."
+        actions={[{ label: "Browse artists", href: "/artists" }, { label: "Browse venues", href: "/venues" }]}
       />
     );
   }
@@ -128,9 +128,9 @@ export function PersonalEventFeed({
       </div>
       {rankedItems.length === 0 ? (
         <EmptyState
-          title="Nothing to show—try clearing preferences"
-          description="Try broadening your timeframe, or follow more artists and venues."
-          actions={[{ label: "Expand to 30 days", href: `/following?days=30&type=${selectedType}` }, { label: "Explore events", href: "/events", variant: "secondary" }]}
+          title="No upcoming events from people you follow"
+          description="The artists and venues you follow don't have upcoming events listed yet."
+          actions={[{ label: "Discover more", href: "/events" }]}
         />
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

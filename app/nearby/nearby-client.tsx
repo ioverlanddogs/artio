@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LocationPreferencesForm } from "@/components/location/location-preferences-form";
@@ -230,19 +229,16 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
         eventItems.length === 0 && venueItems.length === 0 ? (
           canSearch ? (
             <EmptyState
-              title="No nearby results found"
-              description="Increase your radius, or try another area to discover events and venues."
-              actions={[{ label: isAuthenticated ? "Manage location" : "Sign in", href: isAuthenticated ? "/account" : "/login", variant: "secondary" }]}
+              title="No events found nearby"
+              description="Try expanding your search radius or check back soon."
+              actions={[{ label: "Browse all events", href: "/events" }]}
             />
           ) : (
-            <div className="rounded-lg border p-4">
-              <h3 className="font-medium">Enable location</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Nearby uses your device location to compute distance.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => void enableLocation()} disabled={isLocating}>{isLocating ? "Locating..." : "Use my current location"}</button>
-                <Link href="/events" className="rounded border px-3 py-1 text-sm">Browse all events</Link>
-              </div>
-            </div>
+            <EmptyState
+              title="Set your location to see nearby events"
+              description="We'll show events happening close to you."
+              actions={[{ label: "Set location", href: "/account#location" }]}
+            />
           )
         ) : (
           <>
