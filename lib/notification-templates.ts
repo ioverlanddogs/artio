@@ -87,6 +87,13 @@ export type NotificationTemplatePayload =
       venueAddress?: string | null;
     }
   | {
+      type: "TICKET_TRANSFERRED";
+      eventTitle: string;
+      startAt: string;
+      venueName: string;
+      confirmationCode: string;
+    }
+  | {
       type: "ARTWORK_INQUIRY_BUYER";
       artworkTitle: string;
       artworkSlug: string;
@@ -105,7 +112,7 @@ export type NotificationTemplatePayload =
       inquiryId: string;
     };
 
-export function buildNotification({ type, payload }: { type: NotificationType; payload: NotificationTemplatePayload }) {
+export function buildNotification({ type, payload }: { type: NotificationType | "TICKET_TRANSFERRED"; payload: NotificationTemplatePayload }) {
   if (type === "INVITE_CREATED" && payload.type === "INVITE_CREATED") {
     const href = payload.inviteToken ? `/invite/${payload.inviteToken}` : payload.venueId ? `/my/venues/${payload.venueId}` : undefined;
     return {
@@ -234,6 +241,14 @@ export function buildNotification({ type, payload }: { type: NotificationType; p
       body: `${payload.eventTitle} starts within 24 hours.`,
       href: `/events/${payload.eventSlug}`,
       dedupeKey: `event-reminder-24h:${payload.eventSlug}:${payload.startAt}`,
+    };
+  }
+
+  if (type === "TICKET_TRANSFERRED" && payload.type === "TICKET_TRANSFERRED") {
+    return {
+      title: `Your ticket for ${payload.eventTitle} has been transferred to you`,
+      body: `${payload.eventTitle} · ${payload.startAt} · ${payload.venueName}. Confirmation code: ${payload.confirmationCode}`,
+      dedupeKey: `ticket-transferred:${payload.confirmationCode}`,
     };
   }
 
