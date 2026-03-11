@@ -1,4 +1,5 @@
 import type { AnalyticsEntityType } from "@prisma/client";
+import { db } from "@/lib/db";
 
 export type ArtworkAnalyticsInputArtwork = {
   id: string;
@@ -24,6 +25,19 @@ export type ArtworkAnalyticsResult = {
   };
 };
 
+export type ArtworkStat = {
+  artworkId: string;
+  title: string;
+  slug: string | null;
+  imageUrl: string | null;
+  views: number;
+  inquiries: number;
+  orders: number;
+  priceAmount: number | null;
+  currency: string | null;
+  isSold: boolean;
+};
+
 function utcDayStart(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -44,6 +58,81 @@ function buildZeroFilledDailySeries(days: number, now: Date) {
     entries.push({ day: day.toISOString().slice(0, 10), views: 0 });
   }
   return entries;
+}
+
+export async function getArtworkBreakdown(artistId: string, windowDays: 7 | 30): Promise<ArtworkStat[]> {
+  const since = new Date(Date.now() - (windowDays - 1) * 86_400_000);
+
+  const artworks = await db.artwork.findMany({
+    where: { artistId },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      priceAmount: true,
+      currency: true,
+      soldAt: true,
+      featuredAsset: { select: { url: true } },
+    },
+  });
+
+  if (!artworks.length) return [];
+
+  const artworkIds = artworks.map((artwork) => artwork.id);
+
+  const [viewRows, inquiryRows, orderRows] = await Promise.all([
+    db.engagementEvent.groupBy({
+      by: ["targetId"],
+      where: {
+        targetType: "ARTWORK",
+        action: "VIEW",
+        targetId: { in: artworkIds },
+        createdAt: { gte: since },
+      },
+      _count: { _all: true },
+      orderBy: { _count: { targetId: "desc" } },
+      take: 20,
+    }),
+    db.artworkInquiry.groupBy({
+      by: ["artworkId"],
+      where: { artworkId: { in: artworkIds }, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+    db.artworkOrder.groupBy({
+      by: ["artworkId"],
+      where: { artworkId: { in: artworkIds }, status: "CONFIRMED", createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const inquiryCountByArtworkId = new Map(inquiryRows.map((row) => [row.artworkId, row._count._all]));
+  const orderCountByArtworkId = new Map(orderRows.map((row) => [row.artworkId, row._count._all]));
+  const artworkById = new Map(artworks.map((artwork) => [artwork.id, artwork]));
+
+  return viewRows
+    .map((row) => {
+      const artwork = artworkById.get(row.targetId);
+      if (!artwork) return null;
+      return {
+        artworkId: artwork.id,
+        title: artwork.title,
+        slug: artwork.slug,
+        imageUrl: artwork.featuredAsset?.url ?? null,
+        views: row._count._all,
+        inquiries: inquiryCountByArtworkId.get(artwork.id) ?? 0,
+        orders: orderCountByArtworkId.get(artwork.id) ?? 0,
+        priceAmount: artwork.priceAmount,
+        currency: artwork.currency,
+        isSold: artwork.soldAt !== null,
+      } satisfies ArtworkStat;
+    })
+    .filter((item): item is ArtworkStat => item !== null)
+    .sort((a, b) => {
+      const viewDiff = b.views - a.views;
+      if (viewDiff !== 0) return viewDiff;
+      return a.title.localeCompare(b.title);
+    })
+    .slice(0, 20);
 }
 
 export function computeArtworkAnalytics(
