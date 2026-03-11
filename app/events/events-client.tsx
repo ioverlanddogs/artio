@@ -136,6 +136,14 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
   }, [isAuthenticated]);
 
   const sort = searchParams?.get("sort") ?? "soonest";
+  const hasActiveFilters = Boolean(
+    (searchParams?.get("query") ?? "").trim() ||
+    (searchParams?.get("from") ?? "") ||
+    (searchParams?.get("to") ?? "") ||
+    (searchParams?.get("tags") ?? "") ||
+    (searchParams?.get("days") ?? "") ||
+    sort !== "soonest",
+  );
 
   const visibleItems = useMemo(() => {
     const sorted = [...items];
@@ -186,11 +194,18 @@ export function EventsClient({ isAuthenticated, fixtureItems, fallbackFixtureIte
       ) : null}
 
       {!isLoading && !error && visibleItems.length === 0 ? (
-        <EmptyState
-          title="No events match your filters"
-          description="Try changing dates, removing tags, or exploring nearby events."
-          actions={[{ label: "Browse Nearby", href: "/nearby", variant: "secondary" }]}
-        />
+        hasActiveFilters ? (
+          <EmptyState
+            title="No events match your filters"
+            description="Try changing dates, removing tags, or exploring nearby events."
+            actions={[{ label: "Clear filters", href: "/events" }]}
+          />
+        ) : (
+          <EmptyState
+            title="No events yet"
+            description="Events will appear here once venues start listing them."
+          />
+        )
       ) : null}
 
       {!isLoading && visibleItems.length > 0 ? (
