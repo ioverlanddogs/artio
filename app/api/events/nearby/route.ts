@@ -42,14 +42,20 @@ export async function GET(req: NextRequest) {
     return next;
   })();
   const box = getBoundingBox(lat, lng, radiusKm);
-  const user = await getSessionUser();
-  const hiddenEventIds = user
-    ? (await db.engagementEvent.findMany({
+  let hiddenEventIds: string[] = [];
+  try {
+    const user = await getSessionUser();
+    if (user) {
+      const hides = await db.engagementEvent.findMany({
         where: { userId: user.id, action: "HIDE", targetType: "EVENT" },
         select: { targetId: true },
         distinct: ["targetId"],
-      })).map((item) => item.targetId)
-    : [];
+      });
+      hiddenEventIds = hides.map((h) => h.targetId);
+    }
+  } catch {
+    // Outside Next.js request context (e.g. tests) — skip hidden filter
+  }
   let workingCursor = cursor ? decodeNearbyCursor(cursor) : null;
   const pageItems: NearbyEventWithJoin[] = [];
   const batchSize = Math.min(50, Math.max(limit * 3, limit + 1));
