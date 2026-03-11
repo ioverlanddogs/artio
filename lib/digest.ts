@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getBoundingBox } from "@/lib/geo";
 
 export const digestSnapshotItemSchema = z.object({
   id: z.string().trim().min(1).max(120).optional(),
@@ -9,6 +10,32 @@ export const digestSnapshotItemSchema = z.object({
 });
 
 export const digestSnapshotItemsSchema = z.array(digestSnapshotItemSchema);
+
+export type DigestPreferenceUser = {
+  digestEnabled: boolean;
+  digestEventsOnly: boolean;
+  digestRadiusKm: number | null;
+  digestMaxEvents: number;
+  locationLat: number | null;
+  locationLng: number | null;
+};
+
+type DigestEvent = {
+  lat: number | null;
+  lng: number | null;
+  venue: { lat: number | null; lng: number | null } | null;
+};
+
+export function filterEventsByRadius<T extends DigestEvent>(events: T[], user: DigestPreferenceUser): T[] {
+  if (user.digestRadiusKm == null || user.locationLat == null || user.locationLng == null) return events;
+  const box = getBoundingBox(user.locationLat, user.locationLng, user.digestRadiusKm);
+  return events.filter((event) => {
+    const lat = event.lat ?? event.venue?.lat;
+    const lng = event.lng ?? event.venue?.lng;
+    if (lat == null || lng == null) return false;
+    return lat >= box.minLat && lat <= box.maxLat && lng >= box.minLng && lng <= box.maxLng;
+  });
+}
 
 export function isoWeekStamp(input: Date) {
   const d = new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));

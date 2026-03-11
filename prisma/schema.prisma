@@ -317,6 +317,10 @@ model User {
   locationLat          Float?
   locationLng          Float?
   locationRadiusKm     Int                   @default(25)
+  digestEnabled        Boolean               @default(true)
+  digestEventsOnly     Boolean               @default(false)
+  digestRadiusKm       Int?
+  digestMaxEvents      Int                   @default(10)
   betaAccessRequests   BetaAccessRequest[]
   betaFeedbackEntries  BetaFeedback[]
   adminInvitesCreated  AdminInvite[]         @relation("AdminInviteCreatedBy")

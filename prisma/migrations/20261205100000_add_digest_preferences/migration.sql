@@ -1,0 +1,5 @@
+ALTER TABLE "User"
+  ADD COLUMN "digestEnabled" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "digestEventsOnly" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "digestRadiusKm" INTEGER,
+  ADD COLUMN "digestMaxEvents" INTEGER NOT NULL DEFAULT 10;
