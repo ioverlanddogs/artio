@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
-export default function TransferTicketPage({ params }: { params: { confirmationCode: string } }) {
+export default function TransferTicketPage() {
+  const params = useParams<{ confirmationCode: string }>();
   const searchParams = useSearchParams();
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
