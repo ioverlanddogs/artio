@@ -23,6 +23,12 @@ type IngestSettingsProps = {
     ingestEnabled: boolean;
     ingestImageEnabled: boolean;
     venueAutoPublish: boolean;
+    regionAutoPublishVenues?: boolean;
+    regionAutoPublishEvents?: boolean;
+    regionAutoPublishArtists?: boolean;
+    regionAutoPublishArtworks?: boolean;
+    regionDiscoveryEnabled?: boolean;
+    regionMaxVenuesPerRun?: number | null;
     venueGenerationModel: string | null;
     ingestMaxCandidatesPerVenueRun: number | null;
     ingestDuplicateSimilarityThreshold: number | null;
@@ -46,26 +52,99 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
   const [showGooglePseApiKey, setShowGooglePseApiKey] = useState(false);
   const [braveSearchApiKey, setBraveSearchApiKey] = useState("");
   const [showBraveSearchApiKey, setShowBraveSearchApiKey] = useState(false);
-  const [googlePseCx, setGooglePseCx] = useState(props.initial.googlePseCx ?? "");
-  const [eventExtractionProvider, setEventExtractionProvider] = useState<ProviderName>((props.initial.eventExtractionProvider as ProviderName | null) ?? "openai");
-  const [artworkExtractionProvider, setArtworkExtractionProvider] = useState<ProviderName>((props.initial.artworkExtractionProvider as ProviderName | null) ?? "claude");
-  const [artistLookupProvider, setArtistLookupProvider] = useState<ProviderName>((props.initial.artistLookupProvider as ProviderName | null) ?? "gemini");
-  const [artistBioProvider, setArtistBioProvider] = useState<ProviderName>((props.initial.artistBioProvider as ProviderName | null) ?? "claude");
-  const [ingestEnabled, setIngestEnabled] = useState(props.initial.ingestEnabled);
-  const [ingestImageEnabled, setIngestImageEnabled] = useState(props.initial.ingestImageEnabled);
-  const [venueAutoPublish, setVenueAutoPublish] = useState(props.initial.venueAutoPublish);
-  const [venueGenerationModel, setVenueGenerationModel] = useState(props.initial.venueGenerationModel ?? "");
-  const [maxCandidates, setMaxCandidates] = useState(props.initial.ingestMaxCandidatesPerVenueRun != null ? String(props.initial.ingestMaxCandidatesPerVenueRun) : "");
-  const [duplicateThreshold, setDuplicateThreshold] = useState(props.initial.ingestDuplicateSimilarityThreshold != null ? String(props.initial.ingestDuplicateSimilarityThreshold) : "");
-  const [lookbackDays, setLookbackDays] = useState(props.initial.ingestDuplicateLookbackDays != null ? String(props.initial.ingestDuplicateLookbackDays) : "");
-  const [confidenceHigh, setConfidenceHigh] = useState(props.initial.ingestConfidenceHighMin != null ? String(props.initial.ingestConfidenceHighMin) : "");
-  const [confidenceMedium, setConfidenceMedium] = useState(props.initial.ingestConfidenceMediumMin != null ? String(props.initial.ingestConfidenceMediumMin) : "");
-  const [autoTagEnabled, setAutoTagEnabled] = useState(props.initial.autoTagEnabled);
-  const [autoTagProvider, setAutoTagProvider] = useState<ProviderName>((props.initial.autoTagProvider as ProviderName | null) ?? "openai");
-  const [autoTagModel, setAutoTagModel] = useState(props.initial.autoTagModel ?? "");
+  const [googlePseCx, setGooglePseCx] = useState(
+    props.initial.googlePseCx ?? "",
+  );
+  const [eventExtractionProvider, setEventExtractionProvider] =
+    useState<ProviderName>(
+      (props.initial.eventExtractionProvider as ProviderName | null) ??
+        "openai",
+    );
+  const [artworkExtractionProvider, setArtworkExtractionProvider] =
+    useState<ProviderName>(
+      (props.initial.artworkExtractionProvider as ProviderName | null) ??
+        "claude",
+    );
+  const [artistLookupProvider, setArtistLookupProvider] =
+    useState<ProviderName>(
+      (props.initial.artistLookupProvider as ProviderName | null) ?? "gemini",
+    );
+  const [artistBioProvider, setArtistBioProvider] = useState<ProviderName>(
+    (props.initial.artistBioProvider as ProviderName | null) ?? "claude",
+  );
+  const [ingestEnabled, setIngestEnabled] = useState(
+    props.initial.ingestEnabled,
+  );
+  const [ingestImageEnabled, setIngestImageEnabled] = useState(
+    props.initial.ingestImageEnabled,
+  );
+  const [venueAutoPublish, setVenueAutoPublish] = useState(
+    props.initial.venueAutoPublish,
+  );
+  const [regionAutoPublishVenues, setRegionAutoPublishVenues] = useState(
+    props.initial.regionAutoPublishVenues ?? false,
+  );
+  const [regionAutoPublishEvents, setRegionAutoPublishEvents] = useState(
+    props.initial.regionAutoPublishEvents ?? false,
+  );
+  const [regionAutoPublishArtists, setRegionAutoPublishArtists] = useState(
+    props.initial.regionAutoPublishArtists ?? false,
+  );
+  const [regionAutoPublishArtworks, setRegionAutoPublishArtworks] = useState(
+    props.initial.regionAutoPublishArtworks ?? false,
+  );
+  const [regionDiscoveryEnabled, setRegionDiscoveryEnabled] = useState(
+    props.initial.regionDiscoveryEnabled ?? false,
+  );
+  const [regionMaxVenuesPerRun, setRegionMaxVenuesPerRun] = useState(
+    props.initial.regionMaxVenuesPerRun != null
+      ? String(props.initial.regionMaxVenuesPerRun)
+      : "",
+  );
+  const [venueGenerationModel, setVenueGenerationModel] = useState(
+    props.initial.venueGenerationModel ?? "",
+  );
+  const [maxCandidates, setMaxCandidates] = useState(
+    props.initial.ingestMaxCandidatesPerVenueRun != null
+      ? String(props.initial.ingestMaxCandidatesPerVenueRun)
+      : "",
+  );
+  const [duplicateThreshold, setDuplicateThreshold] = useState(
+    props.initial.ingestDuplicateSimilarityThreshold != null
+      ? String(props.initial.ingestDuplicateSimilarityThreshold)
+      : "",
+  );
+  const [lookbackDays, setLookbackDays] = useState(
+    props.initial.ingestDuplicateLookbackDays != null
+      ? String(props.initial.ingestDuplicateLookbackDays)
+      : "",
+  );
+  const [confidenceHigh, setConfidenceHigh] = useState(
+    props.initial.ingestConfidenceHighMin != null
+      ? String(props.initial.ingestConfidenceHighMin)
+      : "",
+  );
+  const [confidenceMedium, setConfidenceMedium] = useState(
+    props.initial.ingestConfidenceMediumMin != null
+      ? String(props.initial.ingestConfidenceMediumMin)
+      : "",
+  );
+  const [autoTagEnabled, setAutoTagEnabled] = useState(
+    props.initial.autoTagEnabled,
+  );
+  const [autoTagProvider, setAutoTagProvider] = useState<ProviderName>(
+    (props.initial.autoTagProvider as ProviderName | null) ?? "openai",
+  );
+  const [autoTagModel, setAutoTagModel] = useState(
+    props.initial.autoTagModel ?? "",
+  );
   const [prompt, setPrompt] = useState(props.initial.ingestSystemPrompt ?? "");
   const [model, setModel] = useState(props.initial.ingestModel ?? "");
-  const [maxTokens, setMaxTokens] = useState(props.initial.ingestMaxOutputTokens != null ? String(props.initial.ingestMaxOutputTokens) : "");
+  const [maxTokens, setMaxTokens] = useState(
+    props.initial.ingestMaxOutputTokens != null
+      ? String(props.initial.ingestMaxOutputTokens)
+      : "",
+  );
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -76,11 +155,21 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
     setErrorMessage(null);
     try {
       const body = {
-        openAiApiKey: showOpenAiApiKey ? (openAiApiKey.trim() || null) : undefined,
-        geminiApiKey: showGeminiApiKey ? (geminiApiKey.trim() || null) : undefined,
-        anthropicApiKey: showAnthropicApiKey ? (anthropicApiKey.trim() || null) : undefined,
-        googlePseApiKey: showGooglePseApiKey ? (googlePseApiKey.trim() || null) : undefined,
-        braveSearchApiKey: showBraveSearchApiKey ? (braveSearchApiKey.trim() || null) : undefined,
+        openAiApiKey: showOpenAiApiKey
+          ? openAiApiKey.trim() || null
+          : undefined,
+        geminiApiKey: showGeminiApiKey
+          ? geminiApiKey.trim() || null
+          : undefined,
+        anthropicApiKey: showAnthropicApiKey
+          ? anthropicApiKey.trim() || null
+          : undefined,
+        googlePseApiKey: showGooglePseApiKey
+          ? googlePseApiKey.trim() || null
+          : undefined,
+        braveSearchApiKey: showBraveSearchApiKey
+          ? braveSearchApiKey.trim() || null
+          : undefined,
         googlePseCx: googlePseCx.trim() || null,
         eventExtractionProvider,
         artworkExtractionProvider,
@@ -89,18 +178,38 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
         ingestEnabled,
         ingestImageEnabled,
         venueAutoPublish,
+        regionAutoPublishVenues,
+        regionAutoPublishEvents,
+        regionAutoPublishArtists,
+        regionAutoPublishArtworks,
+        regionDiscoveryEnabled,
+        regionMaxVenuesPerRun: regionMaxVenuesPerRun.trim()
+          ? Number.parseInt(regionMaxVenuesPerRun.trim(), 10)
+          : null,
         venueGenerationModel: venueGenerationModel.trim() || null,
-        ingestMaxCandidatesPerVenueRun: maxCandidates.trim() ? Number.parseInt(maxCandidates.trim(), 10) : null,
-        ingestDuplicateSimilarityThreshold: duplicateThreshold.trim() ? Number.parseInt(duplicateThreshold.trim(), 10) : null,
-        ingestDuplicateLookbackDays: lookbackDays.trim() ? Number.parseInt(lookbackDays.trim(), 10) : null,
-        ingestConfidenceHighMin: confidenceHigh.trim() ? Number.parseInt(confidenceHigh.trim(), 10) : null,
-        ingestConfidenceMediumMin: confidenceMedium.trim() ? Number.parseInt(confidenceMedium.trim(), 10) : null,
+        ingestMaxCandidatesPerVenueRun: maxCandidates.trim()
+          ? Number.parseInt(maxCandidates.trim(), 10)
+          : null,
+        ingestDuplicateSimilarityThreshold: duplicateThreshold.trim()
+          ? Number.parseInt(duplicateThreshold.trim(), 10)
+          : null,
+        ingestDuplicateLookbackDays: lookbackDays.trim()
+          ? Number.parseInt(lookbackDays.trim(), 10)
+          : null,
+        ingestConfidenceHighMin: confidenceHigh.trim()
+          ? Number.parseInt(confidenceHigh.trim(), 10)
+          : null,
+        ingestConfidenceMediumMin: confidenceMedium.trim()
+          ? Number.parseInt(confidenceMedium.trim(), 10)
+          : null,
         autoTagEnabled,
         autoTagProvider: autoTagEnabled ? autoTagProvider : null,
-        autoTagModel: autoTagEnabled ? (autoTagModel.trim() || null) : null,
+        autoTagModel: autoTagEnabled ? autoTagModel.trim() || null : null,
         ingestSystemPrompt: prompt.trim() || null,
         ingestModel: model.trim() || null,
-        ingestMaxOutputTokens: maxTokens.trim() ? Number.parseInt(maxTokens.trim(), 10) : null,
+        ingestMaxOutputTokens: maxTokens.trim()
+          ? Number.parseInt(maxTokens.trim(), 10)
+          : null,
       };
 
       const res = await fetch("/api/admin/settings", {
@@ -109,7 +218,9 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: { message?: string };
+        };
         setErrorMessage(data.error?.message ?? "Save failed.");
         setStatus("error");
         return;
@@ -132,59 +243,301 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
     <section className="rounded-lg border bg-background p-4 space-y-6">
       <h2 className="text-base font-semibold">Ingest &amp; AI</h2>
 
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ingestEnabled} onChange={(e) => { setIngestEnabled(e.target.checked); setStatus("idle"); }} />Enable ingest runs</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ingestImageEnabled} onChange={(e) => { setIngestImageEnabled(e.target.checked); setStatus("idle"); }} />Enable ingest image prefetch</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={venueAutoPublish} onChange={(e) => { setVenueAutoPublish(e.target.checked); setStatus("idle"); }} />Auto publish generated venues</label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={ingestEnabled}
+          onChange={(e) => {
+            setIngestEnabled(e.target.checked);
+            setStatus("idle");
+          }}
+        />
+        Enable ingest runs
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={ingestImageEnabled}
+          onChange={(e) => {
+            setIngestImageEnabled(e.target.checked);
+            setStatus("idle");
+          }}
+        />
+        Enable ingest image prefetch
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={venueAutoPublish}
+          onChange={(e) => {
+            setVenueAutoPublish(e.target.checked);
+            setStatus("idle");
+          }}
+        />
+        Auto publish generated venues
+      </label>
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium">Region ingestion</h3>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={regionAutoPublishVenues}
+            onChange={(e) => {
+              setRegionAutoPublishVenues(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Auto-publish venues from region runs
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={regionAutoPublishEvents}
+            onChange={(e) => {
+              setRegionAutoPublishEvents(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Auto-publish events from region runs (HIGH confidence only)
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={regionAutoPublishArtists}
+            onChange={(e) => {
+              setRegionAutoPublishArtists(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Auto-publish artists from region runs
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={regionAutoPublishArtworks}
+            onChange={(e) => {
+              setRegionAutoPublishArtworks(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Auto-publish artworks from region runs
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={regionDiscoveryEnabled}
+            onChange={(e) => {
+              setRegionDiscoveryEnabled(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Enable web discovery per region
+        </label>
+        <label className="space-y-1 text-sm">
+          <span>Max venues per region run</span>
+          <input
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={regionMaxVenuesPerRun}
+            onChange={(e) => {
+              setRegionMaxVenuesPerRun(e.target.value);
+              setStatus("idle");
+            }}
+            type="number"
+            placeholder="default 10"
+          />
+        </label>
+      </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="openai-key">OpenAI API key</label>
+        <label className="text-sm font-medium" htmlFor="openai-key">
+          OpenAI API key
+        </label>
         {showOpenAiApiKey ? (
-          <input id="openai-key" type="password" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={openAiApiKey} onChange={(e) => { setOpenAiApiKey(e.target.value); setStatus("idle"); }} placeholder={props.initial.openAiApiKeySet ? "•••••••• (stored)" : "sk-..."} />
+          <input
+            id="openai-key"
+            type="password"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={openAiApiKey}
+            onChange={(e) => {
+              setOpenAiApiKey(e.target.value);
+              setStatus("idle");
+            }}
+            placeholder={
+              props.initial.openAiApiKeySet ? "•••••••• (stored)" : "sk-..."
+            }
+          />
         ) : (
-          <div className="text-xs text-muted-foreground">{props.initial.openAiApiKeySet ? "API key is currently set." : "No API key set."} <button type="button" className="underline" onClick={() => setShowOpenAiApiKey(true)}>Change</button></div>
+          <div className="text-xs text-muted-foreground">
+            {props.initial.openAiApiKeySet
+              ? "API key is currently set."
+              : "No API key set."}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowOpenAiApiKey(true)}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="gemini-key">Gemini API key</label>
+        <label className="text-sm font-medium" htmlFor="gemini-key">
+          Gemini API key
+        </label>
         {showGeminiApiKey ? (
-          <input id="gemini-key" type="password" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={geminiApiKey} onChange={(e) => { setGeminiApiKey(e.target.value); setStatus("idle"); }} placeholder={props.initial.geminiApiKeySet ? "•••••••• (stored)" : "AIza..."} />
+          <input
+            id="gemini-key"
+            type="password"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={geminiApiKey}
+            onChange={(e) => {
+              setGeminiApiKey(e.target.value);
+              setStatus("idle");
+            }}
+            placeholder={
+              props.initial.geminiApiKeySet ? "•••••••• (stored)" : "AIza..."
+            }
+          />
         ) : (
-          <div className="text-xs text-muted-foreground">{props.initial.geminiApiKeySet ? "API key is currently set." : "No API key set."} <button type="button" className="underline" onClick={() => setShowGeminiApiKey(true)}>Change</button></div>
+          <div className="text-xs text-muted-foreground">
+            {props.initial.geminiApiKeySet
+              ? "API key is currently set."
+              : "No API key set."}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowGeminiApiKey(true)}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="anthropic-key">Anthropic API key</label>
+        <label className="text-sm font-medium" htmlFor="anthropic-key">
+          Anthropic API key
+        </label>
         {showAnthropicApiKey ? (
-          <input id="anthropic-key" type="password" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={anthropicApiKey} onChange={(e) => { setAnthropicApiKey(e.target.value); setStatus("idle"); }} placeholder={props.initial.anthropicApiKeySet ? "•••••••• (stored)" : "sk-ant-..."} />
+          <input
+            id="anthropic-key"
+            type="password"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={anthropicApiKey}
+            onChange={(e) => {
+              setAnthropicApiKey(e.target.value);
+              setStatus("idle");
+            }}
+            placeholder={
+              props.initial.anthropicApiKeySet
+                ? "•••••••• (stored)"
+                : "sk-ant-..."
+            }
+          />
         ) : (
-          <div className="text-xs text-muted-foreground">{props.initial.anthropicApiKeySet ? "API key is currently set." : "No API key set."} <button type="button" className="underline" onClick={() => setShowAnthropicApiKey(true)}>Change</button></div>
+          <div className="text-xs text-muted-foreground">
+            {props.initial.anthropicApiKeySet
+              ? "API key is currently set."
+              : "No API key set."}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowAnthropicApiKey(true)}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="google-pse-key">Google PSE API Key</label>
+        <label className="text-sm font-medium" htmlFor="google-pse-key">
+          Google PSE API Key
+        </label>
         {showGooglePseApiKey ? (
-          <input id="google-pse-key" type="password" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={googlePseApiKey} onChange={(e) => { setGooglePseApiKey(e.target.value); setStatus("idle"); }} placeholder={props.initial.googlePseApiKeySet ? "•••••••• (stored)" : "AIza..."} />
+          <input
+            id="google-pse-key"
+            type="password"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={googlePseApiKey}
+            onChange={(e) => {
+              setGooglePseApiKey(e.target.value);
+              setStatus("idle");
+            }}
+            placeholder={
+              props.initial.googlePseApiKeySet ? "•••••••• (stored)" : "AIza..."
+            }
+          />
         ) : (
-          <div className="text-xs text-muted-foreground">{props.initial.googlePseApiKeySet ? "API key is currently set." : "No API key set."} <button type="button" className="underline" onClick={() => setShowGooglePseApiKey(true)}>Change</button></div>
+          <div className="text-xs text-muted-foreground">
+            {props.initial.googlePseApiKeySet
+              ? "API key is currently set."
+              : "No API key set."}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowGooglePseApiKey(true)}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 
-
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="brave-search-key">Brave Search API Key</label>
+        <label className="text-sm font-medium" htmlFor="brave-search-key">
+          Brave Search API Key
+        </label>
         {showBraveSearchApiKey ? (
-          <input id="brave-search-key" type="password" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={braveSearchApiKey} onChange={(e) => { setBraveSearchApiKey(e.target.value); setStatus("idle"); }} placeholder={props.initial.braveSearchApiKeySet ? "•••••••• (stored)" : "BSA..."} />
+          <input
+            id="brave-search-key"
+            type="password"
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            value={braveSearchApiKey}
+            onChange={(e) => {
+              setBraveSearchApiKey(e.target.value);
+              setStatus("idle");
+            }}
+            placeholder={
+              props.initial.braveSearchApiKeySet
+                ? "•••••••• (stored)"
+                : "BSA..."
+            }
+          />
         ) : (
-          <div className="text-xs text-muted-foreground">{props.initial.braveSearchApiKeySet ? "API key is currently set." : "No API key set."} <button type="button" className="underline" onClick={() => setShowBraveSearchApiKey(true)}>Change</button></div>
+          <div className="text-xs text-muted-foreground">
+            {props.initial.braveSearchApiKeySet
+              ? "API key is currently set."
+              : "No API key set."}{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => setShowBraveSearchApiKey(true)}
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium" htmlFor="google-pse-cx">Google PSE Context ID (cx)</label>
-        <input id="google-pse-cx" type="text" className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={googlePseCx} onChange={(e) => { setGooglePseCx(e.target.value); setStatus("idle"); }} placeholder="Search engine cx" />
+        <label className="text-sm font-medium" htmlFor="google-pse-cx">
+          Google PSE Context ID (cx)
+        </label>
+        <input
+          id="google-pse-cx"
+          type="text"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          value={googlePseCx}
+          onChange={(e) => {
+            setGooglePseCx(e.target.value);
+            setStatus("idle");
+          }}
+          placeholder="Search engine cx"
+        />
       </div>
 
       <div className="space-y-2">
@@ -192,7 +545,14 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1 text-sm">
             <span>Event extraction provider</span>
-            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={eventExtractionProvider} onChange={(e) => { setEventExtractionProvider(e.target.value as ProviderName); setStatus("idle"); }}>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={eventExtractionProvider}
+              onChange={(e) => {
+                setEventExtractionProvider(e.target.value as ProviderName);
+                setStatus("idle");
+              }}
+            >
               <option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option>
               <option value="claude">Claude</option>
@@ -200,7 +560,14 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
           </label>
           <label className="space-y-1 text-sm">
             <span>Artwork extraction provider</span>
-            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={artworkExtractionProvider} onChange={(e) => { setArtworkExtractionProvider(e.target.value as ProviderName); setStatus("idle"); }}>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={artworkExtractionProvider}
+              onChange={(e) => {
+                setArtworkExtractionProvider(e.target.value as ProviderName);
+                setStatus("idle");
+              }}
+            >
               <option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option>
               <option value="claude">Claude</option>
@@ -208,7 +575,14 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
           </label>
           <label className="space-y-1 text-sm">
             <span>Artist lookup provider</span>
-            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={artistLookupProvider} onChange={(e) => { setArtistLookupProvider(e.target.value as ProviderName); setStatus("idle"); }}>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={artistLookupProvider}
+              onChange={(e) => {
+                setArtistLookupProvider(e.target.value as ProviderName);
+                setStatus("idle");
+              }}
+            >
               <option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option>
               <option value="claude">Claude</option>
@@ -216,7 +590,14 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
           </label>
           <label className="space-y-1 text-sm">
             <span>Artist bio provider</span>
-            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={artistBioProvider} onChange={(e) => { setArtistBioProvider(e.target.value as ProviderName); setStatus("idle"); }}>
+            <select
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={artistBioProvider}
+              onChange={(e) => {
+                setArtistBioProvider(e.target.value as ProviderName);
+                setStatus("idle");
+              }}
+            >
               <option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option>
               <option value="claude">Claude</option>
@@ -227,12 +608,29 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
 
       <div className="space-y-2">
         <h3 className="text-sm font-medium">Auto-tagging</h3>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoTagEnabled} onChange={(e) => { setAutoTagEnabled(e.target.checked); setStatus("idle"); }} />Enable AI auto-tagging on event approval</label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={autoTagEnabled}
+            onChange={(e) => {
+              setAutoTagEnabled(e.target.checked);
+              setStatus("idle");
+            }}
+          />
+          Enable AI auto-tagging on event approval
+        </label>
         {autoTagEnabled ? (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-1 text-sm">
               <span>Auto-tag provider</span>
-              <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={autoTagProvider} onChange={(e) => { setAutoTagProvider(e.target.value as ProviderName); setStatus("idle"); }}>
+              <select
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={autoTagProvider}
+                onChange={(e) => {
+                  setAutoTagProvider(e.target.value as ProviderName);
+                  setStatus("idle");
+                }}
+              >
                 <option value="openai">OpenAI</option>
                 <option value="gemini">Gemini</option>
                 <option value="claude">Claude</option>
@@ -240,30 +638,101 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
             </label>
             <label className="space-y-1 text-sm">
               <span>Auto-tag model (leave blank for default)</span>
-              <input className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={autoTagModel} onChange={(e) => { setAutoTagModel(e.target.value); setStatus("idle"); }} type="text" />
+              <input
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                value={autoTagModel}
+                onChange={(e) => {
+                  setAutoTagModel(e.target.value);
+                  setStatus("idle");
+                }}
+                type="text"
+              />
             </label>
           </div>
         ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <input className="rounded-md border px-3 py-2 text-sm" value={venueGenerationModel} onChange={(e) => setVenueGenerationModel(e.target.value)} placeholder="Venue generation model (VENUE_GENERATION_MODEL)" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={maxCandidates} onChange={(e) => setMaxCandidates(e.target.value)} type="number" placeholder="25" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={duplicateThreshold} onChange={(e) => setDuplicateThreshold(e.target.value)} type="number" placeholder="85" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={lookbackDays} onChange={(e) => setLookbackDays(e.target.value)} type="number" placeholder="30" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={confidenceHigh} onChange={(e) => setConfidenceHigh(e.target.value)} type="number" placeholder="75" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={confidenceMedium} onChange={(e) => setConfidenceMedium(e.target.value)} type="number" placeholder="45" />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={venueGenerationModel}
+          onChange={(e) => setVenueGenerationModel(e.target.value)}
+          placeholder="Venue generation model (VENUE_GENERATION_MODEL)"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={maxCandidates}
+          onChange={(e) => setMaxCandidates(e.target.value)}
+          type="number"
+          placeholder="25"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={duplicateThreshold}
+          onChange={(e) => setDuplicateThreshold(e.target.value)}
+          type="number"
+          placeholder="85"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={lookbackDays}
+          onChange={(e) => setLookbackDays(e.target.value)}
+          type="number"
+          placeholder="30"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={confidenceHigh}
+          onChange={(e) => setConfidenceHigh(e.target.value)}
+          type="number"
+          placeholder="75"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={confidenceMedium}
+          onChange={(e) => setConfidenceMedium(e.target.value)}
+          type="number"
+          placeholder="45"
+        />
       </div>
 
-      <textarea className="w-full min-h-[160px] rounded-md border px-3 py-2 text-sm" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Extraction system prompt" />
+      <textarea
+        className="w-full min-h-[160px] rounded-md border px-3 py-2 text-sm"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Extraction system prompt"
+      />
       <div className="grid gap-4 md:grid-cols-2">
-        <input className="rounded-md border px-3 py-2 text-sm" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Ingest model (OPENAI_MODEL)" />
-        <input className="rounded-md border px-3 py-2 text-sm" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} type="number" placeholder="4000" />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          placeholder="Ingest model (OPENAI_MODEL)"
+        />
+        <input
+          className="rounded-md border px-3 py-2 text-sm"
+          value={maxTokens}
+          onChange={(e) => setMaxTokens(e.target.value)}
+          type="number"
+          placeholder="4000"
+        />
       </div>
 
-      <div className="flex items-center gap-3 pt-2"><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save settings"}</Button></div>
-      {status === "saved" ? <div className="rounded border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700">Settings saved.</div> : null}
-      {status === "error" ? <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">{errorMessage ?? "An error occurred."}</div> : null}
+      <div className="flex items-center gap-3 pt-2">
+        <Button onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save settings"}
+        </Button>
+      </div>
+      {status === "saved" ? (
+        <div className="rounded border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700">
+          Settings saved.
+        </div>
+      ) : null}
+      {status === "error" ? (
+        <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+          {errorMessage ?? "An error occurred."}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,0 +1,82 @@
+import { unstable_noStore as noStore } from "next/cache";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { apiError } from "@/lib/api";
+import { isAuthError, requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export const runtime = "nodejs";
+
+const createSchema = z.object({
+  country: z.string().trim().min(2).max(120),
+  region: z.string().trim().min(1).max(120),
+});
+
+export async function GET(req: NextRequest) {
+  noStore();
+  try {
+    await requireAdmin();
+    const page = Number.parseInt(
+      req.nextUrl.searchParams.get("page") ?? "1",
+      10,
+    );
+    const pageNumber = Number.isFinite(page) && page > 0 ? page : 1;
+    const pageSize = 20;
+
+    const [regions, total] = await Promise.all([
+      db.ingestRegion.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: (pageNumber - 1) * pageSize,
+        take: pageSize,
+      }),
+      db.ingestRegion.count(),
+    ]);
+
+    return NextResponse.json(
+      { regions, total, page: pageNumber, pageSize },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    if (isAuthError(error))
+      return apiError(401, "unauthorized", "Authentication required");
+    if (error instanceof Error && error.message === "forbidden")
+      return apiError(403, "forbidden", "Forbidden");
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
+}
+
+export async function POST(req: NextRequest) {
+  noStore();
+  try {
+    const admin = await requireAdmin();
+    const parsed = createSchema.safeParse(await req.json());
+    if (!parsed.success)
+      return apiError(
+        400,
+        "invalid_request",
+        "Invalid payload",
+        parsed.error.flatten(),
+      );
+
+    const row = await db.ingestRegion.create({
+      data: {
+        country: parsed.data.country,
+        region: parsed.data.region,
+        status: "PENDING",
+        triggeredById: admin.id,
+      },
+      select: { id: true },
+    });
+
+    return NextResponse.json(
+      { regionId: row.id },
+      { status: 201, headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    if (isAuthError(error))
+      return apiError(401, "unauthorized", "Authentication required");
+    if (error instanceof Error && error.message === "forbidden")
+      return apiError(403, "forbidden", "Forbidden");
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
+}

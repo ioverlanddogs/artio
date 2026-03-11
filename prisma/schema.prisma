@@ -212,6 +212,14 @@ enum DiscoveryCandidateStatus {
   SKIPPED
 }
 
+enum IngestRegionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  PAUSED
+}
+
 enum FavoriteTargetType {
   EVENT
   VENUE
@@ -310,6 +318,7 @@ model User {
   notifications        Notification[]
   savedSearches        SavedSearch[]
   digestRuns           DigestRun[]
+  ingestRegionsTriggered IngestRegion[]
   engagementEvents     EngagementEvent[]
   onboardingState      OnboardingState?
   artistProfile        Artist?
@@ -1053,6 +1062,24 @@ model IngestDiscoveryCandidate {
   @@index([status, createdAt])
 }
 
+model IngestRegion {
+  id             String             @id @default(uuid()) @db.Uuid
+  country        String
+  region         String
+  status         IngestRegionStatus @default(PENDING)
+  venueGenDone   Boolean            @default(false)
+  discoveryDone  Boolean            @default(false)
+  lastRunAt      DateTime?          @db.Timestamptz
+  nextRunAt      DateTime?          @db.Timestamptz
+  errorMessage   String?
+  triggeredById  String             @db.Uuid
+  triggeredBy    User               @relation(fields: [triggeredById], references: [id])
+  createdAt      DateTime           @default(now()) @db.Timestamptz
+  updatedAt      DateTime           @updatedAt @db.Timestamptz
+
+  @@index([status, nextRunAt])
+}
+
 model VenueMembership {
   id        String              @id @default(uuid()) @db.Uuid
   userId    String              @db.Uuid
@@ -1418,6 +1445,12 @@ model SiteSettings {
   autoTagModel String?
   venueGenerationModel String?
   venueAutoPublish Boolean @default(false)
+  regionAutoPublishVenues   Boolean @default(false)
+  regionAutoPublishEvents   Boolean @default(false)
+  regionAutoPublishArtists  Boolean @default(false)
+  regionAutoPublishArtworks Boolean @default(false)
+  regionDiscoveryEnabled    Boolean @default(true)
+  regionMaxVenuesPerRun     Int?
   editorialNotifyTo String?
   editorialNotificationsWebhookUrl String?
   editorialNotificationsEmailEnabled Boolean @default(false)
