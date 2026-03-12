@@ -377,9 +377,11 @@ export async function runVenueIngestExtraction(
     let extractedModel: string | null = null;
     let extractedUsage: ExtractUsage | undefined;
     let extractedVenueSnapshot: VenueSnapshot = {};
+    let extractionProvider: string | null = null;
 
     if (jsonLdResult.attempted && jsonLdResult.events.length > 0) {
       extractionMethod = "json_ld";
+      extractionProvider = "json_ld";
       normalized = jsonLdResult.events.map((event) => normalizeSchedulingFields(event, {
         fallbackSourceUrl: fetched.finalUrl,
         venueCountry: venue?.country ?? null,
@@ -425,6 +427,7 @@ export async function runVenueIngestExtraction(
           venueLng: venue?.lng ?? null,
         }));
         extractionMethod = "openai";
+        extractionProvider = "openai";
         extractedModel = extracted.model;
         extractedUsage = extracted.usage;
         extractedVenueSnapshot = extracted.venueSnapshot;
@@ -460,6 +463,7 @@ export async function runVenueIngestExtraction(
           venueLng: venue?.lng ?? null,
         }));
         extractionMethod = "openai";
+        extractionProvider = provider.name;
         extractedModel = extracted.model;
         extractedUsage = extracted.usage;
         extractedVenueSnapshot = extractVenueSnapshot(rawObject);
@@ -612,6 +616,7 @@ export async function runVenueIngestExtraction(
           confidenceReasons: sanitizeReasons(confidence.reasons),
           rawJson,
           model: extractedModel,
+          extractionProvider,
         },
         select: { id: true },
       });
@@ -718,6 +723,7 @@ export async function runVenueIngestExtraction(
           confidenceReasons: sanitizeReasons(confidence.reasons),
           rawJson,
           model: extractedModel,
+          extractionProvider,
         },
       });
       createdDuplicateCount += 1;

@@ -929,6 +929,7 @@ model IngestExtractedEvent {
   blobImageUrl    String?
   rawJson         Json
   model           String?
+  extractionProvider String?
   confidenceScore Int                        @default(0)
   confidenceBand  String?
   confidenceReasons Json?
