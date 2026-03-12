@@ -14,6 +14,7 @@ type Props = {
     pendingArtworks: number;
     activeRegions: number;
     venueGenRuns7d: number;
+    pendingVenueImages: number;
   };
   children: React.ReactNode;
 };
@@ -45,7 +46,7 @@ export default function IngestShellClient({ stats, children }: Props) {
 
   return (
     <main className="space-y-4">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-8">
         <StatCard
           label="Pending"
           value={stats.total}
@@ -97,6 +98,12 @@ export default function IngestShellClient({ stats, children }: Props) {
           value={stats.venueGenRuns7d}
           note="Generation runs this week"
         />
+        <StatCard
+          label="Pending images"
+          value={stats.pendingVenueImages}
+          note={stats.pendingVenueImages > 0 ? "Awaiting review" : "All reviewed"}
+          accentClassName={stats.pendingVenueImages > 0 ? "text-amber-700" : "text-muted-foreground"}
+        />
       </section>
 
       <nav className="flex items-center gap-2 border-b">
@@ -136,6 +143,12 @@ export default function IngestShellClient({ stats, children }: Props) {
           className={`rounded-t-md px-3 py-2 text-sm ${pathname.startsWith("/admin/ingest/venue-generation") ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
           Venue Gen
+        </Link>
+        <Link
+          href="/admin/ingest/venue-images"
+          className={`rounded-t-md px-3 py-2 text-sm ${pathname.startsWith("/admin/ingest/venue-images") ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Venue Images{stats.pendingVenueImages > 0 ? ` (${stats.pendingVenueImages})` : ""}
         </Link>
         <Link
           href="/admin/ingest/runs"
