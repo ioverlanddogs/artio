@@ -64,7 +64,6 @@ export async function runCronIngestDiscovery(
                 where: { id: candidate.id },
                 data: { status: "DONE" },
               });
-              processed += 1;
               continue;
             }
           }
