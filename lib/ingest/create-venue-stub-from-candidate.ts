@@ -40,7 +40,7 @@ export async function createVenueStubFromCandidate(args: {
         name,
         slug,
         websiteUrl: args.candidateUrl,
-        eventsPageUrl: args.candidateUrl,
+        eventsPageUrl: null,
         country: args.country ?? "",
         region: args.region ?? null,
         isPublished: false,
