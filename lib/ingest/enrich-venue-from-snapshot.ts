@@ -121,10 +121,17 @@ export async function enrichVenueFromSnapshot(args: {
       });
 
       if (candidate?.venueImageId) {
-        await args.db.venue.update({
-          where: { id: args.venueId },
-          data: { featuredAssetId: candidate.venueImageId },
+        const venueImage = await args.db.venueImage.findUnique({
+          where: { id: candidate.venueImageId },
+          select: { assetId: true },
         });
+
+        if (venueImage?.assetId) {
+          await args.db.venue.update({
+            where: { id: args.venueId },
+            data: { featuredAssetId: venueImage.assetId },
+          });
+        }
       }
     } catch (error) {
       console.error("[venue-enrichment] featured asset sync failed", error);
