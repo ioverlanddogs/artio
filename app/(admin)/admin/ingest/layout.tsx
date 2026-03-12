@@ -12,7 +12,7 @@ export default async function AdminIngestLayout({ children }: { children: React.
     redirect("/admin");
   }
 
-  const [bandCounts, failedLast24h, pendingArtists, pendingArtworks, activeRegions, venueGenRuns7d] = await Promise.all([
+  const [bandCounts, failedLast24h, pendingArtists, pendingArtworks, activeRegions, venueGenRuns7d, pendingVenueImages] = await Promise.all([
     db.ingestExtractedEvent.groupBy({
       by: ["confidenceBand"],
       where: { status: "PENDING", duplicateOfId: null },
@@ -32,6 +32,7 @@ export default async function AdminIngestLayout({ children }: { children: React.
     db.venueGenerationRun.count({
       where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
     }),
+    db.venueHomepageImageCandidate.count({ where: { status: "pending" } }),
   ]);
 
   const high = bandCounts.find((band) => band.confidenceBand === "HIGH")?._count.id ?? 0;
@@ -45,6 +46,7 @@ export default async function AdminIngestLayout({ children }: { children: React.
       pendingArtists, pendingArtworks,
       activeRegions,
       venueGenRuns7d,
+      pendingVenueImages,
     }}>
       {children}
     </IngestShellClient>
