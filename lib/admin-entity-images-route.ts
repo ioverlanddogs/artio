@@ -66,6 +66,7 @@ async function listImages(tx: Tx, entityType: AdminEntityType, entityId: string)
 async function updateFeaturedImageUrl(tx: Tx, entityType: AdminEntityType, entityId: string, url: string | null) {
   if (entityType === "event") return;
   if (entityType === "venue") {
+    // This path is URL-backed only; featuredAssetId is intentionally cleared here.
     await tx.venue.update({ where: { id: entityId }, data: { featuredImageUrl: url, featuredAssetId: null } });
     return;
   }
