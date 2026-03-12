@@ -10,20 +10,7 @@ export async function runRegionVenueGeneration(args: {
   model?: string;
 }): Promise<{ runId: string; totalCreated: number; totalSkipped: number; totalFailed: number }> {
   try {
-    const ingestRegion = (args.db as PrismaClient & {
-      ingestRegion: {
-        findUnique: (args: unknown) => Promise<{
-          id: string;
-          country: string;
-          region: string | null;
-          venueGenDone: boolean;
-          triggeredById: string;
-        } | null>;
-        update: (args: unknown) => Promise<unknown>;
-      };
-    }).ingestRegion;
-
-    const region = await ingestRegion.findUnique({
+    const region = await args.db.ingestRegion.findUnique({
       where: { id: args.regionId },
       select: {
         id: true,
@@ -54,7 +41,7 @@ export async function runRegionVenueGeneration(args: {
       autoPublishOverride: args.autoPublishVenues,
     });
 
-    await ingestRegion.update({
+    await args.db.ingestRegion.update({
       where: { id: args.regionId },
       data: {
         venueGenDone: true,
