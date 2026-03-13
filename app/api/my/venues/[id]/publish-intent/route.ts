@@ -32,6 +32,15 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       return NextResponse.json({ outcome: "submitted", status: "IN_REVIEW", message: "This venue is under review. We'll notify you when review is complete." } satisfies PublishIntentResponse);
     }
 
+    if (venue.status === "APPROVED") {
+      return NextResponse.json({
+        outcome: "published",
+        status: "APPROVED",
+        message: "This venue has been approved and is live.",
+        publicUrl: venue.slug ? `/venues/${venue.slug}` : undefined,
+      } satisfies PublishIntentResponse);
+    }
+
     if (venue.isPublished || venue.status === "PUBLISHED") {
       return NextResponse.json({ outcome: "published", status: "PUBLISHED", message: "This venue is already live.", publicUrl: venue.slug ? `/venues/${venue.slug}` : undefined } satisfies PublishIntentResponse);
     }

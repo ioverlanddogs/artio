@@ -3,7 +3,6 @@ import { apiError } from "@/lib/api";
 import { canSelfPublish } from "@/lib/auth";
 import type { AdminAuditInput } from "@/lib/admin-audit";
 import { evaluateEventReadiness } from "@/lib/publish-readiness";
-import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 
 type SessionUser = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN"; isTrustedPublisher?: boolean | null };
 
@@ -35,17 +34,13 @@ export async function handleEventSelfPublish(req: NextRequest, input: { eventId:
     const user = await deps.requireAuth();
     const canEdit = await deps.canEditEvent(input.eventId, user);
     if (!canEdit) return apiError(403, "forbidden", "Venue membership required");
-    if (!canSelfPublish(user)) return apiError(403, "forbidden", "Direct publishing not permitted");
+    if (input.isPublished && !canSelfPublish(user)) return apiError(403, "forbidden", "Direct publishing not permitted");
 
     const event = await deps.findEventForPublish(input.eventId);
     if (!event) return apiError(404, "not_found", "Event not found");
     if (event.deletedAt) return apiError(409, "invalid_state", "Archived events cannot be directly published");
 
     if (input.isPublished) {
-      const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone ?? null, venue: event.venue ?? null });
-      if (blockers.length > 0) {
-        return NextResponse.json({ error: "publish_blocked", blockers }, { status: 409 });
-      }
       const readiness = evaluateEventReadiness(event, event.venueId ? { id: event.venueId } : null);
       if (!readiness.ready) {
         return NextResponse.json({ error: "NOT_READY", message: "Complete required fields before publishing.", blocking: readiness.blocking, warnings: readiness.warnings }, { status: 400 });

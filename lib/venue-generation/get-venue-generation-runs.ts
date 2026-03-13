@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeVenuePublishBlockers } from "@/lib/publish-readiness";
 
 export type VenueGenerationRunsDb = Pick<typeof db, "venueGenerationRun" | "venue">;
 

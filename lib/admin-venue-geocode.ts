@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { forwardGeocodeVenueAddressToLatLng, ForwardGeocodeError } from "@/lib/geocode/forward";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { buildVenueGeocodeQueries, isVenueAddressGeocodeable, normalizeCountryCode } from "@/lib/venues/format-venue-address";
-import { computeReadiness } from "@/lib/publish-blockers";
+import { computeReadiness } from "@/lib/publish-readiness";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 

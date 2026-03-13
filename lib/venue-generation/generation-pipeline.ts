@@ -10,7 +10,7 @@ import { extractHomepageImagesFromHtml, fetchHomepage } from "@/lib/venue-genera
 import { extractHomepageDetails, type HomepageDetails } from "@/lib/venue-generation/extract-homepage-details";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
 import { assertSafeUrl } from "@/lib/ingest/url-guard";
-import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeVenuePublishBlockers } from "@/lib/publish-readiness";
 import { autoSelectVenueCover, type AutoSelectDb, type AutoSelectDeps } from "@/lib/venue-generation/auto-select-venue-cover";
 
 type ResponseOutputContentItem = {

@@ -1,7 +1,7 @@
 import { apiError } from "@/lib/api";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { ok, parseModerationIntentBody } from "@/lib/admin-moderation-intent";
-import { computeEventPublishBlockers } from "@/lib/publish-blockers";
+import { computeEventPublishBlockers } from "@/lib/publish-readiness";
 
 type EventRecord = {
   id: string;
