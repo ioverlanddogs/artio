@@ -6,7 +6,7 @@ import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
 import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
-import { computeEventPublishBlockers } from "@/lib/publish-blockers";
+import { computeEventPublishBlockers } from "@/lib/publish-readiness";
 
 export default async function AdminEditEvent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

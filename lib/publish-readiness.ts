@@ -11,6 +11,16 @@ export type ReadinessResult = {
   warnings: CheckItem[];
 };
 
+export type PublishBlocker = {
+  id: string;
+  message: string;
+};
+
+export type PublishReadiness = {
+  ready: boolean;
+  blockers: string[];
+};
+
 const hasText = (value: string | null | undefined, min = 1) => (value ?? "").trim().length >= min;
 
 export function evaluateArtistReadiness(artist: { name: string | null; bio: string | null; featuredAssetId: string | null; websiteUrl?: string | null }): ReadinessResult {
@@ -61,4 +71,38 @@ export function evaluateArtworkReadiness(artwork: { title: string | null; featur
   if (!hasText(artwork.medium) || !artwork.year) warnings.push({ id: "artwork-medium-year", label: "Add medium and year (recommended).", severity: "info" });
 
   return { ready: blocking.length === 0, blocking, warnings };
+}
+
+function hasLegacyText(value: string | null | undefined) {
+  return Boolean(value && value.trim().length > 0);
+}
+
+export function computeVenuePublishBlockers(venue: { country?: string | null; lat?: number | null; lng?: number | null; name?: string | null; city?: string | null }): PublishBlocker[] {
+  const blockers: PublishBlocker[] = [];
+  if (!hasLegacyText(venue.country)) blockers.push({ id: "country", message: "Country is required." });
+  if (venue.lat == null || venue.lng == null) blockers.push({ id: "coordinates", message: "Coordinates are required." });
+  if (!hasLegacyText(venue.name)) blockers.push({ id: "name", message: "Venue name is required." });
+  if (!hasLegacyText(venue.city)) blockers.push({ id: "city", message: "City is required." });
+  return blockers;
+}
+
+export function computeEventPublishBlockers(event: { startAt: Date | null; timezone?: string | null; venue?: { status?: string | null; isPublished?: boolean | null } | null; hasImage?: boolean }): PublishBlocker[] {
+  const blockers: PublishBlocker[] = [];
+  if (!event.startAt) blockers.push({ id: "startAt", message: "Event start date is required." });
+  if (!hasLegacyText(event.timezone)) blockers.push({ id: "timezone", message: "Event timezone is required." });
+  const venuePublished = event.venue?.status === "PUBLISHED" || event.venue?.isPublished === true;
+  if (!venuePublished) blockers.push({ id: "venue", message: "Event venue must be published." });
+  if (event.hasImage === false) blockers.push({ id: "coverImage", message: "At least one event image is required." });
+  return blockers;
+}
+
+export function computeReadiness(entity: { startAt: Date | null; timezone?: string | null; venue?: { status?: string | null; isPublished?: boolean | null } | null } | { country?: string | null; lat?: number | null; lng?: number | null; name?: string | null; city?: string | null }): PublishReadiness {
+  const blockers = "startAt" in entity
+    ? computeEventPublishBlockers(entity).map((blocker) => blocker.message)
+    : computeVenuePublishBlockers(entity).map((blocker) => blocker.message);
+
+  return {
+    ready: blockers.length === 0,
+    blockers,
+  };
 }

@@ -6,7 +6,7 @@ import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
 import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
-import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeVenuePublishBlockers } from "@/lib/publish-readiness";
 import VenueImagePicker from "@/app/(admin)/admin/venues/[id]/venue-image-picker";
 import VenueEnrichmentLogPanel from "@/components/admin/venue-enrichment-log-panel";
 

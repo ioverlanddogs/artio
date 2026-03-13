@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { computeReadiness } from "@/lib/publish-blockers";
+import { computeReadiness } from "@/lib/publish-readiness";
 import { db } from "@/lib/db";
 import ModerationDetailClient from "./moderation-detail-client";
 

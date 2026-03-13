@@ -6,7 +6,6 @@ import { buildInAppFromTemplate, enqueueNotification } from "@/lib/notifications
 import { submissionSubmittedDedupeKey } from "@/lib/notification-keys";
 import { eventIdParamSchema, zodDetails } from "@/lib/validators";
 import { evaluateEventReadiness } from "@/lib/publish-readiness";
-import { computeEventPublishBlockers } from "@/lib/publish-blockers";
 import { toPublishBlockingIssues, type PublishIntentResponse } from "@/lib/publish-intent";
 import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 
@@ -40,17 +39,22 @@ export async function POST(_: Request, { params }: { params: Promise<{ eventId: 
       return NextResponse.json({ outcome: "submitted", status: "IN_REVIEW", message: "This event is under review. We'll notify you when review is complete." } satisfies PublishIntentResponse);
     }
 
+    if (event.status === "APPROVED") {
+      return NextResponse.json({
+        outcome: "published",
+        status: "APPROVED",
+        message: "This event has been approved and is live.",
+        publicUrl: event.slug ? `/events/${event.slug}` : undefined,
+      } satisfies PublishIntentResponse);
+    }
+
     if (event.isPublished || event.status === "PUBLISHED") {
       return NextResponse.json({ outcome: "published", status: "PUBLISHED", message: "This event is already live.", publicUrl: event.slug ? `/events/${event.slug}` : undefined } satisfies PublishIntentResponse);
     }
 
     const readiness = evaluateEventReadiness(event, event.venueId ? { id: event.venueId } : null);
-    const blockers = computeEventPublishBlockers({ startAt: event.startAt, timezone: event.timezone ?? null, venue: event.venue ?? null });
-    if (!readiness.ready || blockers.length > 0) {
-      const blockingIssues = [
-        ...toPublishBlockingIssues(readiness.blocking),
-        ...blockers.map((blocker) => ({ key: blocker.id, label: blocker.message, href: undefined })),
-      ];
+    if (!readiness.ready) {
+      const blockingIssues = toPublishBlockingIssues(readiness.blocking);
       return NextResponse.json({ outcome: "blocked", status: event.status, message: "Please complete the required fields before publishing.", blockingIssues } satisfies PublishIntentResponse, { status: 400 });
     }
 

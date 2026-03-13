@@ -1,7 +1,7 @@
 import { apiError } from "@/lib/api";
 import { logAdminAction } from "@/lib/admin-audit";
 import { db } from "@/lib/db";
-import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeVenuePublishBlockers } from "@/lib/publish-readiness";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 
 type BulkPublishDeps = {

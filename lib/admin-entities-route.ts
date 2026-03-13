@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
-import { computeEventPublishBlockers, computeReadiness, computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeEventPublishBlockers, computeReadiness, computeVenuePublishBlockers } from "@/lib/publish-readiness";
 import { allowedTransitions, validateModerationTransition } from "@/lib/moderation-decision-service";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 
@@ -19,7 +19,7 @@ type AdminEntitiesDeps = {
 const PAGE_SIZE = 20;
 
 class PublishBlockedError extends Error {
-  constructor(public readonly blockers: import("@/lib/publish-blockers").PublishBlocker[]) {
+  constructor(public readonly blockers: import("@/lib/publish-readiness").PublishBlocker[]) {
     super("publish_blocked");
   }
 }

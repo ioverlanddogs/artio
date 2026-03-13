@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { type JobResult } from "@/lib/jobs/registry";
 import { forwardGeocodeVenueAddressToLatLng } from "@/lib/geocode/forward";
 import { fetchHtmlWithGuards } from "@/lib/ingest/fetch-html";
-import { computeVenuePublishBlockers } from "@/lib/publish-blockers";
+import { computeVenuePublishBlockers } from "@/lib/publish-readiness";
 import { ensureUniqueVenueSlugWithDeps, slugifyVenueName } from "@/lib/venue-slug";
 import { type AutoSelectDeps } from "@/lib/venue-generation/auto-select-venue-cover";
 import { geocodeVenue, incrementBreakdown, normalizeSocialsAndEmail, runHomepageExtraction, toJsonOpeningHours } from "@/lib/venue-generation/generation-pipeline";
