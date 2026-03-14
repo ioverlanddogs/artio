@@ -11,6 +11,7 @@ const completeArtist = {
   websiteUrl: "https://ari.example",
   featuredAssetId: "22222222-2222-4222-8222-222222222222",
   featuredImageUrl: null,
+  featuredAsset: { url: "https://cdn.example/cover-from-asset.jpg" },
   images: [{ id: "img-1" }],
 };
 
@@ -72,6 +73,7 @@ test("handleMyArtistSubmit creates submission when artist is complete", async ()
     createSubmission: async (input) => {
       created = true;
       assert.equal(input.message, "Ready for review");
+      assert.equal(input.snapshot.coverUrl, "https://cdn.example/cover-from-asset.jpg");
       return { id: "sub-1", status: "IN_REVIEW", createdAt: new Date("2026-01-01T00:00:00.000Z"), submittedAt: new Date() };
     },
     enqueueSubmissionNotification: async () => undefined,
@@ -82,6 +84,25 @@ test("handleMyArtistSubmit creates submission when artist is complete", async ()
   assert.equal(res.headers.get("Cache-Control"), "no-store");
   const body = await res.json();
   assert.equal(body.submission.id, "sub-1");
+});
+
+test("handleMyArtistSubmit falls back to featuredImageUrl when featuredAsset is missing", async () => {
+  const req = new NextRequest("http://localhost/api/my/artist/submit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "Ready for review" }),
+  });
+
+  await handleMyArtistSubmit(req, {
+    requireAuth: async () => ({ id: "user-1", email: "user@example.com" }),
+    findOwnedArtistByUserId: async () => ({ ...completeArtist, featuredAsset: null, featuredImageUrl: "https://legacy.example/cover.jpg" }),
+    getLatestSubmissionStatus: async () => null,
+    createSubmission: async (input) => {
+      assert.equal(input.snapshot.coverUrl, "https://legacy.example/cover.jpg");
+      return { id: "sub-1", status: "IN_REVIEW", createdAt: new Date("2026-01-01T00:00:00.000Z"), submittedAt: new Date() };
+    },
+    enqueueSubmissionNotification: async () => undefined,
+  });
 });
 
 test("handleMyArtistSubmit returns 409 when already submitted", async () => {
