@@ -105,7 +105,7 @@ const artworkPatchSchema = z.object({
   dimensions: z.string().trim().max(200).nullable().optional(),
   priceAmount: z.coerce.number().int().min(0).nullable().optional(),
   currency: z.string().trim().length(3).nullable().optional(),
-  artistId: z.string().uuid().nullable().optional(),
+  artistId: z.string().uuid().optional(),
 }).strict();
 
 const importPreviewBodySchema = z.object({
@@ -493,7 +493,12 @@ export async function handleAdminEntityPatch(req: NextRequest, entity: EntityNam
         const before = await tx.artwork.findUnique({ where: { id: entityId } });
         if (!before) throw new Error("not_found");
         const patch = parsedBody.data as z.infer<typeof artworkPatchSchema>;
-        const row = await tx.artwork.update({ where: { id: entityId }, data: patch });
+        const { artistId, ...scalarPatch } = patch;
+        const data: Prisma.ArtworkUpdateInput = {
+          ...scalarPatch,
+          ...(artistId ? { artist: { connect: { id: artistId } } } : {}),
+        };
+        const row = await tx.artwork.update({ where: { id: entityId }, data });
         await tx.adminAuditLog.create({ data: { actorEmail: actor.email, action: "ADMIN_ENTITY_UPDATED", targetType: "artwork", targetId: entityId, metadata: { entityType: "artwork", entityId, before, after: patch, actorId: actor.id, actorEmail: actor.email }, ip, userAgent } });
         return row;
       }
