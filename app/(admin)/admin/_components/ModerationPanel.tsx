@@ -17,7 +17,7 @@ export default function ModerationPanel({
   status,
   blockers,
 }: {
-  resource: "events" | "venues" | "artwork";
+  resource: "events" | "venues" | "artwork" | "artists";
   id: string;
   status: UnifiedPublishStatus;
   blockers: string[];
