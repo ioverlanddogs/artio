@@ -5,11 +5,32 @@ import { db } from "@/lib/db";
 import { ADMIN_IMAGE_ALT_REQUIRED } from "@/lib/admin-policy";
 import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiveActions";
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
+import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
+import { evaluateArtistReadiness } from "@/lib/publish-readiness";
 
 export default async function AdminArtist({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const artist = await db.artist.findUnique({ where: { id } });
+  const artist = await db.artist.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      bio: true,
+      websiteUrl: true,
+      instagramUrl: true,
+      avatarImageUrl: true,
+      featuredImageUrl: true,
+      featuredAssetId: true,
+      status: true,
+      isPublished: true,
+      deletedAt: true,
+    },
+  });
   if (!artist) notFound();
+
+  const readiness = evaluateArtistReadiness(artist);
+  const blockers = readiness.blocking.map((b) => b.label);
 
   return (
     <main className="space-y-6">
@@ -34,6 +55,7 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
         ]}
         altRequired={ADMIN_IMAGE_ALT_REQUIRED}
       />
+      <ModerationPanel resource="artists" id={artist.id} status={artist.status} blockers={blockers} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
         <h2 className="text-base font-semibold">Danger zone</h2>
         <p className="mt-1 text-sm text-muted-foreground">Archive or restore first. Permanent delete is irreversible.</p>
