@@ -274,11 +274,23 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
       const where = { ...deletedFilter, ...(status ? { status: status as ContentStatus } : {}), ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { city: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
       const [total, rows, grouped] = await Promise.all([
         deps.appDb.venue.count({ where }),
-        deps.appDb.venue.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.venues.map((k) => [k, true])) as never }),
+        deps.appDb.venue.findMany({
+          where,
+          orderBy: { updatedAt: "desc" },
+          skip,
+          take: PAGE_SIZE,
+          select: {
+            ...Object.fromEntries(defaultFields.venues.map((k) => [k, true])),
+            featuredAsset: { select: { url: true } },
+          } as never,
+        }),
         deps.appDb.venue.groupBy({ by: ["status"], where: deletedFilter, _count: { _all: true } }),
       ]);
       const items = rows.map((venue) => ({
         ...venue,
+        thumbnailUrl: (venue as { featuredAsset?: { url?: string | null } | null; featuredImageUrl?: string | null }).featuredAsset?.url
+          ?? (venue as { featuredImageUrl?: string | null }).featuredImageUrl
+          ?? null,
         publishBlockers: computeReadiness(venue as { country: string | null; lat?: number | null; lng?: number | null; name?: string | null; city?: string | null }).blockers,
       }));
       return NextResponse.json({ items, total, page, pageSize: PAGE_SIZE, statusCounts: buildStatusCounts(grouped) });
@@ -296,12 +308,14 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
           select: {
             ...Object.fromEntries(defaultFields.events.map((k) => [k, true])),
             venue: { select: { status: true, isPublished: true } },
+            images: { select: { url: true }, orderBy: { sortOrder: "asc" }, take: 1 },
           } as never,
         }),
         deps.appDb.event.groupBy({ by: ["status"], where: deletedFilter, _count: { _all: true } }),
       ]);
       const items = rows.map((event) => ({
         ...event,
+        thumbnailUrl: (event as { images?: Array<{ url?: string | null }> }).images?.[0]?.url ?? null,
         publishBlockers: computeReadiness({
           startAt: (event as { startAt: Date | null }).startAt,
           timezone: (event as { timezone: string | null }).timezone,
@@ -324,7 +338,7 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
           }
           : {}),
       };
-      const [total, items] = await Promise.all([
+      const [total, rows] = await Promise.all([
         deps.appDb.artwork.count({ where }),
         deps.appDb.artwork.findMany({
           where,
@@ -335,17 +349,46 @@ export async function handleAdminEntityList(req: NextRequest, entity: EntityName
             ...Object.fromEntries(defaultFields.artwork.map((k) => [k, true])),
             updatedAt: true,
             artist: { select: { name: true } },
+            images: {
+              select: {
+                url: true,
+                asset: { select: { url: true } },
+              },
+              orderBy: { sortOrder: "asc" },
+              take: 1,
+            },
           } as never,
         }),
       ]);
+      const items = rows.map((row) => ({
+        ...row,
+        thumbnailUrl: (row as { images?: Array<{ url?: string | null; asset?: { url?: string | null } | null }> }).images?.[0]?.asset?.url
+          ?? (row as { images?: Array<{ url?: string | null }> }).images?.[0]?.url
+          ?? null,
+      }));
       return NextResponse.json({ items, total, page, pageSize: PAGE_SIZE });
     }
 
     const where = { ...deletedFilter, ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" as const } }, { slug: { contains: query, mode: "insensitive" as const } }] } : {}) };
-    const [total, items] = await Promise.all([
+    const [total, rows] = await Promise.all([
       deps.appDb.artist.count({ where }),
-      deps.appDb.artist.findMany({ where, orderBy: { updatedAt: "desc" }, skip, take: PAGE_SIZE, select: Object.fromEntries(defaultFields.artists.map((k) => [k, true])) as never }),
+      deps.appDb.artist.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip,
+        take: PAGE_SIZE,
+        select: {
+          ...Object.fromEntries(defaultFields.artists.map((k) => [k, true])),
+          featuredAsset: { select: { url: true } },
+        } as never,
+      }),
     ]);
+    const items = rows.map((artist) => ({
+      ...artist,
+      thumbnailUrl: (artist as { featuredAsset?: { url?: string | null } | null; featuredImageUrl?: string | null }).featuredAsset?.url
+        ?? (artist as { featuredImageUrl?: string | null }).featuredImageUrl
+        ?? null,
+    }));
     return NextResponse.json({ items, total, page, pageSize: PAGE_SIZE });
   } catch (error) {
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");

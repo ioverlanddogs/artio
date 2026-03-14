@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import AdminInlineRowActions, { buildEditableDraft, getNextEditingId } from "../_components/AdminInlineRowActions";
@@ -15,6 +16,7 @@ type ArtworkListItem = {
   priceAmount?: number | null;
   currency?: string | null;
   artist?: { name: string };
+  thumbnailUrl?: string | null;
 };
 
 const PAGE_SIZE = 20;
@@ -242,6 +244,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
                   aria-label="Select all visible artworks"
                 />
               </th>
+              <th className="px-3 py-2 text-left">img</th>
               <th className="px-3 py-2 text-left">title</th>
               <th className="px-3 py-2 text-left">artist</th>
               <th className="px-3 py-2 text-left">price</th>
@@ -254,7 +257,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={8}>{busy ? "Loading..." : "No records"}</td>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={9}>{busy ? "Loading..." : "No records"}</td>
               </tr>
             ) : items.map((item) => {
               const isEditing = editingId === item.id;
@@ -269,6 +272,20 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
                       }}
                       aria-label={`Select ${item.title}`}
                     />
+                  </td>
+                  <td className="px-3 py-2">
+                    {typeof item.thumbnailUrl === "string" && item.thumbnailUrl ? (
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 rounded object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded bg-muted" />
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     {isEditing ? (
