@@ -20,6 +20,7 @@ type Candidate = {
   locationText: string | null;
   description: string | null;
   sourceUrl: string;
+  artistNames: string[];
   imageUrl?: string | null;
   createdEventId: string | null;
   rejectionReason: string | null;
@@ -40,6 +41,7 @@ test("approve creates draft event + submission and updates candidate", async () 
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -103,6 +105,7 @@ test("approve is idempotent and does not duplicate event/submission", async () =
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: "event-1",
     rejectionReason: null,
   };
@@ -161,6 +164,7 @@ test("approve passes candidate imageUrl into importEventImage", async () => {
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     imageUrl: "https://cdn.example.com/extracted.jpg",
     createdEventId: null,
     rejectionReason: null,
@@ -209,6 +213,83 @@ test("approve passes candidate imageUrl into importEventImage", async () => {
   assert.equal(importParams?.candidateImageUrl, "https://cdn.example.com/extracted.jpg");
 });
 
+
+
+test("approve matches existing artists case-insensitively", async () => {
+  const candidate: Candidate = {
+    id: "11111111-1111-4111-8111-111111111121",
+    runId: "22222222-2222-4222-8222-222222222222",
+    venueId: "33333333-3333-4333-8333-333333333333",
+    status: "PENDING",
+    title: "AI Event",
+    startAt: new Date("2026-01-01T18:00:00Z"),
+    endAt: null,
+    timezone: "UTC",
+    locationText: "Main Hall",
+    description: "Test description",
+    sourceUrl: "https://venue.example/events",
+    artistNames: ["sarah lucas"],
+    createdEventId: null,
+    rejectionReason: null,
+  };
+
+  let capturedArtistWhere: unknown = null;
+  const linkedArtists: Array<{ eventId: string; artistId: string }> = [];
+
+  const tx = {
+    ingestExtractedEvent: {
+      findUnique: async () => ({ ...candidate, run: { id: candidate.runId, venueId: candidate.venueId, sourceUrl: candidate.sourceUrl, errorDetail: null }, venue: { id: candidate.venueId, timezone: "UTC", lat: null, lng: null, websiteUrl: "https://venue.example" } }),
+      update: async ({ data }: { data: Partial<Candidate> }) => {
+        Object.assign(candidate, data);
+        return { id: candidate.id, createdEventId: candidate.createdEventId, runId: candidate.runId, venueId: candidate.venueId };
+      },
+    },
+    event: {
+      findUnique: async () => null,
+      create: async () => ({ id: "event-1", title: candidate.title, description: candidate.description }),
+    },
+    submission: {
+      create: async () => ({ id: "submission-1" }),
+    },
+    artist: {
+      findMany: async ({ where }: { where: { OR?: Array<{ name?: { equals?: string; mode?: string } }> } }) => {
+        capturedArtistWhere = where;
+        const artists = [{ id: "artist-1", name: "Sarah Lucas" }];
+        return artists.filter((artist) =>
+          (where.OR ?? []).some((clause) => clause.name?.mode === "insensitive"
+            && clause.name.equals?.toLowerCase() === artist.name.toLowerCase()),
+        );
+      },
+    },
+    eventArtist: {
+      createMany: async ({ data }: { data: Array<{ eventId: string; artistId: string }> }) => {
+        linkedArtists.push(...data);
+        return { count: data.length };
+      },
+    },
+    venue: { update: async () => ({ id: candidate.venueId, timezone: "UTC" }) },
+  };
+
+  const req = new NextRequest("http://localhost/api/admin/ingest/extracted-events/11111111-1111-4111-8111-111111111121/approve", { method: "POST" });
+  const res = await handleAdminIngestApprove(req, { id: candidate.id }, {
+    requireEditorUser: async () => ({ id: "admin-1", email: "admin@example.com", role: "ADMIN" }),
+    appDb: {
+      $transaction: async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx),
+    } as never,
+    logAction: async () => undefined,
+    importEventImage: async () => ({ attached: false, warning: null, imageUrl: null }),
+  });
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(capturedArtistWhere, {
+    isPublished: true,
+    deletedAt: null,
+    OR: [{
+      name: { equals: "sarah lucas", mode: "insensitive" },
+    }],
+  });
+  assert.deepEqual(linkedArtists, [{ eventId: "event-1", artistId: "artist-1" }]);
+});
 test("reject marks candidate rejected and stores reason", async () => {
   const candidate = {
     id: "11111111-1111-4111-8111-111111111113",
@@ -342,6 +423,7 @@ test("approve returns imageWarning when image import warns", async () => {
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -400,6 +482,7 @@ test("approve returns precise missing scheduling fields", async () => {
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -446,6 +529,7 @@ test("approve missing timezone only reports timezone", async () => {
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -491,6 +575,7 @@ test("approve resolves timezone from venue.timezone", async () => {
     locationText: null,
     description: null,
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -545,6 +630,7 @@ test("approve resolves timezone from venue lat/lng when candidate and venue time
     locationText: null,
     description: null,
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -601,6 +687,7 @@ test("approve returns 409 when timezone cannot be resolved", async () => {
     locationText: null,
     description: null,
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -648,6 +735,7 @@ test("approve imports image when enabled", async () => {
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
@@ -699,6 +787,7 @@ test("approve still succeeds when image import fails and warning is persisted", 
     locationText: "Main Hall",
     description: "Test description",
     sourceUrl: "https://venue.example/events",
+    artistNames: [],
     createdEventId: null,
     rejectionReason: null,
   };
