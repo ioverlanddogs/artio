@@ -3,6 +3,14 @@
   "buildCommand": "pnpm run vercel:build",
   "crons": [
     {
+      "path": "/api/cron/ingest/backfill-artists",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/ingest/backfill-artworks",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/cron/ingest/regions",
       "schedule": "0 2 * * *"
     },
