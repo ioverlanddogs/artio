@@ -89,7 +89,6 @@ export async function uploadArtworkImageToBlob(params: {
 
 export async function uploadArtistImageToBlob(params: {
   artistId: string;
-  candidateId: string;
   sourceUrl: string;
   contentType: string;
   bytes: Uint8Array;
@@ -100,9 +99,8 @@ export async function uploadArtistImageToBlob(params: {
   }
 
   const uploadToBlob = params.uploadToBlob ?? put;
-  const hash = createHash("sha256").update(params.bytes).update("|").update(params.sourceUrl).digest("hex");
   const extension = extensionForContentType(params.contentType);
-  const path = `artists/ingest/${params.artistId}/${params.candidateId}/${hash}.${extension}`;
+  const path = `artists/${params.artistId}/profile-${Date.now()}.${extension}`;
   const blob = await uploadToBlob(path, Buffer.from(params.bytes), {
     access: "public",
     contentType: params.contentType,

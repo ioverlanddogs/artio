@@ -117,13 +117,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await importApprovedArtistImage({
       appDb: db,
       artistId: result.artistId,
-      candidateId: result.candidateId,
       name: result.name,
       websiteUrl: result.websiteUrl,
-      instagramUrl: result.instagramUrl,
       sourceUrl: result.sourceUrl,
-      requestId: `manual-approve-artist-${result.candidateId}`,
-    }).catch((err) => console.warn("manual_approve_artist_image_import_failed", { candidateId: result.candidateId, err }));
+      requestId: `admin-approve-artist-${result.candidateId}`,
+    }).catch((err) => console.warn("admin_approve_artist_image_import_failed", { candidateId: result.candidateId, err }));
 
     return NextResponse.json({ artistId: result.artistId, linkedEventCount: result.linkedEventCount }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
