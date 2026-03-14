@@ -55,6 +55,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
   const [onlyArchived, setOnlyArchived] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedPermanently, setFailedPermanently] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -69,6 +70,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
   const maxPage = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
   const load = useCallback(async () => {
+    if (failedPermanently) return;
     setBusy(true);
     setError(null);
     try {
@@ -77,6 +79,11 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
       if (showArchived) params.set("showArchived", "1");
       if (onlyArchived) params.set("onlyArchived", "1");
       const res = await fetch(`/api/admin/artwork?${params.toString()}`);
+      if (res.status === 401 || res.status === 403) {
+        setFailedPermanently(true);
+        setError("Authentication required. Please refresh the page.");
+        return;
+      }
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message ?? "Failed to load artworks");
       const incomingItems = Array.isArray(body.items) ? (body.items as ArtworkListItem[]).map(normalizeItem) : [];
@@ -88,7 +95,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
     } finally {
       setBusy(false);
     }
-  }, [onlyArchived, page, query, showArchived]);
+  }, [failedPermanently, onlyArchived, page, query, showArchived]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 250);

@@ -52,6 +52,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedPermanently, setFailedPermanently] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Record<string, unknown>>>({});
 
@@ -72,6 +73,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
   const editableKeys = useMemo(() => new Set(editableConfig.map((field) => String(field.key))), [editableConfig]);
 
   const loadData = useCallback(async (nextQuery = query, nextPage = page) => {
+    if (failedPermanently) return;
     setBusy(true);
     setError(null);
     try {
@@ -80,6 +82,11 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
       if (showArchived) params.set("showArchived", "1");
       if (nextQuery.trim()) params.set("query", nextQuery.trim());
       const res = await fetch(`/api/admin/${entity}?${params.toString()}`);
+      if (res.status === 401 || res.status === 403) {
+        setFailedPermanently(true);
+        setError("Authentication required. Please refresh the page.");
+        return;
+      }
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message ?? "Failed to load");
       setItems(body.items ?? []);
@@ -90,7 +97,7 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
     } finally {
       setBusy(false);
     }
-  }, [entity, page, query, selectedStatus, showArchived]);
+  }, [entity, failedPermanently, page, query, selectedStatus, showArchived]);
 
   const loadPresets = useCallback(async () => {
     try {
