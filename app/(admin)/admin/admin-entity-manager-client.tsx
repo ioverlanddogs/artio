@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import AdminInlineRowActions, { buildEditableDraft, getNextEditingId } from "./_components/AdminInlineRowActions";
@@ -350,14 +351,28 @@ export function AdminEntityManagerClient({ entity, fields, title, defaultMatchBy
       {error ? <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p> : null}
 
       <div className="overflow-x-auto rounded border bg-background">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-muted/50"><tr>{["id", ...fields, "status", "actions"].map((field) => <th key={field} className="px-3 py-2 text-left">{field}</th>)}</tr></thead>
+        <table className="w-full min-w-[960px] text-sm">
+          <thead className="bg-muted/50"><tr>{["img", "id", ...fields, "status", "actions"].map((field) => <th key={field} className="px-3 py-2 text-left">{field}</th>)}</tr></thead>
           <tbody>
-            {items.length === 0 ? <tr><td className="px-3 py-3 text-muted-foreground" colSpan={fields.length + 3}>{busy ? "Loading..." : "No records"}</td></tr> : items.map((item) => {
+            {items.length === 0 ? <tr><td className="px-3 py-3 text-muted-foreground" colSpan={fields.length + 4}>{busy ? "Loading..." : "No records"}</td></tr> : items.map((item) => {
               const id = String(item.id ?? "");
               const isEditing = editingId === id;
               return (
                 <tr key={id} className="border-t align-top">
+                  <td className="px-3 py-2">
+                    {typeof item.thumbnailUrl === "string" && item.thumbnailUrl ? (
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 rounded object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded bg-muted" />
+                    )}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs">{id}</td>
                   {fields.map((field) => (
                     <td key={field} className="px-3 py-2">
