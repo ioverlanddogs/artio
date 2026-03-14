@@ -336,6 +336,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
                       onStartEdit={() => startEdit(item)}
                       onCancelEdit={() => setEditingId(null)}
                       onSaveSuccess={() => setEditingId(null)}
+                      detailHref={`/admin/artwork/${item.id}`}
                     />
                   </td>
                 </tr>
