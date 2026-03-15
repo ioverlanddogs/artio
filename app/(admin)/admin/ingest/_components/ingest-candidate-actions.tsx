@@ -63,6 +63,12 @@ export default function IngestCandidateActions({
   const [linkedArtistCount, setLinkedArtistCount] = useState<number | null>(null);
   const [imageSkipWarning, setImageSkipWarning] = useState<string | null>(null);
   const [approvedEventId, setApprovedEventId] = useState<string | null>(createdEventId);
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    linkedArtists: number;
+    artistCandidates: number;
+    artworkCandidates: number;
+    imageAttached: boolean;
+  } | null>(null);
   const rejectReasonRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -99,7 +105,22 @@ export default function IngestCandidateActions({
       if (body.imageWarning && !body.imageAttached) {
         setImageSkipWarning(body.imageWarning);
       }
-      if (body.createdEventId) setApprovedEventId(body.createdEventId);
+      if (body.createdEventId) {
+        setApprovedEventId(body.createdEventId);
+        fetch(`/api/admin/ingest/extracted-events/${candidateId}/pipeline-status`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (data) {
+              setPipelineStatus({
+                linkedArtists: data.linkedArtists?.length ?? 0,
+                artistCandidates: data.artistCandidates?.length ?? 0,
+                artworkCandidates: data.artworkCandidates?.length ?? 0,
+                imageAttached: data.imageStatus?.attached ?? false,
+              });
+            }
+          })
+          .catch(() => null);
+      }
       router.refresh();
     } catch {
       setError("Action failed. Please try again.");
@@ -162,9 +183,38 @@ export default function IngestCandidateActions({
         {status === "REJECTED" && rejectionReason ? <span className="text-xs text-muted-foreground" title={rejectionReason}>Reason: {rejectionReason}</span> : null}
       </div>
       {approvedEventId ? (
-        <a href={`/admin/events/${approvedEventId}`} className="text-xs underline text-muted-foreground">
-          View event →
-        </a>
+        <div className="space-y-1">
+          <a href={`/admin/events/${approvedEventId}`} className="text-xs underline text-muted-foreground">
+            View event →
+          </a>
+          {pipelineStatus ? (
+            <div className="space-y-0.5 text-xs text-muted-foreground">
+              <p>
+                <span className={pipelineStatus.linkedArtists > 0 ? "text-emerald-700" : ""}>
+                  {pipelineStatus.linkedArtists} artist{pipelineStatus.linkedArtists === 1 ? "" : "s"} linked
+                </span>
+                {pipelineStatus.artistCandidates > 0 ? (
+                  <>
+                    {" "}·{" "}
+                    <a href="/admin/ingest/artists" className="underline">
+                      {pipelineStatus.artistCandidates} new candidate{pipelineStatus.artistCandidates === 1 ? "" : "s"} queued
+                    </a>
+                  </>
+                ) : null}
+              </p>
+              {pipelineStatus.artworkCandidates > 0 ? (
+                <p>
+                  <a href="/admin/ingest/artworks" className="underline">
+                    {pipelineStatus.artworkCandidates} artwork candidate{pipelineStatus.artworkCandidates === 1 ? "" : "s"} queued
+                  </a>
+                </p>
+              ) : null}
+              <p className={pipelineStatus.imageAttached ? "text-emerald-700" : ""}>
+                {pipelineStatus.imageAttached ? "✓ Image attached" : "— No image imported"}
+              </p>
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {imageSkipWarning ? (
         <div className="mt-1 flex items-start gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-700">
