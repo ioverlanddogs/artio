@@ -26,6 +26,15 @@ type Candidate = {
   confidenceReasons: string[] | null;
 };
 
+type PipelineStatus = {
+  linked: boolean;
+  eventId?: string;
+  linkedArtists: Array<{ id: string; name: string; slug: string }>;
+  artistCandidates: Array<{ id: string; name: string; status: string }>;
+  artworkCandidates: Array<{ id: string; title: string; status: string; imageUrl: string | null }>;
+  imageStatus: { attached: boolean; url: string | null };
+};
+
 function inLane(candidate: Candidate, lane: Lane): boolean {
   if (lane === "ALL") return true;
   if (lane === "HIGH") return candidate.confidenceBand === "HIGH";
@@ -44,6 +53,9 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkResults, setBulkResults] = useState<{ approved: number; failed: number } | null>(null);
+  const [pipelineOpenById, setPipelineOpenById] = useState<Record<string, boolean>>({});
+  const [pipelineDataById, setPipelineDataById] = useState<Record<string, PipelineStatus | null>>({});
+  const [pipelineLoadingById, setPipelineLoadingById] = useState<Record<string, boolean>>({});
 
   async function importImage(candidateId: string, imageUrl: string, setAsFeatured: boolean) {
     setImportingImageFor(candidateId);
@@ -124,6 +136,30 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
 
     return { primaryCandidates, duplicatesByPrimary };
   }, [candidates, lane]);
+
+  async function loadPipeline(candidateId: string) {
+    if (pipelineDataById[candidateId] !== undefined) return;
+    setPipelineLoadingById((prev) => ({ ...prev, [candidateId]: true }));
+    try {
+      const res = await fetch(`/api/admin/ingest/extracted-events/${candidateId}/pipeline-status`);
+      if (res.ok) {
+        const data = await res.json() as PipelineStatus;
+        setPipelineDataById((prev) => ({ ...prev, [candidateId]: data }));
+      } else {
+        setPipelineDataById((prev) => ({ ...prev, [candidateId]: null }));
+      }
+    } catch {
+      setPipelineDataById((prev) => ({ ...prev, [candidateId]: null }));
+    } finally {
+      setPipelineLoadingById((prev) => ({ ...prev, [candidateId]: false }));
+    }
+  }
+
+  function togglePipeline(candidateId: string) {
+    const isOpen = !pipelineOpenById[candidateId];
+    setPipelineOpenById((prev) => ({ ...prev, [candidateId]: isOpen }));
+    if (isOpen) void loadPipeline(candidateId);
+  }
 
   return (
     <div className="space-y-3">
@@ -289,8 +325,59 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
                         createdEventId={candidate.createdEventId}
                         rejectionReason={candidate.rejectionReason}
                       />
+                      <button
+                        type="button"
+                        className="mt-1 text-xs text-muted-foreground underline"
+                        onClick={() => togglePipeline(candidate.id)}
+                      >
+                        {pipelineOpenById[candidate.id] ? "Hide pipeline ▲" : "Pipeline ▼"}
+                      </button>
                     </td>
                   </tr>
+                  {pipelineOpenById[candidate.id] ? (
+                    <tr>
+                      <td colSpan={7} className="border-b bg-muted/30 px-4 py-3">
+                        {pipelineLoadingById[candidate.id] ? (
+                          <p className="text-xs text-muted-foreground">Loading pipeline…</p>
+                        ) : pipelineDataById[candidate.id] === null ? (
+                          <p className="text-xs text-destructive">Failed to load pipeline status.</p>
+                        ) : !pipelineDataById[candidate.id]?.linked ? (
+                          <p className="text-xs text-muted-foreground">Event not yet created — approve this candidate first.</p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-4 text-xs">
+                            <div>
+                              <p className="mb-1 font-medium">Artists linked ({pipelineDataById[candidate.id]!.linkedArtists.length})</p>
+                              {pipelineDataById[candidate.id]!.linkedArtists.length === 0
+                                ? <p className="text-muted-foreground">None linked</p>
+                                : pipelineDataById[candidate.id]!.linkedArtists.map((artist) => (
+                                  <a key={artist.id} href={`/admin/artists/${artist.id}`} className="block underline">{artist.name}</a>
+                                ))}
+                            </div>
+                            <div>
+                              <p className="mb-1 font-medium">Artist candidates ({pipelineDataById[candidate.id]!.artistCandidates.length})</p>
+                              {pipelineDataById[candidate.id]!.artistCandidates.length === 0
+                                ? <p className="text-muted-foreground">None queued</p>
+                                : pipelineDataById[candidate.id]!.artistCandidates.map((artist) => (
+                                  <a key={artist.id} href="/admin/ingest/artists" className="block underline">{artist.name} <span className="text-muted-foreground">({artist.status})</span></a>
+                                ))}
+                            </div>
+                            <div>
+                              <p className="mb-1 font-medium">Artwork candidates ({pipelineDataById[candidate.id]!.artworkCandidates.length})</p>
+                              {pipelineDataById[candidate.id]!.artworkCandidates.length === 0
+                                ? <p className="text-muted-foreground">None queued</p>
+                                : pipelineDataById[candidate.id]!.artworkCandidates.map((artwork) => (
+                                  <p key={artwork.id}>{artwork.title} <span className="text-muted-foreground">({artwork.status})</span></p>
+                                ))}
+                              <p className="mt-2 font-medium">Image</p>
+                              <p className={pipelineDataById[candidate.id]!.imageStatus.attached ? "text-emerald-700" : "text-muted-foreground"}>
+                                {pipelineDataById[candidate.id]!.imageStatus.attached ? "✓ Attached" : "— No image"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ) : null}
                   {showDuplicates && isExpanded ? duplicates.map((duplicate) => (
                     <tr key={duplicate.id} className="border-b align-top bg-muted/20">
                       <td className="px-3 py-2 pl-8">
