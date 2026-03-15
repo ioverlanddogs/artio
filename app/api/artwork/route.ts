@@ -31,7 +31,14 @@ function buildWhere(input: ReturnType<typeof artworkListQuerySchema.parse>): Pri
     ...(artistId ? { artistId } : {}),
     ...(mediums.length ? { medium: { in: mediums, mode: "insensitive" } } : {}),
     ...(yearFrom != null || yearTo != null ? { year: { gte: yearFrom ?? undefined, lte: yearTo ?? undefined } } : {}),
-    ...(priceMin != null || priceMax != null ? { priceAmount: { gte: priceMin ?? undefined, lte: priceMax ?? undefined } } : {}),
+    ...(priceMin != null || priceMax != null
+      ? {
+          priceAmount: {
+            gte: priceMin != null ? Math.round(priceMin * 100) : undefined,
+            lte: priceMax != null ? Math.round(priceMax * 100) : undefined,
+          },
+        }
+      : {}),
     ...(currency ? { currency: currency.toUpperCase() } : {}),
     ...(hasPrice ? { priceAmount: { not: null } } : {}),
     ...(hasImages ? { OR: [{ featuredAssetId: { not: null } }, { images: { some: {} } }] } : {}),

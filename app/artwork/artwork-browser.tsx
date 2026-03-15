@@ -58,26 +58,30 @@ export function ArtworkBrowser({ signedIn, mediumOptions }: { signedIn: boolean;
   }, [queryDraft]);
 
   useEffect(() => {
-    const active = true;
+    const controller = new AbortController();
     setLoading(true);
-    fetch(`/api/artwork?${queryString}`)
+    fetch(`/api/artwork?${queryString}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((data) => {
-        if (!active) return;
         setItems(data.items ?? []);
         setTotal(data.total ?? 0);
       })
-      .finally(() => active && setLoading(false));
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setItems([]);
+          setTotal(0);
+        }
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [queryString]);
 
   useEffect(() => {
     if (!signedIn) return;
-    fetch("/api/favorites")
+    fetch("/api/favorites?targetType=ARTWORK")
       .then((res) => res.json())
       .then((data) => {
-        const ids = (data?.items ?? [])
-          .filter((item: { targetType?: string; targetId?: string }) => item.targetType === "ARTWORK" && typeof item.targetId === "string")
-          .map((item: { targetId: string }) => item.targetId);
+        const ids = (data?.items ?? []).map((item: { targetId: string }) => item.targetId);
         setFavoriteIds(new Set(ids));
       })
       .catch(() => {
@@ -148,7 +152,7 @@ export function ArtworkBrowser({ signedIn, mediumOptions }: { signedIn: boolean;
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2"><input className="rounded border p-2 text-sm" placeholder="Year from" defaultValue={sp?.get("yearFrom") ?? ""} onBlur={(e) => setParam({ yearFrom: e.target.value || null })} /><input className="rounded border p-2 text-sm" placeholder="Year to" defaultValue={sp?.get("yearTo") ?? ""} onBlur={(e) => setParam({ yearTo: e.target.value || null })} /></div>
-        <div className="grid grid-cols-2 gap-2"><input className="rounded border p-2 text-sm" placeholder="Price min" defaultValue={sp?.get("priceMin") ?? ""} onBlur={(e) => setParam({ priceMin: e.target.value || null })} /><input className="rounded border p-2 text-sm" placeholder="Price max" defaultValue={sp?.get("priceMax") ?? ""} onBlur={(e) => setParam({ priceMax: e.target.value || null })} /></div>
+        <div className="grid grid-cols-2 gap-2"><input className="rounded border p-2 text-sm" placeholder="Price min (£)" defaultValue={sp?.get("priceMin") ?? ""} onBlur={(e) => setParam({ priceMin: e.target.value || null })} /><input className="rounded border p-2 text-sm" placeholder="Price max (£)" defaultValue={sp?.get("priceMax") ?? ""} onBlur={(e) => setParam({ priceMax: e.target.value || null })} /></div>
         <select className="w-full rounded border p-2 text-sm" value={sp?.get("currency") ?? ""} onChange={(e) => setParam({ currency: e.target.value || null })}><option value="">Any currency</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option></select>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sp?.get("hasImages") === "true"} onChange={(e) => setParam({ hasImages: e.target.checked ? "true" : null })} />Has images</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sp?.get("hasPrice") === "true"} onChange={(e) => setParam({ hasPrice: e.target.checked ? "true" : null })} />Has price</label>
