@@ -39,9 +39,11 @@ function getConfidenceReasons(value: unknown): string[] | null {
 export default function IngestEventQueueClient({
   candidates,
   venues,
+  userRole,
 }: {
   candidates: QueueCandidate[];
   venues: Array<{ id: string; name: string }>;
+  userRole?: "USER" | "EDITOR" | "ADMIN";
 }) {
   const router = useRouter();
   const [showReasons, setShowReasons] = useState(false);
@@ -313,6 +315,7 @@ export default function IngestEventQueueClient({
                     status={candidate.status}
                     createdEventId={candidate.createdEventId}
                     rejectionReason={candidate.rejectionReason}
+                    userRole={userRole}
                   />
                 </td>
               </tr>

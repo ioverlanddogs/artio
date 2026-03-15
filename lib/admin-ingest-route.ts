@@ -59,6 +59,9 @@ const runsQuerySchema = z.object({
 const runIdSchema = z.object({ runId: z.string().uuid() });
 const candidateIdSchema = z.object({ id: z.string().uuid() });
 const rejectBodySchema = z.object({ rejectionReason: z.string().trim().min(1).max(500) });
+const approveBodySchema = z.object({
+  publishImmediately: z.boolean().optional().default(false),
+});
 
 export async function handleAdminIngestRun(req: NextRequest, params: { venueId?: string }, deps: Partial<AdminIngestDeps> = {}) {
   const resolved = { ...defaultDeps, ...deps };
@@ -256,7 +259,6 @@ export async function handleAdminIngestReject(req: NextRequest, params: { id?: s
     const actor = await resolved.requireEditorUser();
     const parsedParams = candidateIdSchema.safeParse(params);
     if (!parsedParams.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedParams.error), requestId);
-
     const parsedBody = rejectBodySchema.safeParse(await parseBody(req));
     if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedBody.error), requestId);
 
@@ -294,6 +296,12 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
     const actor = await resolved.requireEditorUser();
     const parsedParams = candidateIdSchema.safeParse(params);
     if (!parsedParams.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedParams.error), requestId);
+    const parsedApproveBody = approveBodySchema.safeParse(await parseBody(req).catch(() => ({})));
+    const publishImmediately = parsedApproveBody.success ? parsedApproveBody.data.publishImmediately : false;
+
+    if (publishImmediately && actor.role !== "ADMIN") {
+      return apiError(403, "forbidden", "Approve & Publish requires ADMIN role", undefined, requestId);
+    }
 
     const approved = await resolved.appDb.$transaction(async (tx) => {
       const candidate = await tx.ingestExtractedEvent.findUnique({
@@ -344,6 +352,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
             openAiApiKey: string | null | undefined;
           } | null,
           sourceUrl: candidate.sourceUrl,
+          published: publishImmediately,
           imageContext: {
             runId: candidate.runId,
             venueId: candidate.venueId,
@@ -396,7 +405,9 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
           startAt: requiredStartAt,
           endAt: candidate.endAt,
           timezone: requiredTimezone,
-          isPublished: false,
+          isPublished: publishImmediately,
+          status: publishImmediately ? "PUBLISHED" : "DRAFT",
+          publishedAt: publishImmediately ? new Date() : null,
           isAiExtracted: true,
           ingestSourceRunId: candidate.runId,
         },
@@ -517,26 +528,28 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
         };
       }
 
-      await tx.submission.create({
-        data: {
-          type: "EVENT",
-          kind: "PUBLISH",
-          status: "IN_REVIEW",
-          submitterUserId: actor.id,
-          venueId: candidate.venueId,
-          targetEventId: createdEvent.id,
-          note: "AI ingest candidate submitted for admin moderation",
-          details: {
-            source: "ingest",
-            candidateId: candidate.id,
-            runId: candidate.runId,
-            sourceUrl: candidate.sourceUrl,
-            locationText: candidate.locationText,
+      if (!publishImmediately) {
+        await tx.submission.create({
+          data: {
+            type: "EVENT",
+            kind: "PUBLISH",
+            status: "IN_REVIEW",
+            submitterUserId: actor.id,
+            venueId: candidate.venueId,
+            targetEventId: createdEvent.id,
+            note: "AI ingest candidate submitted for admin moderation",
+            details: {
+              source: "ingest",
+              candidateId: candidate.id,
+              runId: candidate.runId,
+              sourceUrl: candidate.sourceUrl,
+              locationText: candidate.locationText,
+            },
+            submittedAt: new Date(),
           },
-          submittedAt: new Date(),
-        },
-        select: { id: true },
-      });
+          select: { id: true },
+        });
+      }
 
       const updated = await tx.ingestExtractedEvent.update({
         where: { id: candidate.id },
@@ -559,6 +572,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
         artworkSettings,
         sourceUrl: candidate.sourceUrl,
         linkedArtistCount: matchedArtists.length,
+        published: publishImmediately,
         imageContext: {
           runId: candidate.runId,
           venueId: candidate.venueId,
@@ -676,6 +690,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
       candidateId: approved.candidate.id,
       createdEventId: approved.createdEventId,
       linkedArtistCount: approved.linkedArtistCount ?? 0,
+      published: approved.published,
       imageWarning,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

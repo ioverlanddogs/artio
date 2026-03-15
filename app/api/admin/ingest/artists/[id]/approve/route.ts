@@ -10,6 +10,10 @@ import { importApprovedArtistImage } from "@/lib/ingest/import-approved-artist-i
 
 export const runtime = "nodejs";
 
+const approveBodySchema = z.object({
+  publishImmediately: z.boolean().optional().default(false),
+});
+
 const artistApprovePatchSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   bio: z.string().trim().max(5000).nullable().optional(),
@@ -23,7 +27,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const admin = await requireAdmin();
     const { id } = await params;
-    const parsedPatch = artistApprovePatchSchema.safeParse(await parseBody(req));
+    const body = await parseBody(req).catch(() => ({}));
+    const parsedApproveBody = approveBodySchema.safeParse(body);
+    const publishImmediately = parsedApproveBody.success ? parsedApproveBody.data.publishImmediately : false;
+    if (publishImmediately && admin.role !== "ADMIN") {
+      return apiError(403, "forbidden", "Approve & Publish requires ADMIN role");
+    }
+
+    const patchBody = body && typeof body === "object" ? { ...(body as Record<string, unknown>) } : {};
+    delete (patchBody as { publishImmediately?: unknown }).publishImmediately;
+    const parsedPatch = artistApprovePatchSchema.safeParse(patchBody);
     if (!parsedPatch.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedPatch.error));
     const patch = parsedPatch.data;
 
@@ -60,27 +73,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           twitterUrl,
           isAiDiscovered: true,
           extractionProvider: candidate.extractionProvider,
-          status: "IN_REVIEW",
+          status: publishImmediately ? "PUBLISHED" : "IN_REVIEW",
+          isPublished: publishImmediately,
         },
         select: { id: true },
       });
 
-      await tx.submission.create({
-        data: {
-          type: "ARTIST",
-          kind: "PUBLISH",
-          status: "IN_REVIEW",
-          submitterUserId: admin.id,
-          targetArtistId: newArtist.id,
-          note: "AI artist ingest candidate submitted for admin moderation",
-          details: {
-            source: "artist_ingest",
-            candidateId: candidate.id,
-            sourceUrl: candidate.sourceUrl,
+      if (!publishImmediately) {
+        await tx.submission.create({
+          data: {
+            type: "ARTIST",
+            kind: "PUBLISH",
+            status: "IN_REVIEW",
+            submitterUserId: admin.id,
+            targetArtistId: newArtist.id,
+            note: "AI artist ingest candidate submitted for admin moderation",
+            details: {
+              source: "artist_ingest",
+              candidateId: candidate.id,
+              sourceUrl: candidate.sourceUrl,
+            },
+            submittedAt: new Date(),
           },
-          submittedAt: new Date(),
-        },
-      });
+        });
+      }
 
       for (const link of candidate.eventLinks) {
         await tx.eventArtist.upsert({
@@ -106,6 +122,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return {
         artistId: newArtist.id,
         linkedEventCount: candidate.eventLinks.length,
+        published: publishImmediately,
         name,
         websiteUrl,
         instagramUrl,
@@ -123,7 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       requestId: `admin-approve-artist-${result.candidateId}`,
     }).catch((err) => console.warn("admin_approve_artist_image_import_failed", { candidateId: result.candidateId, err }));
 
-    return NextResponse.json({ artistId: result.artistId, linkedEventCount: result.linkedEventCount }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ artistId: result.artistId, linkedEventCount: result.linkedEventCount, published: result.published }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");

@@ -1,10 +1,11 @@
 import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import ArtworksClient from "@/app/(admin)/admin/ingest/artworks/artworks-client";
-import { requireAdmin } from "@/lib/auth";
+import { getSessionUser, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export default async function AdminIngestArtworksPage() {
   await requireAdmin();
+  const user = await getSessionUser();
 
   const candidates = await db.ingestExtractedArtwork.findMany({
     where: { status: "PENDING" },
@@ -36,7 +37,7 @@ export default async function AdminIngestArtworksPage() {
         title="Artwork Extraction Queue"
         description="Pending AI-extracted artwork candidates awaiting moderation."
       />
-      <ArtworksClient candidates={candidates} />
+      <ArtworksClient candidates={candidates} userRole={user?.role} />
     </>
   );
 }

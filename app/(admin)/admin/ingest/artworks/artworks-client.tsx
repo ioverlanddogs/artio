@@ -42,7 +42,13 @@ function getConfidenceReasons(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
-export default function ArtworksClient({ candidates: initial }: { candidates: Candidate[] }) {
+export default function ArtworksClient({
+  candidates: initial,
+  userRole,
+}: {
+  candidates: Candidate[];
+  userRole?: "USER" | "EDITOR" | "ADMIN";
+}) {
   const [candidates, setCandidates] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -189,6 +195,27 @@ export default function ArtworksClient({ candidates: initial }: { candidates: Ca
     }
   }
 
+  async function approveAndPublish(id: string) {
+    setWorkingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/ingest/artworks/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publishImmediately: true }),
+      });
+      if (!res.ok) {
+        setError("Failed to approve and publish artwork candidate.");
+        return;
+      }
+      setCandidates((prev) => prev.filter((item) => item.id !== id));
+    } catch {
+      setError("Failed to approve and publish artwork candidate.");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
   async function reject(id: string) {
     setWorkingId(id);
     setError(null);
@@ -258,6 +285,9 @@ export default function ArtworksClient({ candidates: initial }: { candidates: Ca
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap gap-2">
                         <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id} onClick={() => approve(candidate.id)}>Approve</button>
+                        {userRole === "ADMIN" ? (
+                          <button className="rounded border border-emerald-600 px-2 py-1 text-xs text-emerald-800" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</button>
+                        ) : null}
                         <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id} onClick={() => reject(candidate.id)}>Reject</button>
                         <button
                           className="rounded border px-2 py-1 text-xs"
@@ -363,6 +393,11 @@ export default function ArtworksClient({ candidates: initial }: { candidates: Ca
                         <Button size="sm" disabled={workingId === candidate.id} onClick={() => approveWithPatch(candidate.id)}>
                           Save + approve
                         </Button>
+                        {userRole === "ADMIN" ? (
+                          <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>
+                            Approve & Publish
+                          </Button>
+                        ) : null}
                         <Button size="sm" variant="outline" onClick={() => setEditOpenById((prev) => ({ ...prev, [candidate.id]: false }))}>
                           Cancel
                         </Button>

@@ -1,10 +1,11 @@
 import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import ArtistsClient from "@/app/(admin)/admin/ingest/artists/artists-client";
-import { requireAdmin } from "@/lib/auth";
+import { getSessionUser, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export default async function AdminIngestArtistsPage() {
   await requireAdmin();
+  const user = await getSessionUser();
 
   const candidates = await db.ingestExtractedArtist.findMany({
     where: { status: "PENDING" },
@@ -41,7 +42,7 @@ export default async function AdminIngestArtistsPage() {
         title="Artist Discovery Queue"
         description="Pending AI-discovered artist profile candidates awaiting moderation."
       />
-      <ArtistsClient candidates={candidates} />
+      <ArtistsClient candidates={candidates} userRole={user?.role} />
     </>
   );
 }

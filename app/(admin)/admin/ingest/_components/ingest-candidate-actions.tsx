@@ -47,17 +47,19 @@ export default function IngestCandidateActions({
   status,
   createdEventId,
   rejectionReason,
+  userRole,
 }: {
   candidateId: string;
   venueId: string;
   status: CandidateStatus;
   createdEventId: string | null;
   rejectionReason: string | null;
+  userRole?: "USER" | "EDITOR" | "ADMIN";
 }) {
   const router = useRouter();
   const [openRejectModal, setOpenRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | null>(null);
+  const [loadingAction, setLoadingAction] = useState<"approve" | "reject" | "approve_publish" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missingTimezone, setMissingTimezone] = useState(false);
   const [linkedArtistCount, setLinkedArtistCount] = useState<number | null>(null);
@@ -129,6 +131,41 @@ export default function IngestCandidateActions({
     }
   }
 
+
+  async function approveAndPublish() {
+    if (loadingAction || status !== "PENDING") return;
+    setError(null);
+    setMissingTimezone(false);
+    setImageSkipWarning(null);
+    setLoadingAction("approve_publish");
+    try {
+      const res = await fetch(`/api/admin/ingest/extracted-events/${candidateId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publishImmediately: true }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { details?: unknown } } | null;
+        const missingFields = extractMissingFields(body?.error?.details);
+        setMissingTimezone(missingFields.includes("timezone"));
+        setError(getActionError(res.status, body?.error?.details));
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as {
+        createdEventId?: string;
+        linkedArtistCount?: number;
+        published?: boolean;
+      };
+      setLinkedArtistCount(body.linkedArtistCount ?? 0);
+      if (body.createdEventId) setApprovedEventId(body.createdEventId);
+      router.refresh();
+    } catch {
+      setError("Action failed. Please try again.");
+    } finally {
+      setLoadingAction(null);
+    }
+  }
+
   async function reject() {
     if (loadingAction || status !== "PENDING") return;
     if (!rejectReason.trim()) {
@@ -177,6 +214,17 @@ export default function IngestCandidateActions({
         <Button size="sm" onClick={approve} disabled={status !== "PENDING" || loadingAction !== null}>
           {loadingAction === "approve" ? "Approving…" : "Approve"}
         </Button>
+        {userRole === "ADMIN" && status === "PENDING" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={approveAndPublish}
+            disabled={status !== "PENDING" || loadingAction !== null}
+            className="border-emerald-600 text-emerald-800 hover:bg-emerald-50"
+          >
+            {loadingAction === "approve_publish" ? "Publishing…" : "Approve & Publish"}
+          </Button>
+        ) : null}
         <Button size="sm" variant="outline" onClick={() => setOpenRejectModal(true)} disabled={status !== "PENDING" || loadingAction !== null}>
           {loadingAction === "reject" ? "Rejecting…" : "Reject"}
         </Button>
