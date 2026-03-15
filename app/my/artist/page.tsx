@@ -13,9 +13,10 @@ import { ArtistEventsPanel } from "@/components/artists/artist-events-panel";
 import { Button } from "@/components/ui/button";
 import { countAllArtworksByArtist } from "@/lib/artworks";
 import { ArtworkManagementGrid } from "@/components/my/artist/artwork-management-grid";
-import { evaluateArtistReadiness } from "@/lib/publish-readiness";
+import { evaluateArtistCompleteness, evaluateArtistReadiness } from "@/lib/publish-readiness";
 import { PublishReadinessChecklist } from "@/components/publishing/publish-readiness-checklist";
 import { ArtistStripeConnectButton } from "@/app/my/artist/_components/ArtistStripeConnectButton";
+import { ProfileCompletenessSidebar } from "@/components/my/artist/profile-completeness-sidebar";
 
 export default async function MyArtistPage() {
   const user = await getSessionUser();
@@ -38,6 +39,7 @@ export default async function MyArtistPage() {
       id: true,
       slug: true,
       isPublished: true,
+      status: true,
       name: true,
       bio: true,
       websiteUrl: true,
@@ -112,6 +114,25 @@ export default async function MyArtistPage() {
   const coverUrl = resolveArtistCoverUrl(artist);
   const avatarUrl = resolveEntityPrimaryImage(artist)?.url ?? artist.avatarImageUrl ?? null;
 
+  const publishedArtworkCount = await db.artwork.count({
+    where: { artistId: artist.id, isPublished: true, deletedAt: null },
+  });
+
+  const completeness = evaluateArtistCompleteness(
+    {
+      name: artist.name,
+      bio: artist.bio,
+      mediums: artist.mediums,
+      websiteUrl: artist.websiteUrl,
+      instagramUrl: artist.instagramUrl,
+      featuredAssetId: artist.featuredAssetId,
+      images: artist.images,
+      nationality: null,
+      birthYear: null,
+    },
+    publishedArtworkCount,
+  );
+
   return (
     <main className="space-y-6 p-6">
       {unpaidPricedArtworks > 0 && stripeAccount?.status !== "ACTIVE" ? (
@@ -163,13 +184,28 @@ export default async function MyArtistPage() {
           avatarUrl,
         }}
       />
-      <ArtistGalleryManager
-        initialImages={artist.images}
-        initialCover={coverUrl}
-      />
-      <ArtistVenuesPanel initialVenues={publishedVenues} />
-      <ArtistEventsPanel initialEvents={publishedEvents} />
-      <ArtworkManagementGrid artistId={artist.id} />
+
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_280px]">
+        <div className="min-w-0 space-y-6">
+          <ArtistGalleryManager
+            initialImages={artist.images}
+            initialCover={coverUrl}
+          />
+          <ArtistVenuesPanel initialVenues={publishedVenues} />
+          <ArtistEventsPanel initialEvents={publishedEvents} />
+          <ArtworkManagementGrid artistId={artist.id} />
+        </div>
+
+        <aside>
+          <ProfileCompletenessSidebar
+            completeness={completeness}
+            artistId={artist.id}
+            isPublished={artist.isPublished}
+            status={artist.status ?? "DRAFT"}
+            publicUrl={`/artists/${artist.slug}`}
+          />
+        </aside>
+      </div>
     </main>
   );
 }
