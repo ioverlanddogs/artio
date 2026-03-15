@@ -2,19 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { EntityPageViewTracker } from "@/components/analytics/entity-page-view-tracker";
-import { ArtworkPurchaseCard } from "@/components/artwork/artwork-enquire-card";
+import { ArtworkArtistPanel } from "@/components/artwork/artwork-artist-panel";
+import { ArtworkEnquireCard, ArtworkPurchaseCard } from "@/components/artwork/artwork-enquire-card";
+import { ArtworkImageGallery } from "@/components/artwork/artwork-image-gallery";
 import { ArtworkRelatedSection } from "@/components/artwork/artwork-related-section";
 import { SaveArtworkButton } from "@/components/artwork/save-artwork-button";
 import { FollowButton } from "@/components/follows/follow-button";
 import { EntityHeader } from "@/components/entities/entity-header";
-import { EventGalleryLightbox } from "@/components/events/event-gallery-lightbox";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageShell } from "@/components/ui/page-shell";
 import { resolveImageUrl } from "@/lib/assets";
 import { isArtworkIdKey, shouldRedirectArtworkIdKey } from "@/lib/artwork-route";
-import { listPublishedArtworksByEvent, listPublishedArtworksByVenue, type PublishedArtworkListItem } from "@/lib/artworks";
+import { listPublishedArtworksByArtist, listPublishedArtworksByEvent, listPublishedArtworksByVenue, type PublishedArtworkListItem } from "@/lib/artworks";
+import { resolveArtistCoverUrl } from "@/lib/artists";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/format";
@@ -89,6 +91,10 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
           id: true,
           name: true,
           slug: true,
+          bio: true,
+          avatarImageUrl: true,
+          featuredImageUrl: true,
+          featuredAsset: { select: { url: true } },
           user: { select: { email: true } },
           stripeAccount: {
             select: {
@@ -139,6 +145,11 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
   ]);
 
   const cover = resolveImageUrl(artwork.featuredAsset?.url, artwork.images[0]?.asset?.url);
+  const artistAvatarUrl = resolveArtistCoverUrl({
+    featuredAsset: artwork.artist.featuredAsset,
+    featuredImageUrl: artwork.artist.featuredImageUrl,
+    avatarImageUrl: artwork.artist.avatarImageUrl,
+  });
   const metadataChips = [
     artwork.year ? String(artwork.year) : null,
     artwork.medium,
@@ -164,15 +175,19 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
   const eventChips = artwork.events.map((e) => ({ label: e.event.title, href: `/events/${e.event.slug}` }));
   const hasProvenance = venueChips.length > 0 || eventChips.length > 0;
 
-  const [venueRelatedArtworksByVenue, eventRelatedArtworksByEvent] = await Promise.all([
+  const [venueRelatedArtworksByVenue, eventRelatedArtworksByEvent, artistArtworksRaw] = await Promise.all([
     Promise.all(venueIds.slice(0, 2).map((venueId) => listPublishedArtworksByVenue(venueId, 6))),
     Promise.all(eventIds.slice(0, 2).map((eventId) => listPublishedArtworksByEvent(eventId, 6))),
+    listPublishedArtworksByArtist(artwork.artist.id, 7),
   ]);
 
   const dedupeRelated = (items: PublishedArtworkListItem[]) =>
     Array.from(new Map(items.filter((item) => item.id !== artwork.id).map((item) => [item.id, item])).values());
   const venueRelatedArtworks = dedupeRelated(venueRelatedArtworksByVenue.flat()).slice(0, 6);
   const eventRelatedArtworks = dedupeRelated(eventRelatedArtworksByEvent.flat()).slice(0, 6);
+  const moreByArtist = artistArtworksRaw
+    .filter((item) => item.id !== artwork.id)
+    .slice(0, 6);
   const artworkJsonLd = buildArtworkJsonLd({
     title: artwork.title,
     artistName: artwork.artist.name,
@@ -192,11 +207,15 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
         dangerouslySetInnerHTML={{ __html: JSON.stringify(artworkJsonLd).replace(/</g, "\\u003c") }}
       />
       <EntityPageViewTracker entityType="ARTWORK" entityId={artwork.id} />
-      <Breadcrumbs items={[{ label: "Artworks", href: "/artwork" }, { label: artwork.title, href: `/artwork/${artwork.slug ?? artwork.id}` }]} />
+      <Breadcrumbs items={[
+        { label: "Artworks", href: "/artwork" },
+        { label: artwork.artist.name, href: `/artists/${artwork.artist.slug}` },
+        { label: artwork.title, href: `/artwork/${artwork.slug ?? artwork.id}` },
+      ]} />
       <EntityHeader
         title={artwork.title}
         subtitle={<span>by <Link className="underline" href={`/artists/${artwork.artist.slug}`}>{artwork.artist.name}</Link></span>}
-        imageUrl={cover}
+        imageUrl={null}
         coverUrl={cover}
         primaryAction={
           <div className="flex items-center gap-2">
@@ -305,9 +324,51 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
           currency={artwork.currency}
           initialOfferAmountMajor={artwork.offers[0] ? artwork.offers[0].offerAmount / 100 : undefined}
         />
+      ) : (
+        <ArtworkEnquireCard
+          artworkKey={artwork.slug ?? artwork.id}
+          artworkTitle={artwork.title}
+          priceFormatted="Price on request"
+          artistName={artwork.artist.name}
+        />
+      )}
+
+      <ArtworkArtistPanel
+        artist={{
+          id: artwork.artist.id,
+          name: artwork.artist.name,
+          slug: artwork.artist.slug,
+          bio: artwork.artist.bio,
+          avatarUrl: artistAvatarUrl,
+          followersCount: artistFollowersCount,
+        }}
+        initialIsFollowing={initialFollowing}
+        isAuthenticated={Boolean(user)}
+      />
+
+      {galleryImages.length > 0 ? (
+        <ArtworkImageGallery
+          images={galleryImages}
+          artworkMeta={{
+            title: artwork.title,
+            medium: artwork.medium,
+            dimensions: artwork.dimensions,
+            priceFormatted: artwork.priceAmount != null && artwork.currency
+              ? formatPrice(artwork.priceAmount, artwork.currency)
+              : null,
+          }}
+        />
       ) : null}
 
-      {galleryImages.length > 0 ? <EventGalleryLightbox images={galleryImages} /> : null}
+      <ArtworkRelatedSection
+        title={`More by ${artwork.artist.name}`}
+        subtitle="Other published works from this artist."
+        items={moreByArtist}
+        viewAllHref={moreByArtist.length >= 6
+          ? `/artwork?artistId=${artwork.artist.id}`
+          : undefined}
+        showArtistName={false}
+      />
 
       <ArtworkRelatedSection
         title="Artworks shown at related venues"
