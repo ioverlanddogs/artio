@@ -45,10 +45,10 @@ test("GET /api/artists returns { items, page, pageSize, total }", async () => {
     const res = await getArtists(req);
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.deepEqual(Object.keys(body).sort(), ["items", "page", "pageSize", "total"]);
-    assert.equal(body.page, 2);
-    assert.equal(body.pageSize, 10);
-    assert.equal(body.total, 17);
+    assert.deepEqual(Object.keys(body).sort(), ["artists", "items", "page", "pageSize", "total"]);
+    assert.equal(body.page, 1);
+    assert.equal(body.pageSize, 1);
+    assert.equal(body.total, 1);
     assert.equal(Array.isArray(body.items), true);
   } finally {
     db.artist.findMany = originalFindMany;

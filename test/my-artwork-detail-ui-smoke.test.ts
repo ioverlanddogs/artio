@@ -20,5 +20,5 @@ test("artwork detail page renders stable detail signals", () => {
   // stable detail fields
   assert.match(file, /href=\{`\/artists\/\$\{artwork\.artist\.slug\}`\}/);
   assert.match(file, /const galleryImages = artwork\.images/);
-  assert.match(file, /<EventGalleryLightbox images=\{galleryImages\} \/>/);
+  assert.match(file, /<ArtworkImageGallery/);
 });
