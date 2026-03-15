@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Eye, EyeOff, Pencil, Star } from "lucide-react";
+import { Eye, EyeOff, GripVertical, Pencil, Star } from "lucide-react";
 import { formatPrice, DEFAULT_CURRENCY } from "@/lib/format";
 
 export type ArtworkCardData = {
@@ -33,6 +33,10 @@ export function ArtworkGridCard({
   onToggleFeatured,
   publishBusy,
   featureBusy,
+  dragMode,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }: {
   artwork: ArtworkCardData;
   onEdit: (id: string) => void;
@@ -40,6 +44,10 @@ export function ArtworkGridCard({
   onToggleFeatured: (id: string, isFeatured: boolean) => void;
   publishBusy?: boolean;
   featureBusy?: boolean;
+  dragMode?: boolean;
+  onDragStart?: (id: string) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (id: string) => void;
 }) {
   const cfg = statusConfig(artwork.status, artwork.isPublished, artwork.deletedAt);
   const priceLabel = artwork.priceAmount != null
@@ -48,15 +56,37 @@ export function ArtworkGridCard({
   const canTogglePublish = artwork.status !== "IN_REVIEW" && !artwork.deletedAt;
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div
+      className={`group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-opacity ${dragMode && !artwork.isFeatured ? "pointer-events-none opacity-40" : ""}`}
+      draggable={dragMode && artwork.isFeatured}
+      onDragStart={dragMode && artwork.isFeatured && onDragStart ? () => onDragStart(artwork.id) : undefined}
+      onDragOver={dragMode && artwork.isFeatured && onDragOver
+        ? (e) => {
+          e.preventDefault();
+          onDragOver(e);
+        }
+        : undefined}
+      onDrop={dragMode && artwork.isFeatured && onDrop
+        ? (e) => {
+          e.preventDefault();
+          onDrop(artwork.id);
+        }
+        : undefined}
+    >
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         {artwork.coverUrl
           ? <Image src={artwork.coverUrl} alt={artwork.title} fill className="object-cover transition group-hover:scale-[1.02]" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
           : <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image</div>}
 
-        <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${cfg.color}`}>
-          {cfg.label}
-        </span>
+        {dragMode && artwork.isFeatured ? (
+          <span className="absolute left-2 top-2 cursor-grab rounded bg-black/60 p-1 text-white">
+            <GripVertical className="h-4 w-4" />
+          </span>
+        ) : (
+          <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${cfg.color}`}>
+            {cfg.label}
+          </span>
+        )}
 
         {priceLabel && (
           <span className="absolute right-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[10px] text-white">
@@ -64,38 +94,40 @@ export function ArtworkGridCard({
           </span>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 hidden items-center justify-center gap-2 bg-black/60 py-2 group-hover:flex">
-          <button
-            type="button"
-            title="Edit"
-            className="rounded border border-white/30 p-1.5 text-white hover:bg-white/20"
-            onClick={() => onEdit(artwork.id)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+        {!dragMode && (
+          <div className="absolute inset-x-0 bottom-0 hidden items-center justify-center gap-2 bg-black/60 py-2 group-hover:flex">
+            <button
+              type="button"
+              title="Edit"
+              className="rounded border border-white/30 p-1.5 text-white hover:bg-white/20"
+              onClick={() => onEdit(artwork.id)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
 
-          <button
-            type="button"
-            title={artwork.isPublished ? "Unpublish" : "Publish"}
-            className="rounded border border-white/30 p-1.5 text-white hover:bg-white/20 disabled:opacity-40"
-            disabled={!canTogglePublish || publishBusy}
-            onClick={() => canTogglePublish && onTogglePublish(artwork.id, artwork.isPublished)}
-          >
-            {artwork.isPublished
-              ? <EyeOff className="h-3.5 w-3.5" />
-              : <Eye className="h-3.5 w-3.5" />}
-          </button>
+            <button
+              type="button"
+              title={artwork.isPublished ? "Unpublish" : "Publish"}
+              className="rounded border border-white/30 p-1.5 text-white hover:bg-white/20 disabled:opacity-40"
+              disabled={!canTogglePublish || publishBusy}
+              onClick={() => canTogglePublish && onTogglePublish(artwork.id, artwork.isPublished)}
+            >
+              {artwork.isPublished
+                ? <EyeOff className="h-3.5 w-3.5" />
+                : <Eye className="h-3.5 w-3.5" />}
+            </button>
 
-          <button
-            type="button"
-            title={artwork.isFeatured ? "Remove from featured" : "Add to featured"}
-            className="rounded border border-white/30 p-1.5 hover:bg-white/20 disabled:opacity-40"
-            disabled={featureBusy}
-            onClick={() => onToggleFeatured(artwork.id, artwork.isFeatured)}
-          >
-            <Star className={`h-3.5 w-3.5 ${artwork.isFeatured ? "fill-yellow-400 text-yellow-400" : "text-white"}`} />
-          </button>
-        </div>
+            <button
+              type="button"
+              title={artwork.isFeatured ? "Remove from featured" : "Add to featured"}
+              className="rounded border border-white/30 p-1.5 hover:bg-white/20 disabled:opacity-40"
+              disabled={featureBusy}
+              onClick={() => onToggleFeatured(artwork.id, artwork.isFeatured)}
+            >
+              <Star className={`h-3.5 w-3.5 ${artwork.isFeatured ? "fill-yellow-400 text-yellow-400" : "text-white"}`} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={`h-1 w-full ${cfg.bar}`} />

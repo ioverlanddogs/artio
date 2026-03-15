@@ -26,6 +26,9 @@ export function ArtworkManagementGrid({ artistId }: { artistId: string }) {
   const [sort, setSort] = useState<Sort>("newest");
   const [publishBusyId, setPublishBusyId] = useState<string | null>(null);
   const [featureBusyId, setFeatureBusyId] = useState<string | null>(null);
+  const [dragMode, setDragMode] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [featuredIds, setFeaturedIds] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeEditId, setActiveEditId] = useState<string | null>(null);
@@ -189,6 +192,47 @@ export function ArtworkManagementGrid({ artistId }: { artistId: string }) {
     setArtworks((prev) => prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)));
   }
 
+  function handleDragStart(id: string) {
+    setDraggedId(id);
+  }
+
+  function handleDrop(targetId: string) {
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+    setArtworks((prev) => {
+      const featured = prev.filter((a) => a.isFeatured);
+      const others = prev.filter((a) => !a.isFeatured);
+      const draggedIdx = featured.findIndex((a) => a.id === draggedId);
+      const targetIdx = featured.findIndex((a) => a.id === targetId);
+      if (draggedIdx === -1 || targetIdx === -1) return prev;
+      const reordered = [...featured];
+      const [moved] = reordered.splice(draggedIdx, 1);
+      reordered.splice(targetIdx, 0, moved);
+      return [...reordered, ...others];
+    });
+    setDraggedId(null);
+  }
+
+  async function exitDragMode() {
+    setSavingOrder(true);
+    setDragMode(false);
+    const featuredIdsToSave = artworks.filter((a) => a.isFeatured).map((a) => a.id);
+    try {
+      await fetch("/api/my/artist/featured-artworks", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ artworkIds: featuredIdsToSave }),
+      });
+      enqueueToast({ title: "Feature order saved" });
+    } catch {
+      enqueueToast({ title: "Failed to save feature order", variant: "error" });
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
   const filtered = artworks
     .filter((a) => {
       if (filter === "published") return a.isPublished;
@@ -221,11 +265,34 @@ export function ArtworkManagementGrid({ artistId }: { artistId: string }) {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="ml-auto rounded border bg-background px-2 py-1 text-sm"
+          className="rounded border bg-background px-2 py-1 text-sm"
         >
           <option value="newest">Newest first</option>
           <option value="title">Title A–Z</option>
         </select>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {artworks.filter((a) => a.isFeatured).length} featured
+          </span>
+          {dragMode ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={savingOrder}
+              onClick={() => void exitDragMode()}
+            >
+              {savingOrder ? "Saving…" : "Done reordering"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDragMode(true)}
+            >
+              Feature order
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -268,6 +335,10 @@ export function ArtworkManagementGrid({ artistId }: { artistId: string }) {
               onToggleFeatured={(id, feat) => void handleToggleFeatured(id, feat)}
               publishBusy={publishBusyId === artwork.id}
               featureBusy={featureBusyId === artwork.id}
+              dragMode={dragMode}
+              onDragStart={handleDragStart}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
             />
           ))}
         </div>
