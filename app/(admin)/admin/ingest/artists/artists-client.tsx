@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
+import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
 import { Button } from "@/components/ui/button";
 
 type Candidate = {
@@ -72,6 +73,9 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [editOpenById, setEditOpenById] = useState<Record<string, boolean>>({});
   const [editDraftById, setEditDraftById] = useState<Record<string, EditDraft>>({});
+  const [importingImageFor, setImportingImageFor] = useState<string | null>(null);
+  const [importedImageFor, setImportedImageFor] = useState<Set<string>>(new Set());
+  const [importFailedFor, setImportFailedFor] = useState<Set<string>>(new Set());
 
   function updateDraft(id: string, field: keyof EditDraft, value: string) {
     setEditDraftById((prev) => ({
@@ -155,6 +159,30 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
     }
   }
 
+
+  async function importArtistImage(candidateId: string) {
+    setImportingImageFor(candidateId);
+    try {
+      const res = await fetch(`/api/admin/ingest/artists/${candidateId}/import-image`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setImportedImageFor((prev) => new Set([...prev, candidateId]));
+        setImportFailedFor((prev) => {
+          const next = new Set(prev);
+          next.delete(candidateId);
+          return next;
+        });
+      } else {
+        setImportFailedFor((prev) => new Set([...prev, candidateId]));
+      }
+    } catch {
+      setImportFailedFor((prev) => new Set([...prev, candidateId]));
+    } finally {
+      setImportingImageFor(null);
+    }
+  }
+
   async function reject(id: string) {
     setWorkingId(id);
     setError(null);
@@ -180,6 +208,7 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
           <thead>
             <tr className="border-b text-left">
               <th className="px-3 py-2">Confidence</th>
+              <th className="px-3 py-2">img</th>
               <th className="px-3 py-2">Name</th>
               <th className="px-3 py-2">Bio</th>
               <th className="px-3 py-2">Mediums</th>
@@ -200,6 +229,26 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
                       band={getConfidenceBand(candidate.confidenceBand)}
                       reasons={getConfidenceReasons(candidate.confidenceReasons)}
                       showReasons
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <IngestImageCell
+                      imageUrl={null}
+                      altText={candidate.name}
+                      importStatus={
+                        importedImageFor.has(candidate.id)
+                          ? "imported"
+                          : importFailedFor.has(candidate.id)
+                            ? "failed"
+                            : importingImageFor === candidate.id
+                              ? "importing"
+                              : "none"
+                      }
+                      onImport={
+                        candidate.websiteUrl
+                          ? () => importArtistImage(candidate.id)
+                          : undefined
+                      }
                     />
                   </td>
                   <td className="px-3 py-2 font-medium">{candidate.name}</td>
@@ -245,7 +294,7 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
                 </tr>
                 {editOpenById[candidate.id] ? (
                   <tr className="border-b">
-                    <td colSpan={9} className="px-3 pb-3">
+                    <td colSpan={10} className="px-3 pb-3">
                       <div className="grid grid-cols-2 gap-2 rounded border bg-muted/30 p-3 text-sm">
                         <label className="flex flex-col gap-1">
                           Name
@@ -304,7 +353,7 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
             ))}
             {candidates.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-muted-foreground" colSpan={9}>No artist candidates.</td>
+                <td className="px-3 py-6 text-muted-foreground" colSpan={10}>No artist candidates.</td>
               </tr>
             ) : null}
           </tbody>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import IngestCandidateActions from "@/app/(admin)/admin/ingest/_components/ingest-candidate-actions";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
+import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
 
 type QueueCandidate = {
   id: string;
@@ -51,6 +52,7 @@ export default function IngestEventQueueClient({
   const [importedImageFor, setImportedImageFor] = useState<Set<string>>(
     new Set(),
   );
+  const [importFailedFor, setImportFailedFor] = useState<Set<string>>(new Set());
   const [importImageError, setImportImageError] = useState<string | null>(null);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{
@@ -88,10 +90,19 @@ export default function IngestEventQueueClient({
         const body = (await res.json().catch(() => ({}))) as {
           error?: { message?: string };
         };
+        setImportFailedFor((prev) => new Set([...prev, candidateId]));
         setImportImageError(body.error?.message ?? "Import failed.");
         return;
       }
       setImportedImageFor((prev) => new Set([...prev, candidateId]));
+      setImportFailedFor((prev) => {
+        const next = new Set(prev);
+        next.delete(candidateId);
+        return next;
+      });
+    } catch {
+      setImportFailedFor((prev) => new Set([...prev, candidateId]));
+      setImportImageError("Import failed.");
     } finally {
       setImportingImageFor(null);
     }
@@ -247,64 +258,31 @@ export default function IngestEventQueueClient({
                   />
                 </td>
                 <td className="px-3 py-2">
-                  {candidate.imageUrl ? (
-                    <div className="group relative h-10 w-16">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={candidate.blobImageUrl ?? candidate.imageUrl}
-                        alt={candidate.title}
-                        className="h-10 w-16 rounded object-cover"
-                      />
-                      {candidate.status !== "DUPLICATE" ? (
-                        <div className="absolute inset-0 hidden flex-col items-center justify-center gap-0.5 rounded bg-black/60 group-hover:flex">
-                          <button
-                            type="button"
-                            className="text-[10px] leading-tight text-white underline disabled:opacity-50"
-                            disabled={
-                              importingImageFor === candidate.id ||
-                              importedImageFor.has(candidate.id)
-                            }
-                            onClick={() =>
-                              importImage(
-                                candidate.id,
-                                candidate.run.id,
-                                candidate.imageUrl!,
-                                false,
-                              )
-                            }
-                          >
-                            {importedImageFor.has(candidate.id)
-                              ? "✓ added"
-                              : importingImageFor === candidate.id
-                                ? "…"
-                                : "+ gallery"}
-                          </button>
-                          <button
-                            type="button"
-                            className="text-[10px] leading-tight text-white underline disabled:opacity-50"
-                            disabled={
-                              importingImageFor === candidate.id ||
-                              importedImageFor.has(candidate.id)
-                            }
-                            onClick={() =>
-                              importImage(
-                                candidate.id,
-                                candidate.run.id,
-                                candidate.imageUrl!,
-                                true,
-                              )
-                            }
-                          >
-                            {importingImageFor === candidate.id
-                              ? ""
-                              : "★ cover"}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    "—"
-                  )}
+                  <IngestImageCell
+                    imageUrl={candidate.imageUrl}
+                    blobImageUrl={candidate.blobImageUrl}
+                    altText={candidate.title}
+                    importStatus={
+                      importedImageFor.has(candidate.id)
+                        ? "imported"
+                        : importFailedFor.has(candidate.id)
+                          ? "failed"
+                          : importingImageFor === candidate.id
+                            ? "importing"
+                            : "none"
+                    }
+                    onImport={
+                      candidate.imageUrl && candidate.status !== "DUPLICATE"
+                        ? () =>
+                            importImage(
+                              candidate.id,
+                              candidate.run.id,
+                              candidate.imageUrl!,
+                              true,
+                            )
+                        : undefined
+                    }
+                  />
                 </td>
                 <td className="px-3 py-2 font-medium">{candidate.title}</td>
                 <td className="px-3 py-2">
