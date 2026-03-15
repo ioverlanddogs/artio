@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FavoriteTargetType } from "@prisma/client";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
 import { guardUser } from "@/lib/auth-guard";
@@ -7,11 +8,19 @@ import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey,
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await guardUser();
   if (user instanceof NextResponse) return user;
   try {
-    const items = await db.favorite.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
+    const targetTypeParam = req.nextUrl.searchParams.get("targetType");
+    const targetType = targetTypeParam && targetTypeParam in FavoriteTargetType ? targetTypeParam as FavoriteTargetType : undefined;
+    const items = await db.favorite.findMany({
+      where: {
+        userId: user.id,
+        ...(targetType ? { targetType } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json({ items });
   } catch {
     return apiError(500, "internal_error", "Failed to fetch favorites");
