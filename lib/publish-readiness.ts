@@ -21,6 +21,20 @@ export type PublishReadiness = {
   blockers: string[];
 };
 
+export type CompletenessItem = {
+  id: string;
+  label: string;
+  done: boolean;
+  href?: string;
+};
+
+export type ArtistCompletenessResult = {
+  score: number;
+  required: CompletenessItem[];
+  recommended: CompletenessItem[];
+  canGoLive: boolean;
+};
+
 const hasText = (value: string | null | undefined, min = 1) => (value ?? "").trim().length >= min;
 
 export function evaluateArtistReadiness(artist: { name: string | null; bio: string | null; featuredAssetId: string | null; websiteUrl?: string | null }): ReadinessResult {
@@ -33,6 +47,88 @@ export function evaluateArtistReadiness(artist: { name: string | null; bio: stri
   if (!hasText(artist.websiteUrl)) warnings.push({ id: "artist-website", label: "Add website URL (recommended).", severity: "info", href: "#websiteUrl" });
 
   return { ready: blocking.length === 0, blocking, warnings };
+}
+
+export function evaluateArtistCompleteness(
+  artist: {
+    name: string | null;
+    bio: string | null;
+    mediums: string[];
+    websiteUrl: string | null;
+    instagramUrl: string | null;
+    featuredAssetId: string | null;
+    images: Array<{ id: string }>;
+    nationality?: string | null;
+    birthYear?: number | null;
+  },
+  publishedArtworkCount: number,
+): ArtistCompletenessResult {
+  const required: CompletenessItem[] = [
+    {
+      id: "name",
+      label: "Add your name",
+      done: Boolean(artist.name?.trim()),
+      href: "#name",
+    },
+    {
+      id: "bio",
+      label: "Write a bio (50+ characters)",
+      done: (artist.bio?.trim().length ?? 0) >= 50,
+      href: "#bio",
+    },
+    {
+      id: "image",
+      label: "Add a profile photo",
+      done: Boolean(artist.featuredAssetId) || artist.images.length > 0,
+      href: "#images",
+    },
+    {
+      id: "artwork",
+      label: "Publish at least one artwork",
+      done: publishedArtworkCount > 0,
+      href: "#artworks",
+    },
+  ];
+
+  const recommended: CompletenessItem[] = [
+    {
+      id: "mediums",
+      label: "Add your mediums",
+      done: artist.mediums.length > 0,
+      href: "#mediums",
+    },
+    {
+      id: "website",
+      label: "Add website URL",
+      done: Boolean(artist.websiteUrl?.trim()),
+      href: "#website",
+    },
+    {
+      id: "instagram",
+      label: "Add Instagram",
+      done: Boolean(artist.instagramUrl?.trim()),
+      href: "#instagram",
+    },
+    {
+      id: "nationality",
+      label: "Add nationality",
+      done: Boolean(artist.nationality?.trim()),
+      href: "#nationality",
+    },
+    {
+      id: "birthYear",
+      label: "Add birth year",
+      done: artist.birthYear != null,
+      href: "#birthyear",
+    },
+  ];
+
+  const totalItems = required.length + recommended.length;
+  const doneItems = [...required, ...recommended].filter((i) => i.done).length;
+  const score = Math.round((doneItems / totalItems) * 100);
+  const canGoLive = required.every((i) => i.done);
+
+  return { score, required, recommended, canGoLive };
 }
 
 export function evaluateVenueReadiness(venue: { name: string | null; city: string | null; country: string | null; featuredAssetId: string | null; websiteUrl?: string | null; lat?: number | null; lng?: number | null }): ReadinessResult {
