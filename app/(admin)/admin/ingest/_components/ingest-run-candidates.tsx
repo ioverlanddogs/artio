@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 import IngestStatusBadge from "@/app/(admin)/admin/ingest/_components/ingest-status-badge";
 import IngestCandidateActions from "@/app/(admin)/admin/ingest/_components/ingest-candidate-actions";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
+import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
 
 type ConfidenceBand = "HIGH" | "MEDIUM" | "LOW";
 type Lane = "HIGH" | "NEEDS_REVIEW" | "LOW" | "ALL";
@@ -49,6 +50,7 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
   const [lane, setLane] = useState<Lane>("HIGH");
   const [importingImageFor, setImportingImageFor] = useState<string | null>(null);
   const [importedImageFor, setImportedImageFor] = useState<Set<string>>(new Set());
+  const [importFailedFor, setImportFailedFor] = useState<Set<string>>(new Set());
   const [importImageError, setImportImageError] = useState<string | null>(null);
   const [bulkApproving, setBulkApproving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
@@ -68,10 +70,19 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        setImportFailedFor((prev) => new Set([...prev, candidateId]));
         setImportImageError(body.error?.message ?? "Import failed.");
         return;
       }
       setImportedImageFor((prev) => new Set([...prev, candidateId]));
+      setImportFailedFor((prev) => {
+        const next = new Set(prev);
+        next.delete(candidateId);
+        return next;
+      });
+    } catch {
+      setImportFailedFor((prev) => new Set([...prev, candidateId]));
+      setImportImageError("Import failed.");
     } finally {
       setImportingImageFor(null);
     }
@@ -274,39 +285,25 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
                     <td className="px-3 py-2">{candidate.startAt ? new Date(candidate.startAt).toLocaleString() : "—"}</td>
                     <td className="px-3 py-2">{candidate.locationText ?? "—"}</td>
                     <td className="px-3 py-2">
-                      {candidate.imageUrl
-                        ? (
-                          <>
-                            <div className="group relative h-10 w-16">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={candidate.blobImageUrl ?? candidate.imageUrl} alt={candidate.title} className="h-10 w-16 rounded object-cover" />
-                            {candidate.status !== "DUPLICATE" ? (
-                              <div className="absolute inset-0 hidden flex-col items-center justify-center gap-0.5 rounded bg-black/60 group-hover:flex">
-                                <button
-                                  type="button"
-                                  className="text-[10px] leading-tight text-white underline disabled:opacity-50"
-                                  disabled={importingImageFor === candidate.id || importedImageFor.has(candidate.id)}
-                                  onClick={() => importImage(candidate.id, candidate.blobImageUrl ?? candidate.imageUrl!, false)}
-                                >
-                                  {importedImageFor.has(candidate.id) ? "✓ added" : importingImageFor === candidate.id ? "…" : "+ venue gallery"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="text-[10px] leading-tight text-white underline disabled:opacity-50"
-                                  disabled={importingImageFor === candidate.id || importedImageFor.has(candidate.id)}
-                                  onClick={() => importImage(candidate.id, candidate.blobImageUrl ?? candidate.imageUrl!, true)}
-                                >
-                                  {importingImageFor === candidate.id ? "" : "★ venue cover"}
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                          {importedImageFor.has(candidate.id) ? (
-                            <p className="text-[10px] leading-tight text-muted-foreground">Added to venue. Approve to set event image.</p>
-                          ) : null}
-                          </>
-                        )
-                        : "—"}
+                      <IngestImageCell
+                        imageUrl={candidate.imageUrl}
+                        blobImageUrl={candidate.blobImageUrl}
+                        altText={candidate.title}
+                        importStatus={
+                          importedImageFor.has(candidate.id)
+                            ? "imported"
+                            : importFailedFor.has(candidate.id)
+                              ? "failed"
+                              : importingImageFor === candidate.id
+                                ? "importing"
+                                : "none"
+                        }
+                        onImport={
+                          candidate.imageUrl && candidate.status !== "DUPLICATE"
+                            ? () => importImage(candidate.id, candidate.imageUrl!, true)
+                            : undefined
+                        }
+                      />
                     </td>
                     <td className="px-3 py-2">
                       <IngestConfidenceBadge
@@ -389,14 +386,12 @@ export default function IngestRunCandidates({ candidates, venueId, runId }: { ca
                       <td className="px-3 py-2">{duplicate.startAt ? new Date(duplicate.startAt).toLocaleString() : "—"}</td>
                       <td className="px-3 py-2">{duplicate.locationText ?? "—"}</td>
                       <td className="px-3 py-2">
-                        {duplicate.imageUrl
-                          ? (
-                            <>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={duplicate.blobImageUrl ?? duplicate.imageUrl} alt={duplicate.title} className="h-10 w-16 rounded object-cover" />
-                            </>
-                          )
-                          : "—"}
+                        <IngestImageCell
+                          imageUrl={duplicate.imageUrl}
+                          blobImageUrl={duplicate.blobImageUrl}
+                          altText={duplicate.title}
+                          importStatus="none"
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <IngestConfidenceBadge

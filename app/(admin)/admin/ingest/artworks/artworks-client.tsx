@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useState } from "react";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
+import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
 import { Button } from "@/components/ui/button";
 
 type Candidate = {
@@ -228,17 +229,11 @@ export default function ArtworksClient({ candidates: initial }: { candidates: Ca
               <Fragment key={candidate.id}>
                 <tr className="border-b align-top">
                   <td className="px-3 py-2">
-                    {candidate.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={candidate.imageUrl}
-                        alt={candidate.title}
-                        className="h-14 w-20 rounded object-cover bg-muted"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ) : (
-                      <div className="h-14 w-20 rounded bg-muted" />
-                    )}
+                    <IngestImageCell
+                      imageUrl={candidate.imageUrl}
+                      altText={candidate.title}
+                      importStatus="none"
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <IngestConfidenceBadge
