@@ -25,8 +25,8 @@ export function TrendingRail({ items }: { items: TrendingArtworkListItem[] }) {
             href={getArtworkPublicHref(item)}
             className="w-[74%] shrink-0 snap-start rounded border bg-card p-3 transition hover:bg-muted/40 md:w-auto"
           >
-            <div className="relative mb-2 h-40 overflow-hidden rounded bg-muted">
-              {item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill className="object-cover" /> : null}
+            <div className="relative mb-2 aspect-[4/3] overflow-hidden rounded bg-muted">
+              {item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill className="object-contain" /> : null}
             </div>
             <div className="line-clamp-1 font-medium">{item.title}</div>
             <div className="line-clamp-1 text-sm text-muted-foreground">{item.artist.name}</div>

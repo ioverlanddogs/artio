@@ -21,7 +21,7 @@ export function ArtworkRelatedSection({ title, subtitle, items, viewAllHref, sho
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {items.map((item) => (
           <Link key={item.id} href={getArtworkPublicHref(item)} className="rounded border p-2 hover:bg-muted/40">
-            <div className="relative mb-2 h-28 w-full overflow-hidden rounded bg-muted">
+            <div className="relative mb-2 aspect-[4/3] w-full overflow-hidden rounded bg-muted">
               {item.coverUrl ? <Image src={item.coverUrl} alt={item.title} fill className="object-contain" /> : null}
             </div>
             <p className="line-clamp-1 text-sm font-medium">{item.title}</p>
