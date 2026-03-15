@@ -11,51 +11,56 @@ import { computeArtworkCompleteness } from "@/lib/artwork-completeness";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const user = await requireAuth();
-  const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
-  if (!artist && user.role !== "ADMIN") return apiError(403, "forbidden", "Artist profile required");
+  try {
+    const user = await requireAuth();
+    const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (!artist && user.role !== "ADMIN") return apiError(403, "forbidden", "Artist profile required");
 
-  const items = await db.artwork.findMany({
-    where: user.role === "ADMIN" ? {} : { artistId: artist!.id, deletedAt: null },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      status: true,
-      isPublished: true,
-      deletedAt: true,
-      priceAmount: true,
-      currency: true,
-      updatedAt: true,
-      description: true,
-      year: true,
-      medium: true,
-      featuredAssetId: true,
-      featuredAsset: { select: { url: true } },
-      images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: 1, select: { asset: { select: { url: true } } } },
-      _count: { select: { images: true } },
-    },
-  });
-  return NextResponse.json({
-    items: items.map((item) => {
-      const completeness = computeArtworkCompleteness(item, item._count.images);
-      return {
-        id: item.id,
-        title: item.title,
-        slug: item.slug,
-        status: item.status,
-        isPublished: item.isPublished,
-        deletedAt: item.deletedAt,
-        priceAmount: item.priceAmount,
-        currency: item.currency,
-        featuredAsset: item.featuredAsset,
-        images: item.images,
-        updatedAt: item.updatedAt,
-        completeness: { scorePct: completeness.scorePct, requiredOk: completeness.required.ok },
-      };
-    }),
-  });
+    const items = await db.artwork.findMany({
+      where: user.role === "ADMIN" ? {} : { artistId: artist!.id, deletedAt: null },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        status: true,
+        isPublished: true,
+        deletedAt: true,
+        priceAmount: true,
+        currency: true,
+        updatedAt: true,
+        description: true,
+        year: true,
+        medium: true,
+        featuredAssetId: true,
+        featuredAsset: { select: { url: true } },
+        images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: 1, select: { asset: { select: { url: true } } } },
+        _count: { select: { images: true } },
+      },
+    });
+    return NextResponse.json({
+      artworks: items.map((item) => {
+        const completeness = computeArtworkCompleteness(item, item._count.images);
+        return {
+          id: item.id,
+          title: item.title,
+          slug: item.slug,
+          status: item.status,
+          isPublished: item.isPublished,
+          deletedAt: item.deletedAt?.toISOString() ?? null,
+          priceAmount: item.priceAmount,
+          currency: item.currency,
+          featuredAsset: item.featuredAsset,
+          images: item.images,
+          updatedAt: item.updatedAt,
+          completeness: { scorePct: completeness.scorePct, requiredOk: completeness.required.ok },
+        };
+      }),
+    });
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
 }
 
 export async function POST(req: NextRequest) {
