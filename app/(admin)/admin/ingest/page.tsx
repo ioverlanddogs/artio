@@ -2,8 +2,11 @@ import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import IngestEventQueueClient from "@/app/(admin)/admin/ingest/_components/ingest-event-queue-client";
 import IngestTriggerClient from "@/app/(admin)/admin/ingest/_components/ingest-trigger-client";
 import { db } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 export default async function AdminIngestPage() {
+  const user = await getSessionUser();
+
   const [candidates, venues] = await Promise.all([
     db.ingestExtractedEvent.findMany({
       where: {
@@ -50,7 +53,7 @@ export default async function AdminIngestPage() {
         description="All pending extracted event candidates across venues, ordered by confidence. Recent Runs are available in the Runs tab."
       />
       <IngestTriggerClient venues={venueOptions} />
-      <IngestEventQueueClient candidates={candidates} venues={venueOptions} />
+      <IngestEventQueueClient candidates={candidates} venues={venueOptions} userRole={user?.role} />
     </>
   );
 }

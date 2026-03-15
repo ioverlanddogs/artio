@@ -16,6 +16,10 @@ type ApproveArtworkDeps = {
 
 const defaultDeps: ApproveArtworkDeps = { requireAdmin, db };
 
+const approveBodySchema = z.object({
+  publishImmediately: z.boolean().optional().default(false),
+});
+
 const approvePatchSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   artistName: z.string().trim().min(1).max(200).optional(),
@@ -31,10 +35,17 @@ export async function handleAdminIngestArtworkApprove(
   deps: ApproveArtworkDeps = defaultDeps,
 ) {
   try {
-    await deps.requireAdmin();
+    const actor = await deps.requireAdmin();
     const { id } = await params;
     const body = await parseBody(req).catch(() => ({}));
-    const patch = approvePatchSchema.safeParse(body).data ?? {};
+    const parsedApproveBody = approveBodySchema.safeParse(body);
+    const publishImmediately = parsedApproveBody.success ? parsedApproveBody.data.publishImmediately : false;
+    if (publishImmediately && actor.role !== "ADMIN") {
+      return apiError(403, "forbidden", "Approve & Publish requires ADMIN role");
+    }
+    const patchBody = body && typeof body === "object" ? { ...(body as Record<string, unknown>) } : {};
+    delete (patchBody as { publishImmediately?: unknown }).publishImmediately;
+    const patch = approvePatchSchema.safeParse(patchBody).data ?? {};
 
     const candidate = await deps.db.ingestExtractedArtwork.findUnique({
       where: { id },
@@ -102,8 +113,8 @@ export async function handleAdminIngestArtworkApprove(
           year: effectiveYear ?? undefined,
           dimensions: effectiveDimensions ?? undefined,
           description: effectiveDescription ?? undefined,
-          isPublished: false,
-          status: "IN_REVIEW",
+          isPublished: publishImmediately,
+          status: publishImmediately ? "PUBLISHED" : "IN_REVIEW",
         },
         select: { id: true },
       });
@@ -124,7 +135,7 @@ export async function handleAdminIngestArtworkApprove(
         data: { status: "APPROVED", createdArtworkId: newArtwork.id },
       });
 
-      return { artworkId: newArtwork.id };
+      return { artworkId: newArtwork.id, published: publishImmediately };
     });
 
     const imageImportResult = await importApprovedArtworkImage({
@@ -149,6 +160,7 @@ export async function handleAdminIngestArtworkApprove(
       imageImportWarning: imageImportResult.warning,
       imageImported: imageImportResult.attached,
       imageUrl: imageImportResult.imageUrl,
+      published: result.published,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");

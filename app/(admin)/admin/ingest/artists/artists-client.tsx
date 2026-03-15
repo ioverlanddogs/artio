@@ -67,7 +67,13 @@ function getInitialDraft(candidate: Candidate): EditDraft {
   };
 }
 
-export default function ArtistsClient({ candidates: initial }: { candidates: Candidate[] }) {
+export default function ArtistsClient({
+  candidates: initial,
+  userRole,
+}: {
+  candidates: Candidate[];
+  userRole?: "USER" | "EDITOR" | "ADMIN";
+}) {
   const [candidates, setCandidates] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -154,6 +160,28 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
       setEditOpenById((prev) => ({ ...prev, [id]: false }));
     } catch {
       setError("Failed to approve artist candidate.");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+
+  async function approveAndPublish(id: string) {
+    setWorkingId(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/ingest/artists/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publishImmediately: true }),
+      });
+      if (!res.ok) {
+        setError("Failed to approve and publish artist candidate.");
+        return;
+      }
+      setCandidates((prev) => prev.filter((item) => item.id !== id));
+    } catch {
+      setError("Failed to approve and publish artist candidate.");
     } finally {
       setWorkingId(null);
     }
@@ -285,6 +313,9 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approve(candidate.id)}>Approve</Button>
+                      {userRole === "ADMIN" ? (
+                        <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</Button>
+                      ) : null}
                       <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => toggleEdit(candidate)}>
                         {editOpenById[candidate.id] ? "Close edit" : "Edit"}
                       </Button>
@@ -342,6 +373,11 @@ export default function ArtistsClient({ candidates: initial }: { candidates: Can
                         <Button size="sm" disabled={workingId === candidate.id} onClick={() => approveWithPatch(candidate.id)}>
                           Save + approve
                         </Button>
+                        {userRole === "ADMIN" ? (
+                          <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>
+                            Approve & Publish
+                          </Button>
+                        ) : null}
                         <Button size="sm" variant="outline" onClick={() => setEditOpenById((prev) => ({ ...prev, [candidate.id]: false }))}>
                           Cancel
                         </Button>
