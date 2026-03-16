@@ -37,7 +37,7 @@ export default function ArtworkAdminForm({ artworkId, initial }: { artworkId: st
         dimensions: form.dimensions?.trim() ? form.dimensions.trim() : null,
         priceAmount: form.priceAmountMajor != null ? Math.round(form.priceAmountMajor * 100) : null,
         currency: form.currency?.trim() ? form.currency.trim() : null,
-        artistId: form.artistId.trim() ? form.artistId.trim() : null,
+        ...(form.artistId.trim() ? { artistId: form.artistId.trim() } : {}),
         isPublished: form.isPublished,
       }),
     });
