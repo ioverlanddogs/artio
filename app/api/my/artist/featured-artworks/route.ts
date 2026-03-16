@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
-import { isAuthError, requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
+import { isAuthError } from "@/lib/auth";
 import { logAdminAction } from "@/lib/admin-audit";
 import { handleGetMyArtistFeaturedArtworks, handlePutMyArtistFeaturedArtworks } from "@/lib/my-artist-featured-artworks-route";
 import { parseBody } from "@/lib/validators";
@@ -61,22 +62,20 @@ export async function POST(req: NextRequest) {
     const artworkId = typeof body?.artworkId === "string" ? body.artworkId : null;
     if (!artworkId) return apiError(400, "invalid_request", "artworkId is required");
 
-    // Verify artwork is owned by this artist and not deleted
     const artwork = await db.artwork.findFirst({
       where: { id: artworkId, artistId: artist.id, deletedAt: null },
       select: { id: true },
     });
     if (!artwork) return apiError(404, "not_found", "Artwork not found or not owned by your artist profile");
 
-    // Upsert — ignore if already featured
+    const currentCount = await db.artistFeaturedArtwork.count({
+      where: { artistId: artist.id },
+    });
+
     await db.artistFeaturedArtwork.upsert({
       where: { artistId_artworkId: { artistId: artist.id, artworkId } },
       update: {},
-      create: {
-        artistId: artist.id,
-        artworkId,
-        sortOrder: await db.artistFeaturedArtwork.count({ where: { artistId: artist.id } }),
-      },
+      create: { artistId: artist.id, artworkId, sortOrder: currentCount },
     });
 
     return new Response(null, { status: 204 });
