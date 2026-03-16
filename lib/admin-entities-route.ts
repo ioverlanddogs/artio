@@ -105,7 +105,7 @@ const artworkPatchSchema = z.object({
   dimensions: z.string().trim().max(200).nullable().optional(),
   priceAmount: z.coerce.number().int().min(0).nullable().optional(),
   currency: z.string().trim().length(3).nullable().optional(),
-  artistId: z.string().uuid().optional(),
+  artistId: z.string().uuid().nullish().transform((value) => value ?? undefined),
 }).strict();
 
 const importPreviewBodySchema = z.object({
