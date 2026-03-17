@@ -20,15 +20,6 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  const isTest = process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT === "true" || process.env.CI === "true";
-  if (isTest) {
-    return NextResponse.next();
-  }
-
   const canonicalHost = getCanonicalHost();
   const reqHost = req.nextUrl.host;
 
@@ -49,6 +40,15 @@ export async function middleware(req: NextRequest) {
         [REQUEST_ID_HEADER]: requestId,
       },
     });
+  }
+
+  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  const isTest = process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT === "true" || process.env.CI === "true";
+  if (isTest) {
+    return NextResponse.next();
   }
 
   const betaConfig = getBetaConfig();
