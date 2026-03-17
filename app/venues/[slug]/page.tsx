@@ -6,8 +6,8 @@ import { EntityTabs } from "@/components/entities/entity-tabs";
 import { EventCard } from "@/components/events/event-card";
 import { FollowButton } from "@/components/follows/follow-button";
 import { VenueEventsGrid } from "@/components/venues/venue-events-grid";
-import { VenueUpcomingMap } from "@/components/venues/venue-upcoming-map";
 import { VenueArtistsSection } from "@/components/venues/venue-artists-section";
+import { VenueUpcomingMapShell } from "@/components/venues/venue-upcoming-map-shell";
 import { ArtworkRelatedSection } from "@/components/artwork/artwork-related-section";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -249,7 +249,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
             {venue.lat != null && venue.lng != null ? (
               <div className="space-y-3">
                 <div className="mb-6 overflow-hidden rounded-xl border" style={{ height: "12rem" }}>
-                  <VenueUpcomingMap lat={venue.lat} lng={venue.lng} venueId={venue.id} venueSlug={venue.slug} venueName={venue.name} city={venue.city} />
+                  <VenueUpcomingMapShell lat={venue.lat} lng={venue.lng} venueId={venue.id} venueSlug={venue.slug} venueName={venue.name} city={venue.city} />
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href={directionsUrl} target="_blank" rel="noopener noreferrer">
