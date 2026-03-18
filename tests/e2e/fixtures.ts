@@ -16,13 +16,18 @@ async function createAuthedPage(browser: Browser, authPath: string) {
   const auth = JSON.parse(await readFile(authPath, 'utf8')) as AuthState;
   const context: BrowserContext = await browser.newContext();
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   await context.addCookies([
     {
-      name: 'next-auth.session-token',
+      name: isProduction
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
       value: auth.sessionToken,
       domain: 'localhost',
       path: '/',
       httpOnly: true,
+      secure: isProduction,
       sameSite: 'Lax',
     },
   ]);
