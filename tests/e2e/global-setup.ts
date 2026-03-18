@@ -35,6 +35,8 @@ async function seedUserSession(params: {
       process.env.NEXTAUTH_SECRET
       ?? process.env.AUTH_SECRET
       ?? 'ci-e2e-auth-secret',
+    salt: 'next-auth.session-token',
+    maxAge: 30 * 24 * 60 * 60,
   });
 
   const outputPath = resolve(params.outputFile);

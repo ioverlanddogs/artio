@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { AdminEntityManagerClient } from "../admin-entity-manager-client";
 import AdminPageHeader from "../_components/AdminPageHeader";
@@ -8,7 +9,18 @@ export default async function AdminVenues() {
   await requireAdmin({ redirectOnFail: true });
   return (
     <main className="space-y-6">
-      <AdminPageHeader title="Venues" description="Manage venue records and publishing metadata." />
+      <AdminPageHeader
+        title="Venues"
+        description="Manage venue records and publishing metadata."
+        right={(
+          <Link
+            href="/admin/venues/new"
+            className="rounded border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            New venue
+          </Link>
+        )}
+      />
       <AdminEntityManagerClient
         entity="venues"
         title="Manage Venues"
