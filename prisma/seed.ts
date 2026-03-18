@@ -97,9 +97,15 @@ async function run() {
     { slug: "amina-khan", name: "Amina Khan", bio: "Photographer focused on night scenes" },
   ];
 
-  const artworks = [
-    { slug: "jane-dawn-study", title: "Dawn Study", artistSlug: "jane-doe" },
-    { slug: "liam-reframed-steel", title: "Reframed Steel", artistSlug: "liam-ng" },
+  const artworks: Array<{
+    slug: string;
+    title: string;
+    artistSlug: string;
+    priceAmount: number;
+    currency: string;
+  }> = [
+    { slug: "jane-dawn-study", title: "Dawn Study", artistSlug: "jane-doe", priceAmount: 120000, currency: "GBP" },
+    { slug: "liam-reframed-steel", title: "Reframed Steel", artistSlug: "liam-ng", priceAmount: 85000, currency: "GBP" },
   ];
 
   const tagBySlug = new Map<string, { id: string }>();
@@ -145,6 +151,8 @@ async function run() {
         artistId,
         isPublished: true,
         status: "PUBLISHED",
+        priceAmount: artwork.priceAmount,
+        currency: artwork.currency,
       },
       create: {
         slug: artwork.slug,
@@ -152,6 +160,8 @@ async function run() {
         artistId,
         isPublished: true,
         status: "PUBLISHED",
+        priceAmount: artwork.priceAmount,
+        currency: artwork.currency,
       },
     });
   }

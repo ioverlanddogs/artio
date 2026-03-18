@@ -305,7 +305,7 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
         )
       ) : (
         <>
-          <div className="relative min-h-[420px] md:min-h-[600px] w-full overflow-x-hidden rounded-lg border bg-card p-2">
+          <div data-testid="calendar" className="relative min-h-[420px] md:min-h-[600px] w-full overflow-x-hidden rounded-lg border bg-card p-2">
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
