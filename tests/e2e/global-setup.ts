@@ -32,8 +32,8 @@ async function seedUserSession(params: {
       role: user.role,
     },
     secret:
-      process.env.AUTH_SECRET
-      ?? process.env.NEXTAUTH_SECRET
+      process.env.NEXTAUTH_SECRET
+      ?? process.env.AUTH_SECRET
       ?? 'ci-e2e-auth-secret',
   });
 
