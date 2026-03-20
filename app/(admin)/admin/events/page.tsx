@@ -11,18 +11,36 @@ export const dynamic = "force-dynamic";
 export default async function AdminEvents() {
   await requireAdmin({ redirectOnFail: true });
 
-  const approvedEvents = await db.event.findMany({
-    where: { status: "APPROVED", deletedAt: null },
-    select: {
-      id: true,
-      startAt: true,
-      timezone: true,
-      venue: { select: { status: true, isPublished: true } },
-      _count: { select: { images: true } },
-    },
-    orderBy: { startAt: "asc" },
-    take: 100,
-  });
+  const [approvedEvents, statusCounts] = await Promise.all([
+    db.event.findMany({
+      where: { status: "APPROVED", deletedAt: null },
+      select: {
+        id: true,
+        startAt: true,
+        timezone: true,
+        venue: { select: { status: true, isPublished: true } },
+        _count: { select: { images: true } },
+      },
+      orderBy: { startAt: "asc" },
+      take: 100,
+    }),
+    db.event.groupBy({
+      by: ["status"],
+      where: {
+        deletedAt: null,
+        status: { in: ["IN_REVIEW", "APPROVED", "DRAFT"] },
+      },
+      _count: { id: true },
+    }),
+  ]);
+
+  const inReview =
+    statusCounts.find((s) => s.status === "IN_REVIEW")?._count.id ?? 0;
+  const approved =
+    statusCounts.find((s) => s.status === "APPROVED")?._count.id ?? 0;
+  const draft =
+    statusCounts.find((s) => s.status === "DRAFT")?._count.id ?? 0;
+  const needsAttention = inReview + approved;
 
   const publishableIds = approvedEvents
     .filter((e) => computeEventPublishBlockers({
@@ -47,6 +65,19 @@ export default async function AdminEvents() {
           </Link>
         )}
       />
+      {needsAttention > 0 ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            {needsAttention} event{needsAttention === 1 ? "" : "s"} need attention
+          </p>
+          <p className="text-xs text-amber-800/70 dark:text-amber-300/70">
+            {inReview > 0 ? `${inReview} in review` : ""}
+            {inReview > 0 && approved > 0 ? " · " : ""}
+            {approved > 0 ? `${approved} approved (ready to publish)` : ""}
+            {draft > 0 ? ` · ${draft} draft` : ""}
+          </p>
+        </div>
+      ) : null}
       <BulkPublishEventsClient approvedIds={publishableIds} />
       <AdminEntityManagerClient
         entity="events"
