@@ -20,7 +20,14 @@ type Candidate = {
   confidenceBand: string | null;
   confidenceReasons: unknown;
   extractionProvider: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
+  createdArtworkId: string | null;
   sourceEvent: { id: string; title: string; slug: string };
+  createdArtwork?: {
+    id: string;
+    artistId: string;
+    artist: { id: string; name: string; slug: string; status: string } | null;
+  } | null;
 };
 
 type EditDraft = {
@@ -133,7 +140,8 @@ export default function ArtworksClient({
         setError("Failed to link artwork candidate to existing artwork.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artworkId?: string; artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
     } catch {
       setError("Failed to link artwork candidate to existing artwork.");
     } finally {
@@ -150,7 +158,8 @@ export default function ArtworksClient({
         setError("Failed to approve artwork candidate due to an unexpected server error.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artworkId?: string; artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
     } catch {
       setError("Failed to approve artwork candidate.");
     } finally {
@@ -187,7 +196,8 @@ export default function ArtworksClient({
         setError("Failed to approve artwork candidate due to an unexpected server error.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artworkId?: string; artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
     } catch {
       setError("Failed to approve artwork candidate.");
     } finally {
@@ -208,7 +218,8 @@ export default function ArtworksClient({
         setError("Failed to approve and publish artwork candidate.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artworkId?: string; artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
     } catch {
       setError("Failed to approve and publish artwork candidate.");
     } finally {
@@ -279,26 +290,44 @@ export default function ArtworksClient({
                   <td className="px-3 py-2">{candidate.year ?? "—"}</td>
                   <td className="px-3 py-2">
                     <Link className="underline" href={`/events/${candidate.sourceEvent.slug}`}>{candidate.sourceEvent.title}</Link>
+                    {candidate.createdArtworkId ? (
+                      <p className="text-xs text-muted-foreground">
+                        Artist:{" "}
+                        {candidate.createdArtwork?.artist ? (
+                          <Link
+                            href={`/admin/artists/${candidate.createdArtwork.artist.id}`}
+                            className="underline"
+                          >
+                            {candidate.createdArtwork.artist.name}
+                          </Link>
+                        ) : (
+                          <span className="text-amber-600">not linked</span>
+                        )}
+                        {candidate.createdArtwork?.artist?.status === "IN_REVIEW" ? (
+                          <span className="ml-1 text-amber-600">(stub — awaiting artist approval)</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2">{candidate.extractionProvider}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap gap-2">
-                        <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id} onClick={() => approve(candidate.id)}>Approve</button>
+                        <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approve(candidate.id)}>Approve</button>
                         {userRole === "ADMIN" ? (
-                          <button className="rounded border border-emerald-600 px-2 py-1 text-xs text-emerald-800" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</button>
+                          <button className="rounded border border-emerald-600 px-2 py-1 text-xs text-emerald-800" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</button>
                         ) : null}
-                        <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id} onClick={() => reject(candidate.id)}>Reject</button>
+                        <button className="rounded border px-2 py-1 text-xs" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => reject(candidate.id)}>Reject</button>
                         <button
                           className="rounded border px-2 py-1 text-xs"
-                          disabled={workingId === candidate.id}
+                          disabled={workingId === candidate.id || candidate.status !== "PENDING"}
                           onClick={() => openEdit(candidate)}
                         >
                           Edit
                         </button>
                         <button
                           className="rounded border px-2 py-1 text-xs"
-                          disabled={workingId === candidate.id}
+                          disabled={workingId === candidate.id || candidate.status !== "PENDING"}
                           onClick={() => setMergeOpenById((prev) => ({ ...prev, [candidate.id]: !prev[candidate.id] }))}
                         >
                           Link to existing artwork
@@ -394,7 +423,7 @@ export default function ArtworksClient({
                           Save + approve
                         </Button>
                         {userRole === "ADMIN" ? (
-                          <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>
+                          <Button size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approveAndPublish(candidate.id)}>
                             Approve & Publish
                           </Button>
                         ) : null}
