@@ -1431,6 +1431,8 @@ model SiteSettings {
   platformFeePercent Int @default(5)
   emailOutboxBatchSize Int?
   ingestSystemPrompt String?
+  artworkExtractionSystemPrompt String?
+  artistBioSystemPrompt String?
   ingestModel String?
   ingestMaxOutputTokens Int?
   analyticsSalt String?

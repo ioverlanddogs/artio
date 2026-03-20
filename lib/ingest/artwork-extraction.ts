@@ -33,7 +33,19 @@ const artworkExtractionSchema = {
   },
 } as const;
 
-const systemPrompt = "You are an expert art cataloguer. Extract all artworks mentioned or displayed on this exhibition page. For each artwork extract: title, medium (e.g. 'oil on canvas', 'archival pigment print'), year, dimensions (raw string e.g. '120 × 90 cm'), a brief description of the work, an image URL if visible, and the artist name. Only extract real artworks — do not invent or hallucinate. If a field is not present on the page, return null for that field.";
+export const DEFAULT_ARTWORK_SYSTEM_PROMPT =
+  "You are an expert art cataloguer. Extract all artworks mentioned or " +
+  "displayed on this exhibition page. For each artwork extract: title, " +
+  "medium (e.g. 'oil on canvas', 'archival pigment print'), year, " +
+  "dimensions (raw string e.g. '120 × 90 cm'), a brief description of " +
+  "the work, an image URL if visible, and the artist name. Only extract " +
+  "real artworks — do not invent or hallucinate. If a field is not " +
+  "present on the page, return null for that field.";
+
+function resolveArtworkSystemPrompt(override?: string | null): string {
+  const trimmed = override?.trim();
+  return trimmed || DEFAULT_ARTWORK_SYSTEM_PROMPT;
+}
 
 function asString(value: unknown): string | null {
   return typeof value === "string" ? value.trim() || null : null;
@@ -124,13 +136,21 @@ export async function extractArtworksForEvent(args: {
       return { created: 0, duplicates: 0, skipped: 1 };
     }
 
+    const settings = await args.db.siteSettings.findUnique({
+      where: { id: "default" },
+      select: {
+        regionAutoPublishArtworks: true,
+        artworkExtractionSystemPrompt: true,
+      },
+    });
+
     const provider = getProvider((args.settings.artworkExtractionProvider as ProviderName | null) ?? "claude");
     const apiKey = resolveProviderApiKey(provider.name, args.settings);
 
     const result = await provider.extract({
       html: preprocessHtml(fetched.html),
       sourceUrl: args.sourceUrl,
-      systemPrompt,
+      systemPrompt: resolveArtworkSystemPrompt(settings?.artworkExtractionSystemPrompt),
       jsonSchema: artworkExtractionSchema,
       model: "",
       apiKey,
@@ -198,11 +218,7 @@ export async function extractArtworksForEvent(args: {
       created += 1;
     }
 
-    const artworkSettings = await args.db.siteSettings.findUnique({
-      where: { id: "default" },
-      select: { regionAutoPublishArtworks: true },
-    });
-    if (artworkSettings?.regionAutoPublishArtworks) {
+    if (settings?.regionAutoPublishArtworks) {
       for (const artwork of createdArtworks) {
         await autoApproveArtworkCandidate({
           candidateId: artwork.id,

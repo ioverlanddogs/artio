@@ -7,6 +7,11 @@ import { assertSafeUrl } from "@/lib/ingest/url-guard";
 import { scoreArtistCandidate } from "@/lib/ingest/artist-confidence";
 import { autoApproveArtistCandidate } from "@/lib/ingest/auto-approve-artist-candidate";
 
+export const DEFAULT_ARTIST_BIO_SYSTEM_PROMPT =
+  "Extract the artist profile from the following page HTML. Return only " +
+  "the structured data requested. If a field is not present on the page, " +
+  "return null for that field.";
+
 const artistExtractionSchema = {
   type: "object",
   additionalProperties: false,
@@ -88,6 +93,7 @@ export async function discoverArtist(args: {
     geminiApiKey?: string | null;
     anthropicApiKey?: string | null;
     openAiApiKey?: string | null;
+    artistBioSystemPrompt?: string | null;
   };
 }): Promise<{ status: "created" | "linked" | "skipped"; candidateId?: string }> {
   const normalizedName = normalizeName(args.artistName);
@@ -212,11 +218,14 @@ export async function discoverArtist(args: {
   let usageTotalTokens: number | null = null;
   let extractedModel = "";
 
+  const artistBioSystemPrompt =
+    args.settings.artistBioSystemPrompt?.trim() || DEFAULT_ARTIST_BIO_SYSTEM_PROMPT;
+
   try {
     const result = await chosenProvider.extract({
       html: html || `Artist name: ${args.artistName}`,
       sourceUrl,
-      systemPrompt: "Extract the artist profile from the following page HTML. Return only the structured data requested. If a field is not present on the page, return null for that field.",
+      systemPrompt: artistBioSystemPrompt,
       jsonSchema: artistExtractionSchema,
       model: "",
       apiKey,
