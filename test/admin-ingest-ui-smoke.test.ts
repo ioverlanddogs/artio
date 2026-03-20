@@ -2,11 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("admin ingest list page includes trigger and runs sections", () => {
+test("admin ingest list page is review-only; trigger lives on runs page", () => {
   const pageSource = readFileSync("app/(admin)/admin/ingest/page.tsx", "utf8");
+  // List page is review-only — no trigger widget
   assert.match(pageSource, /title="Ingest"/);
-  assert.match(pageSource, /IngestTriggerClient/);
-  assert.match(pageSource, /Recent Runs/);
+  assert.doesNotMatch(pageSource, /IngestTriggerClient/);
+  assert.match(pageSource, /Use the Runs tab to trigger/);
+
+  // Trigger now lives on the runs page
+  const runsPageSource = readFileSync(
+    "app/(admin)/admin/ingest/runs/page.tsx",
+    "utf8",
+  );
+  assert.match(runsPageSource, /IngestTriggerClient/);
+  assert.match(runsPageSource, /Trigger a manual extraction run/);
 });
 
 test("admin ingest run detail includes candidate moderation actions", () => {
