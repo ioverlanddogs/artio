@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useState } from "react";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
 import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
@@ -19,6 +20,9 @@ type Candidate = {
   confidenceBand: string | null;
   confidenceReasons: unknown;
   extractionProvider: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "DUPLICATE";
+  createdArtistId: string | null;
+  blobImageUrl?: string | null;
   eventLinks: Array<{ eventId: string; event: { title: string; slug: string } }>;
 };
 
@@ -82,6 +86,10 @@ export default function ArtistsClient({
   const [importingImageFor, setImportingImageFor] = useState<string | null>(null);
   const [importedImageFor, setImportedImageFor] = useState<Set<string>>(new Set());
   const [importFailedFor, setImportFailedFor] = useState<Set<string>>(new Set());
+  const [editingImageFor, setEditingImageFor] = useState<string | null>(null);
+  const [editImageUrl, setEditImageUrl] = useState<Record<string, string>>({});
+  const [editingImageLoading, setEditingImageLoading] = useState<string | null>(null);
+  const [editImageError, setEditImageError] = useState<Record<string, string>>({});
 
   function updateDraft(id: string, field: keyof EditDraft, value: string) {
     setEditDraftById((prev) => ({
@@ -115,7 +123,8 @@ export default function ArtistsClient({
         setError("Failed to approve artist candidate.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtistId: body.artistId ?? item.createdArtistId } : item));
     } catch {
       setError("Failed to approve artist candidate.");
     } finally {
@@ -156,7 +165,8 @@ export default function ArtistsClient({
         setError("Failed to approve artist candidate.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtistId: body.artistId ?? item.createdArtistId } : item));
       setEditOpenById((prev) => ({ ...prev, [id]: false }));
     } catch {
       setError("Failed to approve artist candidate.");
@@ -179,7 +189,8 @@ export default function ArtistsClient({
         setError("Failed to approve and publish artist candidate.");
         return;
       }
-      setCandidates((prev) => prev.filter((item) => item.id !== id));
+      const body = await res.json() as { artistId?: string };
+      setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtistId: body.artistId ?? item.createdArtistId } : item));
     } catch {
       setError("Failed to approve and publish artist candidate.");
     } finally {
@@ -208,6 +219,34 @@ export default function ArtistsClient({
       setImportFailedFor((prev) => new Set([...prev, candidateId]));
     } finally {
       setImportingImageFor(null);
+    }
+  }
+
+
+  async function replaceArtistImage(candidateId: string, artistId: string) {
+    setEditingImageLoading(candidateId);
+    setEditImageError((prev) => ({ ...prev, [candidateId]: "" }));
+    try {
+      const sourceUrl = editImageUrl[candidateId] ?? "";
+      const response = await fetch(`/api/admin/artists/${artistId}/image`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceUrl }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+        setEditImageError((prev) => ({ ...prev, [candidateId]: body.error?.message ?? "Image replace failed" }));
+        return;
+      }
+
+      setEditImageUrl((prev) => ({ ...prev, [candidateId]: "" }));
+      setEditingImageFor(null);
+      setImportedImageFor((prev) => new Set([...prev, candidateId]));
+      setEditImageError((prev) => ({ ...prev, [candidateId]: "" }));
+    } catch {
+      setEditImageError((prev) => ({ ...prev, [candidateId]: "Image replace failed" }));
+    } finally {
+      setEditingImageLoading(null);
     }
   }
 
@@ -261,7 +300,7 @@ export default function ArtistsClient({
                   </td>
                   <td className="px-3 py-2">
                     <IngestImageCell
-                      imageUrl={null}
+                      imageUrl={candidate.sourceUrl}
                       altText={candidate.name}
                       importStatus={
                         importedImageFor.has(candidate.id)
@@ -312,15 +351,55 @@ export default function ArtistsClient({
                   <td className="px-3 py-2">{candidate.eventLinks.length}</td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approve(candidate.id)}>Approve</Button>
+                      <Button size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approve(candidate.id)}>Approve</Button>
                       {userRole === "ADMIN" ? (
-                        <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</Button>
+                        <Button size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approveAndPublish(candidate.id)}>Approve & Publish</Button>
                       ) : null}
-                      <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => toggleEdit(candidate)}>
+                      <Button size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => toggleEdit(candidate)}>
                         {editOpenById[candidate.id] ? "Close edit" : "Edit"}
                       </Button>
-                      <Button size="sm" variant="outline" disabled={workingId === candidate.id} onClick={() => reject(candidate.id)}>Reject</Button>
+                      <Button size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => reject(candidate.id)}>Reject</Button>
                     </div>
+                    {candidate.createdArtistId ? (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-muted-foreground">Approved artist: <Link href={`/admin/artists/${candidate.createdArtistId}`} className="underline">{candidate.createdArtistId}</Link></p>
+                        {editingImageFor !== candidate.id ? (
+                          <button
+                            type="button"
+                            className="text-xs underline text-muted-foreground"
+                            onClick={() => {
+                              setEditingImageFor(candidate.id);
+                              setEditImageUrl((prev) => (prev[candidate.id] !== undefined ? prev : { ...prev, [candidate.id]: candidate.sourceUrl ?? "" }));
+                            }}
+                          >
+                            Replace image
+                          </button>
+                        ) : (
+                          <div className="space-y-1">
+                            <input
+                              className="w-full rounded border px-2 py-1 text-xs"
+                              placeholder="https://… image URL"
+                              value={editImageUrl[candidate.id] ?? ""}
+                              onChange={(event) => setEditImageUrl((prev) => ({ ...prev, [candidate.id]: event.target.value }))}
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="text-xs"
+                                disabled={editingImageLoading === candidate.id || !candidate.createdArtistId}
+                                onClick={() => candidate.createdArtistId && replaceArtistImage(candidate.id, candidate.createdArtistId)}
+                              >
+                                {editingImageLoading === candidate.id ? "Replacing…" : "Replace"}
+                              </button>
+                              <button type="button" className="text-xs text-muted-foreground" onClick={() => setEditingImageFor(null)}>
+                                Cancel
+                              </button>
+                            </div>
+                            {editImageError[candidate.id] ? <p className="text-xs text-destructive">{editImageError[candidate.id]}</p> : null}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
                 {editOpenById[candidate.id] ? (

@@ -9,7 +9,7 @@ export default async function AdminIngestArtistsPage() {
   const user = await getSessionUser();
 
   const candidates = await db.ingestExtractedArtist.findMany({
-    where: { status: "PENDING" },
+    where: { status: { in: ["PENDING", "APPROVED"] } },
     select: {
       id: true,
       name: true,
@@ -25,6 +25,7 @@ export default async function AdminIngestArtistsPage() {
       confidenceBand: true,
       confidenceReasons: true,
       extractionProvider: true,
+      createdArtistId: true,
       createdAt: true,
       eventLinks: {
         select: {

@@ -9,7 +9,7 @@ export default async function AdminIngestArtworksPage() {
   const user = await getSessionUser();
 
   const candidates = await db.ingestExtractedArtwork.findMany({
-    where: { status: "PENDING" },
+    where: { status: { in: ["PENDING", "APPROVED"] } },
     select: {
       id: true,
       title: true,
@@ -25,8 +25,16 @@ export default async function AdminIngestArtworksPage() {
       confidenceBand: true,
       confidenceReasons: true,
       extractionProvider: true,
+      createdArtworkId: true,
       createdAt: true,
       sourceEvent: { select: { id: true, title: true, slug: true } },
+      createdArtwork: {
+        select: {
+          id: true,
+          artistId: true,
+          artist: { select: { id: true, name: true, slug: true, status: true } },
+        },
+      },
     },
     orderBy: [{ confidenceScore: "desc" }, { createdAt: "desc" }],
     take: 50,
