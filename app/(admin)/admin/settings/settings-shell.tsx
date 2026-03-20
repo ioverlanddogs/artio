@@ -53,6 +53,8 @@ export default function SettingsShell({ initial }: { initial: Record<string, unk
         <TabsContent value="email"><EmailSettingsClient initial={emailInitial} /></TabsContent>
         <TabsContent value="ingest-ai"><IngestSettingsClient initial={{
           ingestSystemPrompt: (initial.ingestSystemPrompt as string | null) ?? null,
+          artworkExtractionSystemPrompt: (initial.artworkExtractionSystemPrompt as string | null) ?? null,
+          artistBioSystemPrompt: (initial.artistBioSystemPrompt as string | null) ?? null,
           ingestModel: (initial.ingestModel as string | null) ?? null,
           ingestMaxOutputTokens: (initial.ingestMaxOutputTokens as number | null) ?? null,
           openAiApiKeySet: Boolean(initial.openAiApiKeySet),

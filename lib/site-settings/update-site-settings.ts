@@ -4,6 +4,8 @@ const SITE_SETTINGS_ID = "default";
 
 export async function updateSiteSettings(data: {
   ingestSystemPrompt?: string | null;
+  artworkExtractionSystemPrompt?: string | null;
+  artistBioSystemPrompt?: string | null;
   ingestModel?: string | null;
   ingestMaxOutputTokens?: number | null;
   emailEnabled?: boolean;

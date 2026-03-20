@@ -9,6 +9,8 @@ import type { requireAdmin } from "@/lib/admin";
 const patchSchema = z
   .object({
     ingestSystemPrompt: z.string().trim().min(1).nullable().optional(),
+    artworkExtractionSystemPrompt: z.string().trim().min(1).nullable().optional(),
+    artistBioSystemPrompt: z.string().trim().min(1).nullable().optional(),
     ingestModel: z.string().trim().min(1).nullable().optional(),
     ingestMaxOutputTokens: z.number().int().positive().nullable().optional(),
     emailEnabled: z.boolean().optional(),
@@ -149,6 +151,8 @@ export async function handleAdminSettingsGet(
       const settings = await (deps.getSiteSettingsFn ?? getSiteSettings)();
       return Response.json({
         ingestSystemPrompt: settings.ingestSystemPrompt,
+        artworkExtractionSystemPrompt: settings.artworkExtractionSystemPrompt,
+        artistBioSystemPrompt: settings.artistBioSystemPrompt,
         ingestModel: settings.ingestModel,
         ingestMaxOutputTokens: settings.ingestMaxOutputTokens,
         emailEnabled: settings.emailEnabled,
@@ -232,6 +236,8 @@ export async function handleAdminSettingsPatch(
         ok: true,
         settings: {
           ingestSystemPrompt: updated.ingestSystemPrompt,
+          artworkExtractionSystemPrompt: updated.artworkExtractionSystemPrompt,
+          artistBioSystemPrompt: updated.artistBioSystemPrompt,
           ingestModel: updated.ingestModel,
           ingestMaxOutputTokens: updated.ingestMaxOutputTokens,
           emailEnabled: updated.emailEnabled,

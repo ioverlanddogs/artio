@@ -12,6 +12,8 @@ export default async function AdminSettingsPage() {
       <AdminPageHeader title="Settings" description="Configure platform-wide settings." />
       <SettingsShell initial={{
         ingestSystemPrompt: settings.ingestSystemPrompt ?? null,
+        artworkExtractionSystemPrompt: settings.artworkExtractionSystemPrompt ?? null,
+        artistBioSystemPrompt: settings.artistBioSystemPrompt ?? null,
         ingestModel: settings.ingestModel ?? null,
         ingestMaxOutputTokens: settings.ingestMaxOutputTokens ?? null,
         emailEnabled: settings.emailEnabled ?? false,

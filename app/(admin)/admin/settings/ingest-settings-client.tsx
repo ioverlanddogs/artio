@@ -8,6 +8,8 @@ type ProviderName = "openai" | "gemini" | "claude";
 type IngestSettingsProps = {
   initial: {
     ingestSystemPrompt: string | null;
+    artworkExtractionSystemPrompt: string | null;
+    artistBioSystemPrompt: string | null;
     ingestModel: string | null;
     ingestMaxOutputTokens: number | null;
     openAiApiKeySet: boolean;
@@ -142,7 +144,9 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
   const [autoTagModel, setAutoTagModel] = useState(
     props.initial.autoTagModel ?? "",
   );
-  const [prompt, setPrompt] = useState(props.initial.ingestSystemPrompt ?? "");
+  const [eventPrompt, setEventPrompt] = useState(props.initial.ingestSystemPrompt ?? "");
+  const [artworkPrompt, setArtworkPrompt] = useState(props.initial.artworkExtractionSystemPrompt ?? "");
+  const [artistPrompt, setArtistPrompt] = useState(props.initial.artistBioSystemPrompt ?? "");
   const [model, setModel] = useState(props.initial.ingestModel ?? "");
   const [maxTokens, setMaxTokens] = useState(
     props.initial.ingestMaxOutputTokens != null
@@ -210,7 +214,9 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
         autoTagEnabled,
         autoTagProvider: autoTagEnabled ? autoTagProvider : null,
         autoTagModel: autoTagEnabled ? autoTagModel.trim() || null : null,
-        ingestSystemPrompt: prompt.trim() || null,
+        ingestSystemPrompt: eventPrompt.trim() || null,
+        artworkExtractionSystemPrompt: artworkPrompt.trim() || null,
+        artistBioSystemPrompt: artistPrompt.trim() || null,
         ingestModel: model.trim() || null,
         ingestMaxOutputTokens: maxTokens.trim()
           ? Number.parseInt(maxTokens.trim(), 10)
@@ -714,12 +720,42 @@ export default function IngestSettingsClient(props: IngestSettingsProps) {
         />
       </div>
 
-      <textarea
-        className="w-full min-h-[160px] rounded-md border px-3 py-2 text-sm"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Extraction system prompt"
-      />
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium">Extraction system prompts</h3>
+        <p className="text-xs text-muted-foreground">
+          Leave blank to use the built-in default prompt for each type.
+        </p>
+
+        <label className="space-y-1 text-sm block">
+          <span>Event extraction prompt</span>
+          <textarea
+            className="w-full min-h-[120px] rounded-md border bg-background px-3 py-2 text-sm font-mono"
+            value={eventPrompt}
+            onChange={(e) => { setEventPrompt(e.target.value); setStatus("idle"); }}
+            placeholder="Leave blank to use the built-in event extraction prompt"
+          />
+        </label>
+
+        <label className="space-y-1 text-sm block">
+          <span>Artwork extraction prompt</span>
+          <textarea
+            className="w-full min-h-[120px] rounded-md border bg-background px-3 py-2 text-sm font-mono"
+            value={artworkPrompt}
+            onChange={(e) => { setArtworkPrompt(e.target.value); setStatus("idle"); }}
+            placeholder="Leave blank to use the built-in artwork extraction prompt"
+          />
+        </label>
+
+        <label className="space-y-1 text-sm block">
+          <span>Artist bio extraction prompt</span>
+          <textarea
+            className="w-full min-h-[120px] rounded-md border bg-background px-3 py-2 text-sm font-mono"
+            value={artistPrompt}
+            onChange={(e) => { setArtistPrompt(e.target.value); setStatus("idle"); }}
+            placeholder="Leave blank to use the built-in artist bio extraction prompt"
+          />
+        </label>
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         <input
           className="rounded-md border px-3 py-2 text-sm"

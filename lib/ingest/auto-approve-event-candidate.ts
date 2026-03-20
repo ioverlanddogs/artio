@@ -112,6 +112,7 @@ export async function autoApproveEventCandidate(args: {
           googlePseCx: true,
           artistLookupProvider: true,
           artistBioProvider: true,
+          artistBioSystemPrompt: true,
           autoTagEnabled: true,
           autoTagProvider: true,
           autoTagModel: true,
@@ -137,6 +138,7 @@ export async function autoApproveEventCandidate(args: {
           geminiApiKey: settings?.geminiApiKey,
           anthropicApiKey: settings?.anthropicApiKey,
           openAiApiKey: settings?.openAiApiKey,
+          artistBioSystemPrompt: settings?.artistBioSystemPrompt ?? null,
         },
         artworkSettings: {
           artworkExtractionProvider: settings?.artworkExtractionProvider,
@@ -162,7 +164,10 @@ export async function autoApproveEventCandidate(args: {
             db: args.db,
             artistName: name,
             eventId: approved.createdEvent.id,
-            settings: approved.artistSettings,
+            settings: {
+              ...approved.artistSettings,
+              artistBioSystemPrompt: approved.artistSettings.artistBioSystemPrompt,
+            },
           }).catch((err) => console.warn("auto_approve_event_artist_discovery_failed", { candidateId: candidate.id, name, err })),
         ),
       ).catch(() => {});
