@@ -122,6 +122,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return {
         artistId: newArtist.id,
         linkedEventCount: candidate.eventLinks.length,
+        linkedEventIds: candidate.eventLinks.map((link) => link.eventId),
         published: publishImmediately,
         name,
         websiteUrl,
@@ -140,6 +141,44 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       instagramUrl: result.instagramUrl,
       requestId: `admin-approve-artist-${result.candidateId}`,
     }).catch((err) => console.warn("admin_approve_artist_image_import_failed", { candidateId: result.candidateId, err }));
+
+    // Retroactive artwork re-link
+    try {
+      if (result.linkedEventIds.length > 0) {
+        const affectedArtworks = await db.artwork.findMany({
+          where: {
+            events: { some: { eventId: { in: result.linkedEventIds } } },
+            artist: {
+              name: { equals: result.name, mode: "insensitive" },
+              status: "IN_REVIEW",
+              isAiDiscovered: true,
+            },
+            artistId: { not: result.artistId },
+          },
+          select: { id: true, artistId: true },
+        });
+
+        for (const artwork of affectedArtworks) {
+          await db.artwork.update({
+            where: { id: artwork.id },
+            data: { artistId: result.artistId },
+          });
+        }
+
+        if (affectedArtworks.length > 0) {
+          console.info("artist_retroactive_artwork_relink", {
+            candidateId: result.candidateId,
+            newArtistId: result.artistId,
+            relinkedCount: affectedArtworks.length,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("artist_retroactive_artwork_relink_failed", {
+        candidateId: result.candidateId,
+        err,
+      });
+    }
 
     return NextResponse.json({ artistId: result.artistId, linkedEventCount: result.linkedEventCount, published: result.published }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

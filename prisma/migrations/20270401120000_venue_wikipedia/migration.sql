@@ -1,0 +1,3 @@
+ALTER TABLE "Venue"
+  ADD COLUMN IF NOT EXISTS "wikipediaPageId" TEXT,
+  ADD COLUMN IF NOT EXISTS "wikipediaUrl" TEXT;

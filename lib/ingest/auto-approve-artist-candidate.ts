@@ -94,6 +94,45 @@ export async function autoApproveArtistCandidate(args: {
       requestId: `auto-approve-artist-${candidate.id}`,
     }).catch((err) => console.warn("auto_approve_artist_image_failed", { candidateId: candidate.id, err }));
 
+    // Retroactive artwork re-link
+    try {
+      const eventIds = candidate.eventLinks.map((link) => link.eventId);
+      if (eventIds.length > 0) {
+        const affectedArtworks = await args.db.artwork.findMany({
+          where: {
+            events: { some: { eventId: { in: eventIds } } },
+            artist: {
+              name: { equals: candidate.name, mode: "insensitive" },
+              status: "IN_REVIEW",
+              isAiDiscovered: true,
+            },
+            artistId: { not: newArtist.id },
+          },
+          select: { id: true, artistId: true },
+        });
+
+        for (const artwork of affectedArtworks) {
+          await args.db.artwork.update({
+            where: { id: artwork.id },
+            data: { artistId: newArtist.id },
+          });
+        }
+
+        if (affectedArtworks.length > 0) {
+          console.info("artist_retroactive_artwork_relink", {
+            candidateId: args.candidateId,
+            newArtistId: newArtist.id,
+            relinkedCount: affectedArtworks.length,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("artist_retroactive_artwork_relink_failed", {
+        candidateId: args.candidateId,
+        err,
+      });
+    }
+
     const canPublish = Boolean(
       args.autoPublish
       && candidate.name.trim().length > 0

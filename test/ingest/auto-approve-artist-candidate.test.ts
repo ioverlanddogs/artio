@@ -16,7 +16,8 @@ type Candidate = {
   eventLinks: Array<{ eventId: string }>;
 };
 
-function createDb(candidate: Candidate) {
+function createDb(candidate: Candidate, options?: { affectedArtworks?: Array<{ id: string; artistId: string }> }) {
+  const updates: Array<{ id: string; artistId: string }> = [];
   const tx = {
     artist: {
       findFirst: async () => null,
@@ -36,12 +37,20 @@ function createDb(candidate: Candidate) {
     ingestExtractedArtist: {
       findUnique: async () => candidate,
     },
+    artwork: {
+      findMany: async () => options?.affectedArtworks ?? [],
+      update: async (args: { where: { id: string }; data: { artistId: string } }) => {
+        updates.push({ id: args.where.id, artistId: args.data.artistId });
+        return { id: args.where.id };
+      },
+    },
     artist: {
       findFirst: async () => null,
       findUnique: async () => null,
       update: async () => ({ id: "artist-1" }),
     },
     $transaction: async <T>(fn: (trx: typeof tx) => Promise<T>) => fn(tx),
+    __updates: updates,
   };
 }
 
@@ -98,4 +107,28 @@ test("resolves successfully even when image import rejects", async () => {
   });
 
   assert.deepEqual(result, { artistId: "artist-1", published: true });
+});
+
+test("retroactively re-links artworks from matching IN_REVIEW stub artist", async () => {
+  const candidate = {
+    ...baseCandidate,
+    name: "Retro Artist",
+    eventLinks: [{ eventId: "event-1" }],
+  };
+  const db = createDb(candidate, {
+    affectedArtworks: [{ id: "artwork-1", artistId: "stub-artist-1" }],
+  });
+
+  autoApproveArtistCandidateDeps.importApprovedArtistImage = async () => ({ attached: true, warning: null, imageUrl: "https://blob.example/x.jpg" });
+
+  const result = await autoApproveArtistCandidate({
+    candidateId: candidate.id,
+    db: db as never,
+    autoPublish: false,
+  });
+
+  assert.deepEqual(result, { artistId: "artist-1", published: false });
+  assert.deepEqual(db.__updates, [
+    { id: "artwork-1", artistId: "artist-1" },
+  ]);
 });
