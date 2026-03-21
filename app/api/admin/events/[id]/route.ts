@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
-import { isAuthError } from "@/lib/auth";
 import { idParamSchema, zodDetails } from "@/lib/validators";
 import { handleAdminEntityPatch } from "@/lib/admin-entities-route";
 import { notifyGoogleIndexing } from "@/lib/google-event-indexing";
 import { requireAdmin } from "@/lib/admin";
+import { withAdminRoute } from "@/lib/admin-route";
+import { logAdminAction as writeAdminAuditLog } from "@/lib/admin-audit";
 
 export const runtime = "nodejs";
 
@@ -13,11 +14,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return handleAdminEntityPatch(req, "events", await params, { requireAdminUser: requireAdmin, appDb: db });
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    await requireAdmin();
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  return withAdminRoute(async ({ actorEmail }) => {
     const parsedId = idParamSchema.safeParse(await params);
     if (!parsedId.success) return apiError(400, "invalid_request", "Invalid route parameter", zodDetails(parsedId.error));
+
     const event = await db.event.findUnique({
       where: { id: parsedId.data.id },
       select: { deletedAt: true, slug: true },
@@ -30,11 +31,18 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       await notifyGoogleIndexing(`${appUrl}/events/${event.slug}`, "URL_DELETED");
     }
+
     await db.event.delete({ where: { id: parsedId.data.id } });
+
+    await writeAdminAuditLog({
+      actorEmail,
+      action: "EVENT_HARD_DELETED",
+      targetType: "event",
+      targetId: parsedId.data.id,
+      metadata: { eventId: parsedId.data.id, actorEmail },
+      req,
+    });
+
     return Response.json({ ok: true });
-  } catch (error) {
-    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
-    if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Admin role required");
-    return apiError(500, "internal_error", "Unexpected server error");
-  }
+  });
 }

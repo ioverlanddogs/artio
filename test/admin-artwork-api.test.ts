@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 test("admin artwork api route requires admin on patch and delete", () => {
   const source = readFileSync("app/api/admin/artwork/[id]/route.ts", "utf8");
   assert.match(source, /handleAdminEntityPatch\(req, "artwork"/);
-  assert.match(source, /await requireAdmin\(\)/);
+  assert.match(source, /withAdminRoute\(async \(\{ actorEmail \}\) =>/);
 });
 
 test("admin artwork delete includes foreign-key conflict guidance", () => {

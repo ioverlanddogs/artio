@@ -7,6 +7,8 @@ import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { requireAdmin } from "@/lib/admin";
+import { isAuthError } from "@/lib/auth";
+import { isForbiddenError } from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 
@@ -48,8 +50,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     });
 
     return Response.json(updated);
-  } catch {
-    return apiError(403, "forbidden", "Admin role required");
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    if (isForbiddenError(error)) return apiError(403, "forbidden", "Admin role required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
 
@@ -63,7 +67,9 @@ export async function DELETE(_req: NextRequest, context: { params: Promise<{ id:
 
     await db.emailCampaign.delete({ where: { id } });
     return Response.json({ ok: true });
-  } catch {
-    return apiError(403, "forbidden", "Admin role required");
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    if (isForbiddenError(error)) return apiError(403, "forbidden", "Admin role required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
