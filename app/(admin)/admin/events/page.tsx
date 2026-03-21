@@ -79,7 +79,7 @@ export default async function AdminEvents() {
           </p>
         </div>
       ) : null}
-      <BackfillEventImagesTrigger />
+
       <BulkPublishEventsClient approvedIds={publishableIds} />
       <AdminEntityManagerClient
         entity="events"
