@@ -45,11 +45,16 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
     name: artist.name,
     bio: artist.bio,
     featuredAssetId: artist.featuredAssetId,
-    featuredImageUrl: artist.featuredImageUrl,
-    avatarImageUrl: artist.avatarImageUrl,
     websiteUrl: artist.websiteUrl,
   });
-  const blockers = readiness.blocking.map((b) => b.label);
+  const hasAnyImage = Boolean(
+    artist.featuredAssetId ||
+    artist.featuredImageUrl?.trim() ||
+    artist.avatarImageUrl?.trim(),
+  );
+  const blockers = readiness.blocking
+    .filter((b) => !(b.id === "artist-avatar" && hasAnyImage))
+    .map((b) => b.label);
 
   return (
     <main className="space-y-6">
