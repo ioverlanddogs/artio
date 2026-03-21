@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { computeVenueCompleteness } from "@/lib/venue-completeness";
 import { AdminEntityManagerClient } from "../admin-entity-manager-client";
 import AdminPageHeader from "../_components/AdminPageHeader";
+import { BackfillVenueImagesTrigger } from "./backfill-images-trigger";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,8 @@ export default async function AdminVenues() {
           </p>
         </section>
       )}
+
+      <BackfillVenueImagesTrigger />
 
       <VenueIngestStatusPanel venues={venues} />
 
