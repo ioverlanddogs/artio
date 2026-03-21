@@ -8,7 +8,7 @@ type EmailSettingsProps = {
   initial: {
     emailEnabled: boolean;
     emailFromAddress: string | null;
-    resendApiKey: string | null;
+    resendApiKeySet: boolean;
     resendFromAddress: string | null;
     emailOutboxBatchSize: number | null;
   };
@@ -16,7 +16,7 @@ type EmailSettingsProps = {
 
 export default function EmailSettingsClient(props: EmailSettingsProps) {
   const [enabled, setEnabled] = useState(props.initial.emailEnabled);
-  const [resendApiKey, setResendApiKey] = useState(props.initial.resendApiKey ?? "");
+  const [resendApiKey, setResendApiKey] = useState("");
   const [fromAddress, setFromAddress] = useState(props.initial.resendFromAddress ?? "");
   const [batchSize, setBatchSize] = useState(
     props.initial.emailOutboxBatchSize !== null ? String(props.initial.emailOutboxBatchSize) : "",
@@ -131,7 +131,7 @@ export default function EmailSettingsClient(props: EmailSettingsProps) {
             setResendApiKey(e.target.value);
             setStatus("idle");
           }}
-          placeholder={props.initial.resendApiKey ? "•••••••• (stored)" : "re_..."}
+          placeholder={props.initial.resendApiKeySet ? "•••••••• (stored)" : "re_..."}
           disabled={saving}
           autoComplete="off"
         />

@@ -18,7 +18,7 @@ export default async function AdminSettingsPage() {
         ingestMaxOutputTokens: settings.ingestMaxOutputTokens ?? null,
         emailEnabled: settings.emailEnabled ?? false,
         emailFromAddress: settings.emailFromAddress ?? null,
-        resendApiKey: settings.resendApiKey ?? null,
+        resendApiKeySet: Boolean(settings.resendApiKey),
         resendFromAddress: settings.resendFromAddress ?? null,
         stripePublishableKey: settings.stripePublishableKey ?? null,
         stripeSecretKeySet: Boolean(settings.stripeSecretKey),

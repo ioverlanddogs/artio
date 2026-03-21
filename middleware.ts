@@ -21,7 +21,7 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
   const isPlaywright = process.env.PLAYWRIGHT === "true";
-  if (isPlaywright) {
+  if (isPlaywright && process.env.NODE_ENV !== "production") {
     return NextResponse.next({
       request: {
         headers: requestHeaders,
