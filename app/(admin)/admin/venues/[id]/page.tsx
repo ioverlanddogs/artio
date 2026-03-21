@@ -11,6 +11,7 @@ import VenueImagePicker from "@/app/(admin)/admin/venues/[id]/venue-image-picker
 import VenueEnrichmentLogPanel from "@/components/admin/venue-enrichment-log-panel";
 import { DetectEventsPageButton } from "@/app/(admin)/admin/venues/[id]/detect-events-page-button";
 import { IngestFrequencySelect } from "@/app/(admin)/admin/venues/[id]/ingest-frequency-select";
+import { WikipediaLookupButton } from "@/app/(admin)/admin/venues/[id]/wikipedia-lookup-button";
 
 export default async function AdminVenue({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -94,6 +95,10 @@ export default async function AdminVenue({ params }: { params: Promise<{ id: str
       <DetectEventsPageButton
         venueId={id}
         initialUrl={venue?.eventsPageUrl ?? null}
+      />
+      <WikipediaLookupButton
+        venueId={id}
+        venueName={venue.name}
       />
       <VenueImagePicker
         venueId={id}

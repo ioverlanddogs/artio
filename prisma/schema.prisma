@@ -484,6 +484,8 @@ model Venue {
   openingHours       Json?
   lastEnrichedAt     DateTime?                @db.Timestamptz
   enrichmentSource   String?
+  wikipediaPageId    String?
+  wikipediaUrl       String?
   featuredImageUrl   String?
   featuredAssetId    String?                  @db.Uuid
   /// @deprecated Use `status` (ContentStatus) as canonical publish lifecycle state.
@@ -603,7 +605,7 @@ model VenueGenerationRunItem {
 model VenueHomepageImageCandidate {
   id           String    @id @default(uuid()) @db.Uuid
   venueId      String    @db.Uuid
-  runItemId    String    @db.Uuid
+  runItemId    String?   @db.Uuid
   url          String
   source       String
   sortOrder    Int
@@ -614,7 +616,7 @@ model VenueHomepageImageCandidate {
   createdAt    DateTime  @default(now()) @db.Timestamptz
 
   venue      Venue                  @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  runItem    VenueGenerationRunItem @relation(fields: [runItemId], references: [id], onDelete: Cascade)
+  runItem    VenueGenerationRunItem? @relation(fields: [runItemId], references: [id], onDelete: Cascade)
   selectedBy User?                  @relation(fields: [selectedById], references: [id], onDelete: SetNull)
   venueImage VenueImage?            @relation(fields: [venueImageId], references: [id], onDelete: SetNull)
 
