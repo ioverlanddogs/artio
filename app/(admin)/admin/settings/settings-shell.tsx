@@ -30,7 +30,7 @@ export default function SettingsShell({ initial }: { initial: Record<string, unk
   const emailInitial = useMemo(() => ({
     emailEnabled: Boolean(initial.emailEnabled),
     emailFromAddress: (initial.emailFromAddress as string | null) ?? null,
-    resendApiKey: (initial.resendApiKey as string | null) ?? null,
+    resendApiKeySet: Boolean(initial.resendApiKeySet),
     resendFromAddress: (initial.resendFromAddress as string | null) ?? null,
     emailOutboxBatchSize: (initial.emailOutboxBatchSize as number | null) ?? null,
   }), [initial]);
