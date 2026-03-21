@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { resolveAudience } from "@/lib/email/audience";
 import { generateUnsubscribeToken } from "@/lib/email/unsubscribe-token";
 import { requireAdmin } from "@/lib/admin";
+import { isAuthError } from "@/lib/auth";
+import { isForbiddenError } from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 
@@ -61,7 +63,9 @@ export async function POST(_req: NextRequest, context: { params: Promise<{ id: s
     });
 
     return Response.json({ ok: true, enqueued: audience.length });
-  } catch {
-    return apiError(403, "forbidden", "Admin role required");
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    if (isForbiddenError(error)) return apiError(403, "forbidden", "Admin role required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }

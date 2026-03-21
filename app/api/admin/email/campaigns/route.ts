@@ -7,6 +7,8 @@ import { apiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { requireAdmin } from "@/lib/admin";
+import { isAuthError } from "@/lib/auth";
+import { isForbiddenError } from "@/lib/http-errors";
 
 export const runtime = "nodejs";
 
@@ -28,8 +30,10 @@ export async function GET() {
     });
 
     return Response.json({ campaigns });
-  } catch {
-    return apiError(403, "forbidden", "Admin role required");
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    if (isForbiddenError(error)) return apiError(403, "forbidden", "Admin role required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
 
@@ -56,7 +60,9 @@ export async function POST(req: NextRequest) {
     });
 
     return Response.json(created, { status: 201 });
-  } catch {
-    return apiError(403, "forbidden", "Admin role required");
+  } catch (error) {
+    if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
+    if (isForbiddenError(error)) return apiError(403, "forbidden", "Admin role required");
+    return apiError(500, "internal_error", "Unexpected server error");
   }
 }
