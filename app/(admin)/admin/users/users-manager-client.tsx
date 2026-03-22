@@ -83,9 +83,10 @@ export function UsersManagerClient() {
   }
 
   useEffect(() => {
+    if (query.trim().length < 2) return;
     const timer = setTimeout(() => {
       void loadUsers(query);
-    }, 250);
+    }, 300);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -258,13 +259,26 @@ export function UsersManagerClient() {
 
       <div className="rounded border bg-background p-3 space-y-2">
         <label htmlFor="users-search" className="text-sm font-medium">Search users</label>
-        <input
-          id="users-search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by email or name"
-          className="w-full rounded border px-2 py-1 text-sm"
-        />
+        <div className="flex gap-2">
+          <input
+            id="users-search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void loadUsers(query);
+            }}
+            placeholder="Search by email or name"
+            className="flex-1 rounded border px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void loadUsers(query)}
+            className="rounded border px-3 py-1 text-sm"
+          >
+            {busy ? "Searching…" : "Search"}
+          </button>
+        </div>
       </div>
 
       {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
@@ -281,9 +295,13 @@ export function UsersManagerClient() {
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 ? (
+            {users.length === 0 && !busy ? (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={5}>{busy ? "Loading users..." : "No users found."}</td>
+                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={6}>
+                  {query.trim().length > 0
+                    ? "No users found."
+                    : "Enter a name or email to search, or click Search to list all users."}
+                </td>
               </tr>
             ) : users.map((user) => (
               <tr key={user.id} className="border-t">

@@ -19,7 +19,9 @@ export function BulkPublishEventsClient({ approvedIds: initialIds }: Props) {
   } | null>(null);
   const [done, setDone] = useState(false);
 
-  if (ids.length === 0) return null;
+  const hasWork = ids.length > 0;
+  const hasResult = done && progress !== null;
+  if (!hasWork && !hasResult) return null;
 
   async function bulkPublish() {
     if (
@@ -82,25 +84,26 @@ export function BulkPublishEventsClient({ approvedIds: initialIds }: Props) {
           </p>
           {done && progress ? (
             <p className="text-xs text-emerald-800/70 dark:text-emerald-300/70">
-              {progress.published > 0 ? `${progress.published} published` : ""}
-              {progress.published > 0 && (progress.blocked > 0 || progress.failed > 0) ? " · " : ""}
-              {progress.blocked > 0 ? `${progress.blocked} blocked` : ""}
-              {progress.blocked > 0 && progress.failed > 0 ? " · " : ""}
-              {progress.failed > 0 ? `${progress.failed} failed` : ""}
+              Done —{" "}
+              {progress.published} published
+              {progress.blocked > 0 ? `, ${progress.blocked} blocked` : ""}
+              {progress.failed > 0 ? `, ${progress.failed} failed` : ""}
             </p>
           ) : null}
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-emerald-600 text-emerald-900 hover:bg-emerald-100 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
-          onClick={() => void bulkPublish()}
-          disabled={running}
-        >
-          {running
-            ? `Publishing… ${progress?.done ?? 0}/${progress?.total ?? ids.length}`
-            : `Publish all ${ids.length}`}
-        </Button>
+        {hasWork ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-emerald-600 text-emerald-900 hover:bg-emerald-100 dark:text-emerald-200 dark:hover:bg-emerald-900/30"
+            onClick={() => void bulkPublish()}
+            disabled={running}
+          >
+            {running
+              ? `Publishing… ${progress?.done ?? 0}/${progress?.total ?? ids.length}`
+              : `Publish all ${ids.length}`}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
