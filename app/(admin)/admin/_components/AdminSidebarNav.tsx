@@ -10,14 +10,18 @@ type NavLink = {
   label: string;
 };
 
-type AdminSidebarNavProps = {
-  userLinks: NavLink[];
-  adminLinks: NavLink[];
+type NavSection = {
+  label: string;
+  links: NavLink[];
 };
 
-export default function AdminSidebarNav({ userLinks, adminLinks }: AdminSidebarNavProps) {
-  const pathname = usePathname();
+type AdminSidebarNavProps = {
+  userLinks: NavLink[];
+  adminSections: NavSection[];
+};
 
+export default function AdminSidebarNav({ userLinks, adminSections }: AdminSidebarNavProps) {
+  const pathname = usePathname();
 
   return (
     <nav className="space-y-1" aria-label="Admin navigation">
@@ -40,25 +44,30 @@ export default function AdminSidebarNav({ userLinks, adminLinks }: AdminSidebarN
           </Link>
         );
       })}
-      <div className="my-2 border-t" />
-      {adminLinks.map((item) => {
-        const isActive = isRouteActive(pathname, item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-              "block w-full rounded-md border-l-2 px-3 py-2 text-sm transition-colors",
-              isActive
-                ? "border-primary bg-muted font-medium text-foreground"
-                : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-            )}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+      {adminSections.map((section) => (
+        <div key={section.label}>
+          <div className="my-2 border-t" />
+          <p className="px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{section.label}</p>
+          {section.links.map((item) => {
+            const isActive = isRouteActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "block w-full rounded-md border-l-2 px-3 py-2 text-sm transition-colors",
+                  isActive
+                    ? "border-primary bg-muted font-medium text-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
