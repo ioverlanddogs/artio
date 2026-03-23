@@ -65,6 +65,9 @@ export default function ArtworksClient({
   const [editOpenById, setEditOpenById] = useState<Record<string, boolean>>({});
   const [editDraftById, setEditDraftById] = useState<Record<string, EditDraft>>({});
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [importingImageFor, setImportingImageFor] = useState<string | null>(null);
+  const [importedImageFor, setImportedImageFor] = useState<Set<string>>(new Set());
+  const [importFailedFor, setImportFailedFor] = useState<Set<string>>(new Set());
 
   function updateDraft(id: string, field: keyof EditDraft, value: string) {
     setEditDraftById((prev) => ({
@@ -128,6 +131,29 @@ export default function ArtworksClient({
     }
   }
 
+  async function importArtworkImage(candidateId: string) {
+    setImportingImageFor(candidateId);
+    try {
+      const res = await fetch(`/api/admin/ingest/artworks/${candidateId}/import-image`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setImportedImageFor((prev) => new Set([...prev, candidateId]));
+        setImportFailedFor((prev) => {
+          const next = new Set(prev);
+          next.delete(candidateId);
+          return next;
+        });
+      } else {
+        setImportFailedFor((prev) => new Set([...prev, candidateId]));
+      }
+    } catch {
+      setImportFailedFor((prev) => new Set([...prev, candidateId]));
+    } finally {
+      setImportingImageFor(null);
+    }
+  }
+
   const merge = useCallback(async (id: string, existingArtworkId: string) => {
     setWorkingId(id);
     setError(null);
@@ -141,8 +167,18 @@ export default function ArtworksClient({
         setError("Failed to link artwork candidate to existing artwork.");
         return;
       }
-      const body = await res.json() as { artworkId?: string; artistId?: string };
+      const body = await res.json() as {
+        artworkId?: string;
+        artistId?: string;
+        imageImported?: boolean;
+        imageUrl?: string | null;
+      };
       setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
+      if (body.imageImported) {
+        setImportedImageFor((prev) => new Set([...prev, id]));
+      } else if (body.artworkId) {
+        setImportFailedFor((prev) => new Set([...prev, id]));
+      }
       setFocusedIndex(null);
     } catch {
       setError("Failed to link artwork candidate to existing artwork.");
@@ -160,8 +196,18 @@ export default function ArtworksClient({
         setError("Failed to approve artwork candidate due to an unexpected server error.");
         return;
       }
-      const body = await res.json() as { artworkId?: string; artistId?: string };
+      const body = await res.json() as {
+        artworkId?: string;
+        artistId?: string;
+        imageImported?: boolean;
+        imageUrl?: string | null;
+      };
       setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
+      if (body.imageImported) {
+        setImportedImageFor((prev) => new Set([...prev, id]));
+      } else if (body.artworkId) {
+        setImportFailedFor((prev) => new Set([...prev, id]));
+      }
       setFocusedIndex(null);
     } catch {
       setError("Failed to approve artwork candidate.");
@@ -199,8 +245,18 @@ export default function ArtworksClient({
         setError("Failed to approve artwork candidate due to an unexpected server error.");
         return;
       }
-      const body = await res.json() as { artworkId?: string; artistId?: string };
+      const body = await res.json() as {
+        artworkId?: string;
+        artistId?: string;
+        imageImported?: boolean;
+        imageUrl?: string | null;
+      };
       setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
+      if (body.imageImported) {
+        setImportedImageFor((prev) => new Set([...prev, id]));
+      } else if (body.artworkId) {
+        setImportFailedFor((prev) => new Set([...prev, id]));
+      }
     } catch {
       setError("Failed to approve artwork candidate.");
     } finally {
@@ -221,8 +277,18 @@ export default function ArtworksClient({
         setError("Failed to approve and publish artwork candidate.");
         return;
       }
-      const body = await res.json() as { artworkId?: string; artistId?: string };
+      const body = await res.json() as {
+        artworkId?: string;
+        artistId?: string;
+        imageImported?: boolean;
+        imageUrl?: string | null;
+      };
       setCandidates((prev) => prev.map((item) => item.id === id ? { ...item, status: "APPROVED", createdArtworkId: body.artworkId ?? item.createdArtworkId, createdArtwork: body.artworkId ? { id: body.artworkId, artistId: body.artistId ?? item.createdArtwork?.artistId ?? "", artist: item.createdArtwork?.artist ?? null } : item.createdArtwork } : item));
+      if (body.imageImported) {
+        setImportedImageFor((prev) => new Set([...prev, id]));
+      } else if (body.artworkId) {
+        setImportFailedFor((prev) => new Set([...prev, id]));
+      }
     } catch {
       setError("Failed to approve and publish artwork candidate.");
     } finally {
@@ -317,7 +383,20 @@ export default function ArtworksClient({
                     <IngestImageCell
                       imageUrl={candidate.imageUrl}
                       altText={candidate.title}
-                      importStatus="none"
+                      importStatus={
+                        importedImageFor.has(candidate.id)
+                          ? "imported"
+                          : importFailedFor.has(candidate.id)
+                            ? "failed"
+                            : importingImageFor === candidate.id
+                              ? "importing"
+                              : "none"
+                      }
+                      onImport={
+                        candidate.createdArtworkId
+                          ? () => importArtworkImage(candidate.id)
+                          : undefined
+                      }
                     />
                   </td>
                   <td className="px-3 py-2">
