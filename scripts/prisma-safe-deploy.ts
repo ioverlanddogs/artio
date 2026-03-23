@@ -52,7 +52,11 @@ function runPrisma(
   );
 
   const env = { ...process.env };
-  if (args[0] === "migrate" && args[1] === "deploy" && env.DIRECT_URL) {
+  if (args[0] === "migrate" && env.DIRECT_URL) {
+    // Always use the direct (non-pooler) URL for all migrate subcommands.
+    // Using the pooler URL for `migrate status` or `migrate resolve` causes
+    // PgBouncer to hold the advisory lock on an idle connection, preventing
+    // `migrate deploy` from acquiring it on the direct connection.
     env.DATABASE_URL = env.DIRECT_URL;
   }
 
