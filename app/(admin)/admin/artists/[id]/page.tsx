@@ -7,7 +7,7 @@ import { AdminArchiveActions } from "@/app/(admin)/admin/_components/AdminArchiv
 import AdminHardDeleteButton from "@/app/(admin)/admin/_components/AdminHardDeleteButton";
 import ModerationPanel from "@/app/(admin)/admin/_components/ModerationPanel";
 import { evaluateArtistReadiness } from "@/lib/publish-readiness";
-import { ImageReplacePanel } from "@/components/admin/ImageReplacePanel";
+import ImageGalleryManager from "@/app/(admin)/admin/_components/ImageGalleryManager";
 
 export default async function AdminArtist({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,10 +25,7 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
       tiktokUrl: true,
       youtubeUrl: true,
       mediums: true,
-      avatarImageUrl: true,
-      featuredImageUrl: true,
       featuredAssetId: true,
-      featuredAsset: { select: { url: true } },
       status: true,
       isPublished: true,
       deletedAt: true,
@@ -36,22 +33,13 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
   });
   if (!artist) notFound();
 
-  const currentImageUrl =
-    (artist as { featuredAsset?: { url?: string | null } | null }).featuredAsset?.url
-    ?? artist.featuredImageUrl
-    ?? null;
-
   const readiness = evaluateArtistReadiness({
     name: artist.name,
     bio: artist.bio,
     featuredAssetId: artist.featuredAssetId,
     websiteUrl: artist.websiteUrl,
   });
-  const hasAnyImage = Boolean(
-    artist.featuredAssetId ||
-    artist.featuredImageUrl?.trim() ||
-    artist.avatarImageUrl?.trim(),
-  );
+  const hasAnyImage = Boolean(artist.featuredAssetId);
   const blockers = readiness.blocking
     .filter((b) => !(b.id === "artist-avatar" && hasAnyImage))
     .map((b) => b.label);
@@ -80,16 +68,13 @@ export default async function AdminArtist({ params }: { params: Promise<{ id: st
           { name: "nationality", label: "Nationality" },
           { name: "birthYear", label: "Birth year" },
           { name: "mediums", label: "Mediums (comma-separated)" },
-          { name: "avatarImageUrl", label: "Avatar Image URL" },
-          { name: "featuredImageUrl", label: "Featured Image URL" },
-          { name: "featuredAssetId", label: "Featured Asset ID" },
         ]}
         altRequired={ADMIN_IMAGE_ALT_REQUIRED}
       />
-      <ImageReplacePanel
-        endpoint={`/api/admin/artists/${id}/image`}
-        label="artist"
-        currentImageUrl={currentImageUrl}
+      <ImageGalleryManager
+        entityType="artist"
+        entityId={id}
+        altRequired={ADMIN_IMAGE_ALT_REQUIRED}
       />
       <ModerationPanel resource="artists" id={artist.id} status={artist.status} blockers={blockers} />
       <section className="rounded-lg border border-destructive/30 bg-card p-4">
