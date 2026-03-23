@@ -187,35 +187,37 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
               {suggestions.map((suggestion) => {
                 const isImporting = importingUrl === suggestion.originalUrl;
                 return (
-                  <div key={suggestion.candidateId} className="group relative h-24 w-36 overflow-hidden rounded-lg border-2 border-transparent">
-                    <Image
-                      src={suggestion.displayUrl}
-                      alt={suggestion.title || "Suggested venue image"}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-                    <div className="absolute inset-0 hidden items-center justify-center gap-1 rounded-lg bg-black/60 group-hover:flex">
+                  <div key={suggestion.candidateId} className="w-36 space-y-1">
+                    <div className="relative h-24 w-36 overflow-hidden rounded-lg border-2 border-transparent">
+                      <Image
+                        src={suggestion.displayUrl}
+                        alt={suggestion.title || "Suggested venue image"}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                      {isImporting ? (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-xs text-white">…</div>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-1">
                       <button
                         type="button"
-                        className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white disabled:opacity-50"
+                        className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
                         onClick={() => importSuggestion(suggestion, false)}
                         disabled={isImporting}
                       >
-                        {isImporting ? "…" : "+ gallery"}
+                        + Add to gallery
                       </button>
                       <button
                         type="button"
-                        className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white disabled:opacity-50"
+                        className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
                         onClick={() => importSuggestion(suggestion, true)}
                         disabled={isImporting}
                       >
-                        {isImporting ? "…" : "★ cover"}
+                        ★ Set as cover
                       </button>
                     </div>
-                    {isImporting ? (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-xs text-white">…</div>
-                    ) : null}
                   </div>
                 );
               })}
@@ -237,45 +239,47 @@ export default function VenueImagePicker(props: VenueImagePickerProps) {
               {homepageCandidates.map((candidate) => {
                 const isLoading = candidateLoadingId === candidate.id;
                 return (
-                  <div key={candidate.id} className="group relative h-24 w-36 overflow-hidden rounded-lg border-2 border-transparent">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={candidate.url}
-                      alt="Homepage candidate"
-                      className="h-full w-full object-cover"
-                      onError={(event) => {
-                        (event.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    <div className="absolute inset-0 hidden items-center justify-center gap-1 rounded-lg bg-black/60 group-hover:flex flex-col">
+                  <div key={candidate.id} className="w-36 space-y-1">
+                    <div className="relative h-24 w-36 overflow-hidden rounded-lg border-2 border-transparent">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={candidate.url}
+                        alt="Homepage candidate"
+                        className="h-full w-full object-cover"
+                        onError={(event) => {
+                          (event.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-xs text-white">…</div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
                       <button
                         type="button"
-                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white disabled:opacity-50"
+                        className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
                         onClick={() => selectCandidate(candidate.id, true)}
                         disabled={isLoading}
                       >
-                        {isLoading ? "…" : "★ Upload & set cover"}
+                        ★ Upload & set cover
                       </button>
                       <button
                         type="button"
-                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-white disabled:opacity-50"
+                        className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
                         onClick={() => selectCandidate(candidate.id, false)}
                         disabled={isLoading}
                       >
-                        {isLoading ? "…" : "+ Upload to gallery"}
+                        + Upload to gallery
                       </button>
                       <button
                         type="button"
-                        className="w-28 rounded bg-black/60 px-1.5 py-0.5 text-center text-[10px] text-red-300 disabled:opacity-50"
+                        className="w-full rounded border px-1.5 py-1 text-left text-[11px] text-destructive disabled:opacity-50"
                         onClick={() => rejectCandidate(candidate.id)}
                         disabled={isLoading}
                       >
-                        {isLoading ? "…" : "✕ Dismiss"}
+                        ✕ Dismiss
                       </button>
                     </div>
-                    {isLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/45 text-xs text-white">…</div>
-                    )}
                   </div>
                 );
               })}

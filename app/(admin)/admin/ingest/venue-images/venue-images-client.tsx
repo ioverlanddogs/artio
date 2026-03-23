@@ -175,8 +175,8 @@ export function VenueImagesClient(props: VenueImagesClientProps) {
                   const isLoading = loadingId === candidate.id;
                   return (
                     <div key={candidate.id} className="w-36 space-y-1">
-                      <div className="group relative h-24 w-36 overflow-hidden rounded-lg border">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <div className="relative h-24 w-36 overflow-hidden rounded-lg border">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={candidate.url}
                           alt="Homepage candidate"
@@ -185,11 +185,37 @@ export function VenueImagesClient(props: VenueImagesClientProps) {
                             (event.target as HTMLImageElement).style.display = "none";
                           }}
                         />
-                        <div className="absolute inset-0 hidden items-center justify-center gap-1 rounded-lg bg-black/60 group-hover:flex flex-col">
-                          <button type="button" className="w-28 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white disabled:opacity-50" onClick={() => selectCandidate(group.venueId, candidate.id, true)} disabled={isLoading}>{isLoading ? "…" : "★ Set as cover"}</button>
-                          <button type="button" className="w-28 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white disabled:opacity-50" onClick={() => selectCandidate(group.venueId, candidate.id, false)} disabled={isLoading}>{isLoading ? "…" : "+ Add to gallery"}</button>
-                          <button type="button" className="w-28 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-red-300 disabled:opacity-50" onClick={() => rejectCandidate(group.venueId, candidate.id)} disabled={isLoading}>{isLoading ? "…" : "✕ Dismiss"}</button>
-                        </div>
+                        {isLoading ? (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 text-xs text-white">
+                            …
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          type="button"
+                          className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
+                          onClick={() => selectCandidate(group.venueId, candidate.id, true)}
+                          disabled={isLoading}
+                        >
+                          ★ Set as cover
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full rounded border px-1.5 py-1 text-left text-[11px] disabled:opacity-50"
+                          onClick={() => selectCandidate(group.venueId, candidate.id, false)}
+                          disabled={isLoading}
+                        >
+                          + Add to gallery
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full rounded border px-1.5 py-1 text-left text-[11px] text-destructive disabled:opacity-50"
+                          onClick={() => rejectCandidate(group.venueId, candidate.id)}
+                          disabled={isLoading}
+                        >
+                          ✕ Dismiss
+                        </button>
                       </div>
                       <p className="text-xs text-muted-foreground">{candidate.source}</p>
                       {errors[candidate.id] ? (
