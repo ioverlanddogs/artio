@@ -30,6 +30,7 @@ export const ADMIN_SECTIONS: AdminNavSection[] = [
     label: "Discovery",
     links: [
       { href: "/admin/ingest", label: "Ingest" },
+      { href: "/admin/ingest/ready-to-publish", label: "Ready to publish" },
       { href: "/admin/submissions", label: "Submissions" },
       { href: "/admin/curation", label: "Curation" },
     ],

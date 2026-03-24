@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import IngestConfidenceBadge from "@/app/(admin)/admin/ingest/_components/ingest-confidence-badge";
 import IngestImageCell from "@/app/(admin)/admin/ingest/_components/ingest-image-cell";
 import { Button } from "@/components/ui/button";
+import { computeArtistCompleteness } from "@/lib/artist-completeness";
 
 type Candidate = {
   id: string;
@@ -35,23 +36,6 @@ type EditDraft = {
   websiteUrl: string;
   instagramUrl: string;
 };
-
-function computeArtistCandidateCompleteness(candidate: Candidate): {
-  score: number;
-  missing: string[];
-} {
-  const checks = [
-    { label: "bio", has: Boolean(candidate.bio?.trim()) },
-    { label: "mediums", has: candidate.mediums.length > 0 },
-    { label: "website", has: Boolean(candidate.websiteUrl?.trim()) },
-    { label: "instagram", has: Boolean(candidate.instagramUrl?.trim()) },
-    { label: "nationality", has: Boolean(candidate.nationality?.trim()) },
-    { label: "birth year", has: candidate.birthYear != null },
-  ];
-  const present = checks.filter((c) => c.has).length;
-  const missing = checks.filter((c) => !c.has).map((c) => c.label);
-  return { score: Math.round((present / checks.length) * 100), missing };
-}
 
 function getConfidenceBand(band: string | null): "HIGH" | "MEDIUM" | "LOW" {
   if (band === "HIGH" || band === "MEDIUM" || band === "LOW") return band;
@@ -387,7 +371,7 @@ export default function ArtistsClient({
                   <td className="px-3 py-2">{candidate.mediums.length > 0 ? candidate.mediums.join(", ") : "—"}</td>
                   <td className="px-3 py-2 min-w-[160px]">
                     {(() => {
-                      const { score, missing } = computeArtistCandidateCompleteness(candidate);
+                      const { score, missing } = computeArtistCompleteness(candidate);
                       return (
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
