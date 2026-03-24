@@ -110,6 +110,10 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    optionalDependencies:
+      sharp:
+        specifier: ^0.34.4
+        version: 0.34.5
     devDependencies:
       '@playwright/test':
         specifier: ^1.58.2
