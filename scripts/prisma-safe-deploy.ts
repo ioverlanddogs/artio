@@ -17,8 +17,10 @@ const RESOLVABLE_FAILED_MIGRATIONS = new Set([
   ...RESOLVABLE_AS_ROLLED_BACK,
   ...RESOLVABLE_AS_APPLIED,
 ]);
-const DEPLOY_MAX_ATTEMPTS = 2;
-const DEPLOY_RETRY_DELAY_MS = 2_000;
+const DEPLOY_MAX_ATTEMPTS = 3;
+const DEPLOY_RETRY_DELAY_MS = 8_000;
+const NEON_WARMUP_MAX_ATTEMPTS = 8;
+const NEON_WARMUP_RETRY_DELAY_MS = 5_000;
 
 type PrismaResult = {
   status: number;
@@ -39,6 +41,50 @@ function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+async function warmUpConnection(): Promise<void> {
+  const isNeon =
+    (process.env.DATABASE_URL ?? "").includes("neon.tech") ||
+    (process.env.DIRECT_URL ?? "").includes("neon.tech");
+
+  if (!isNeon) return;
+
+  console.log(
+    "[prisma-safe-deploy] Neon endpoint detected — warming up connection before deploy.",
+  );
+
+  for (let attempt = 1; attempt <= NEON_WARMUP_MAX_ATTEMPTS; attempt += 1) {
+    const result = runPrisma(["migrate", "status"], {
+      allowFailure: true,
+      step: `Neon warm-up probe (attempt ${attempt}/${NEON_WARMUP_MAX_ATTEMPTS})`,
+    });
+
+    if (result.status === 0) {
+      console.log(
+        `[prisma-safe-deploy] Connection warm-up succeeded on attempt ${attempt}.`,
+      );
+      return;
+    }
+
+    if (result.output.includes("P1001")) {
+      console.log(
+        `[prisma-safe-deploy] Branch still cold (attempt ${attempt}/${NEON_WARMUP_MAX_ATTEMPTS}), retrying in ${NEON_WARMUP_RETRY_DELAY_MS / 1000}s...`,
+      );
+      if (attempt < NEON_WARMUP_MAX_ATTEMPTS) {
+        await sleep(NEON_WARMUP_RETRY_DELAY_MS);
+      }
+    } else {
+      console.log(
+        "[prisma-safe-deploy] Warm-up probe returned non-connectivity error, proceeding.",
+      );
+      return;
+    }
+  }
+
+  console.warn(
+    "[prisma-safe-deploy] Could not confirm warm connection after max attempts — proceeding anyway.",
+  );
 }
 
 function runPrisma(
@@ -211,10 +257,18 @@ async function main() {
     "[prisma-safe-deploy] Starting safe Prisma migration deploy flow.",
   );
 
+  await warmUpConnection();
+
   const statusResult = runPrisma(["migrate", "status"], {
     allowFailure: true,
     step: "Checking migration status",
   });
+
+  if (statusResult.output.includes("P1001")) {
+    console.log(
+      "[prisma-safe-deploy] [status] P1001 connectivity error in status check — warm-up should have handled this. Proceeding with deploy attempt.",
+    );
+  }
 
   const status = parseStatusSummary(statusResult.output);
 
