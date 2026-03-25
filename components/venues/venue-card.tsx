@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export type VenueCardItem = {
   slug: string;
@@ -12,8 +13,17 @@ export function VenueCard({ venue }: { venue: VenueCardItem }) {
   return (
     <Link href={`/venues/${venue.slug}`} className="overflow-hidden rounded-lg border bg-card">
       {venue.primaryImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={venue.primaryImageUrl} alt={venue.name} className="h-40 w-full object-cover" />
+        <div className="relative h-40 w-full overflow-hidden">
+          <Image
+            src={venue.primaryImageUrl}
+            alt={venue.name}
+            fill
+            sizes="(max-width: 640px) 100vw,
+             (max-width: 1024px) 50vw,
+             33vw"
+            className="object-cover"
+          />
+        </div>
       ) : null}
       <div className="space-y-1 p-3">
         <p className="line-clamp-1 font-medium">{venue.name}</p>

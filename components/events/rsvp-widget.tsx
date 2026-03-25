@@ -28,6 +28,7 @@ export function RsvpWidget({ eventSlug, initialAvailability }: { eventSlug: stri
   const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
   const [isWaitlisted, setIsWaitlisted] = useState(false);
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const activeTiers = useMemo(() => availability.tiers.filter((tier) => tier.available == null || tier.available > 0), [availability.tiers]);
 
@@ -50,6 +51,7 @@ export function RsvpWidget({ eventSlug, initialAvailability }: { eventSlug: stri
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
     setIsSubmitting(true);
     const res = await fetch(`/api/events/${eventSlug}/register`, {
       method: "POST",
@@ -72,6 +74,12 @@ export function RsvpWidget({ eventSlug, initialAvailability }: { eventSlug: stri
       setGuestName("");
       setGuestEmail("");
       setTierId("");
+    } else {
+      const message =
+        body?.error?.message ??
+        body?.message ??
+        "Could not complete RSVP. Please try again.";
+      setError(typeof message === "string" ? message : "Registration failed.");
     }
     setIsSubmitting(false);
   }
@@ -122,6 +130,11 @@ export function RsvpWidget({ eventSlug, initialAvailability }: { eventSlug: stri
       <label className="block text-sm">Name<input className="mt-1 w-full rounded border p-2" value={guestName} onChange={(e) => setGuestName(e.target.value)} required disabled={isSubmitting} /></label>
       <label className="block text-sm">Email<input className="mt-1 w-full rounded border p-2" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} required disabled={isSubmitting} /></label>
       <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : isJoiningWaitlist ? "Join waitlist" : "RSVP"}</Button>
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }

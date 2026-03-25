@@ -9,17 +9,11 @@ import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFi
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { ArtworkCardActions } from "@/app/my/artwork/_components/ArtworkCardActions";
 import { DEFAULT_CURRENCY, formatPrice } from "@/lib/format";
+import { publisherStatusVariant } from "@/lib/publisher-status-variant";
 
 export const dynamic = "force-dynamic";
 
 type ArtworkSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
-
-function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
-  if (status === "Published" || status === "Live") return "default";
-  if (status === "Rejected") return "destructive";
-  if (status === "Submitted" || status === "Under review") return "secondary";
-  return "outline";
-}
 
 export default async function MyArtworkPage({ searchParams }: { searchParams: ArtworkSearchParams }) {
   const user = await getSessionUser();
@@ -121,7 +115,7 @@ export default async function MyArtworkPage({ searchParams }: { searchParams: Ar
                 : item.status === "CHANGES_REQUESTED" ? "Changes requested"
                 : "Draft";
               return (
-                <Badge variant={statusVariant(label)} className="text-xs">
+                <Badge variant={publisherStatusVariant(label)} className="text-xs">
                   {label}
                 </Badge>
               );

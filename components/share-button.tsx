@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { track } from "@/lib/analytics/client";
 
 export function ShareButton({ eventSlug, ui = "detail" }: { eventSlug?: string; ui?: "detail" | "calendar_panel" }) {
@@ -23,8 +24,8 @@ export function ShareButton({ eventSlug, ui = "detail" }: { eventSlug?: string; 
   }
 
   return (
-    <button type="button" onClick={handleShare} className="rounded border px-3 py-1 text-sm" aria-label="Copy page URL">
+    <Button variant="outline" size="sm" type="button" aria-label="Copy page URL" onClick={handleShare}>
       {copied ? "Copied" : "Share"}
-    </button>
+    </Button>
   );
 }

@@ -8,17 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { VenueRowActions } from "@/app/my/venues/_components/VenueRowActions";
+import { publisherStatusVariant } from "@/lib/publisher-status-variant";
 
 export const dynamic = "force-dynamic";
 
 type VenuesSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
-
-function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
-  if (status === "Published" || status === "Live") return "default";
-  if (status === "Rejected") return "destructive";
-  if (status === "Submitted" || status === "Under review") return "secondary";
-  return "outline";
-}
 
 function buildVenueStatusWhere(status: string | undefined): Prisma.VenueWhereInput {
   if (!status) return {};
@@ -129,7 +123,7 @@ export default async function MyVenuesPage({ searchParams }: { searchParams: Ven
               <tr key={item.id} className="border-b">
                 <td className="p-2">{item.venue.name}</td>
                 <td className="p-2">
-                  <Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge>
+                  <Badge variant={publisherStatusVariant(statusLabel)}>{statusLabel}</Badge>
                 </td>
                 <td className="p-2 text-right">
                   <VenueRowActions
