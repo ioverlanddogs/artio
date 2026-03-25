@@ -2,13 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { __resetRateLimitWarningsForTests, enforceRateLimit } from "@/lib/rate-limit";
 
-test("rate limit warns once in production-like env when using memory fallback", async () => {
+test("rate limit throws in production when Redis unavailable", async () => {
   const prevNodeEnv = process.env.NODE_ENV;
   const prevVercel = process.env.VERCEL;
   const prevUrl = process.env.UPSTASH_REDIS_REST_URL;
   const prevToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-  const originalWarn = console.warn;
-  const warnings: string[] = [];
 
   try {
     process.env.NODE_ENV = "production";
@@ -16,17 +14,19 @@ test("rate limit warns once in production-like env when using memory fallback", 
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     __resetRateLimitWarningsForTests();
-    console.warn = ((message?: unknown) => {
-      warnings.push(String(message ?? ""));
-    }) as typeof console.warn;
 
-    await enforceRateLimit({ key: "warn-once-a", limit: 10, windowMs: 1000 });
-    await enforceRateLimit({ key: "warn-once-b", limit: 10, windowMs: 1000 });
-
-    assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /Upstash Redis is not configured or unavailable/);
+    await assert.rejects(
+      () => enforceRateLimit({
+        key: "prod-throw-test",
+        limit: 10,
+        windowMs: 1000,
+      }),
+      (err: Error) => {
+        assert.match(err.message, /Upstash Redis is unavailable in production/);
+        return true;
+      },
+    );
   } finally {
-    console.warn = originalWarn;
     if (prevNodeEnv == null) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = prevNodeEnv;
     if (prevVercel == null) delete process.env.VERCEL;

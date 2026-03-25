@@ -10,7 +10,7 @@ import {
   handleAdminEntityList,
   handleAdminEntityPatch,
   handleAdminEntityRestore,
-} from "../lib/admin-entities-route.ts";
+} from "../lib/admin-entity-helpers.ts";
 
 function buildVenueDeps() {
   const venues = [

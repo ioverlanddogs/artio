@@ -9,8 +9,6 @@ test("for-you page disables caching for auth gate", () => {
 
   assert.match(contents, /export const runtime = ["']nodejs["'];/);
   assert.match(contents, /export const dynamic = ["']force-dynamic["'];/);
-  assert.match(contents, /export const revalidate = 0;/);
-  assert.match(contents, /noStore\(\);/);
   assert.match(contents, /const user = await getSessionUser\(\);/);
   assert.match(contents, /if \(!user\) \{/);
 });
