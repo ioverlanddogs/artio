@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { countAllArtworksByArtist } from "@/lib/artworks";
 import { ArtworkManagementGrid } from "@/components/my/artist/artwork-management-grid";
 import { evaluateArtistCompleteness, evaluateArtistReadiness } from "@/lib/publish-readiness";
-import { PublishReadinessChecklist } from "@/components/publishing/publish-readiness-checklist";
+import { ReadinessChecklist } from "@/components/publishing/ReadinessChecklist";
 import { ArtistStripeConnectButton } from "@/app/my/artist/_components/ArtistStripeConnectButton";
 import { ProfileCompletenessSidebar } from "@/components/my/artist/profile-completeness-sidebar";
 
@@ -111,6 +111,20 @@ export default async function MyArtistPage() {
     : 0;
 
   const readiness = evaluateArtistReadiness({ name: artist.name, bio: artist.bio, featuredAssetId: artist.featuredAssetId, websiteUrl: artist.websiteUrl });
+  const readinessById = new Map([...readiness.blocking, ...readiness.warnings].map((item) => [item.id, item]));
+  const readinessItems = [
+    { id: "artist-name", label: "Add artist name." },
+    { id: "artist-bio", label: "Add bio (20+ characters)." },
+    { id: "artist-avatar", label: "Add profile avatar." },
+    { id: "artist-website", label: "Add website URL (recommended)." },
+  ].map((item) => {
+    const issue = readinessById.get(item.id);
+    return {
+      label: item.label,
+      complete: !issue,
+      fixHref: issue?.href,
+    };
+  });
   const coverUrl = resolveArtistCoverUrl(artist);
   const avatarUrl = resolveEntityPrimaryImage(artist)?.url ?? artist.avatarImageUrl ?? null;
 
@@ -157,7 +171,7 @@ export default async function MyArtistPage() {
         </div>
         <Button asChild><Link href="/my/artwork/new">Add artwork</Link></Button>
       </div>
-      <PublishReadinessChecklist title="Artist publish readiness" ready={readiness.ready} blocking={readiness.blocking} warnings={readiness.warnings} />
+      <ReadinessChecklist title="Artist publish readiness" items={readinessItems} />
       <ArtistStripePanel stripeAccount={stripeAccount} />
       <ArtistPublishPanel
         artistSlug={artist.slug}

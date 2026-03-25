@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+
 type ErrorCardProps = {
   title?: string;
   message: string;
@@ -10,13 +12,9 @@ export function ErrorCard({ title = "Something went wrong", message, onRetry }: 
       <p className="font-medium">{title}</p>
       <p className="mt-1 text-sm opacity-90">{message}</p>
       {onRetry ? (
-        <button
-          type="button"
-          className="mt-3 rounded-md border border-destructive/40 bg-background px-3 py-1 text-sm text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={onRetry}
-        >
+        <Button variant="outline" size="sm" onClick={onRetry}>
           Retry
-        </button>
+        </Button>
       ) : null}
     </div>
   );

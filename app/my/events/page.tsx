@@ -10,6 +10,7 @@ import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filt
 import { VenueFilterSelect } from "@/app/my/events/_components/VenueFilterSelect";
 import { EventRowActions } from "@/app/my/events/_components/EventRowActions";
 import { getPublisherStatusLabel, type UnifiedPublishStatus } from "@/lib/publish-intent";
+import { publisherStatusVariant } from "@/lib/publisher-status-variant";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 function formatDate(value: Date): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value);
-}
-
-function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
-  if (status === "Published" || status === "Live") return "default";
-  if (status === "Rejected") return "destructive";
-  if (status === "Submitted" || status === "Under review") return "secondary";
-  return "outline";
 }
 
 function buildEventStatusWhere(status: string | undefined, showArchived: boolean): object {
@@ -137,7 +131,7 @@ export default async function MyEventsPage({ searchParams }: { searchParams: Eve
             (event.deletedAt ? "ARCHIVED" : event.isPublished ? "PUBLISHED" : (submitted ?? "DRAFT")) as UnifiedPublishStatus
           );
 
-          return <tr className="border-b" key={event.id}><td className="p-2"><p className="font-medium">{event.title}</p><p className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"} · {formatDate(event.startAt)}</p></td><td className="p-2"><Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge></td><td className="p-2 text-right"><EventRowActions eventId={event.id} slug={event.slug} isPublished={event.isPublished} isArchived={!!event.deletedAt} submissionStatus={event.submissions[0]?.status ?? null} /></td></tr>;
+          return <tr className="border-b" key={event.id}><td className="p-2"><p className="font-medium">{event.title}</p><p className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"} · {formatDate(event.startAt)}</p></td><td className="p-2"><Badge variant={publisherStatusVariant(statusLabel)}>{statusLabel}</Badge></td><td className="p-2 text-right"><EventRowActions eventId={event.id} slug={event.slug} isPublished={event.isPublished} isArchived={!!event.deletedAt} submissionStatus={event.submissions[0]?.status ?? null} /></td></tr>;
         })}
       </tbody></table>
     </main>

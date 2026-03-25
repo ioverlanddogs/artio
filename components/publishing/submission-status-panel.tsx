@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { getStatusUiLabel, type LifecycleStatus } from "@/lib/submission-lifecycle";
 
 type Action = { label: string; disabled?: boolean; onClick?: () => void; href?: string };
@@ -31,11 +32,13 @@ export function SubmissionStatusPanel(props: {
 
       <div className="flex flex-wrap gap-2">
         {props.primaryAction.href ? (
-          <Link href={props.primaryAction.href} className="rounded border px-3 py-1 text-sm">{props.primaryAction.label}</Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href={props.primaryAction.href}>{props.primaryAction.label}</Link>
+          </Button>
         ) : (
-          <button className="rounded border px-3 py-1 text-sm disabled:opacity-60" onClick={props.primaryAction.onClick} disabled={props.primaryAction.disabled}>{props.primaryAction.label}</button>
+          <Button variant="outline" size="sm" onClick={props.primaryAction.onClick} disabled={props.primaryAction.disabled}>{props.primaryAction.label}</Button>
         )}
-        {props.secondaryAction ? <button className="rounded border px-3 py-1 text-sm disabled:opacity-60" onClick={props.secondaryAction.onClick} disabled={props.secondaryAction.disabled}>{props.secondaryAction.label}</button> : null}
+        {props.secondaryAction ? <Button variant="outline" size="sm" onClick={props.secondaryAction.onClick} disabled={props.secondaryAction.disabled}>{props.secondaryAction.label}</Button> : null}
       </div>
     </section>
   );
