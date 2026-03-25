@@ -35,11 +35,14 @@ jobs:
         id: vercel_secrets
         shell: bash
         run: |
-          ok=true
-          [ -n "${{ secrets.VERCEL_TOKEN }}" ] || ok=false
-          [ -n "${{ secrets.VERCEL_ORG_ID }}" ] || ok=false
-          [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ] || ok=false
-          echo "has_vercel_secrets=$ok" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && \
+             [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && \
+             [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "has_vercel_secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_vercel_secrets=false" >> "$GITHUB_OUTPUT"
+            echo "Vercel secrets not configured — skipping Vercel steps."
+          fi
 
       - name: Skip when Neon secrets are unavailable
         run: |
@@ -59,13 +62,22 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           PR_GIT_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
+          # Hard guard — exit cleanly if secrets are not configured.
+          if [ -z "$VERCEL_TOKEN" ] || \
+             [ -z "$VERCEL_ORG_ID" ] || \
+             [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel secrets not set — skipping env var cleanup."
+            exit 0
+          fi
+
           VERCEL_ENV_LIST_URL="https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?gitBranch=$PR_GIT_BRANCH&teamId=$VERCEL_ORG_ID"
 
           for ENV_KEY in DATABASE_URL DIRECT_URL; do
-            ENV_ID=$(curl -sf \
+            VERCEL_ENV_RESPONSE=$(curl -sf \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "$VERCEL_ENV_LIST_URL" \
-              | jq -r --arg key "$ENV_KEY" '.envs[] | select(.key == $key and .gitBranch == env.PR_GIT_BRANCH) | .id' || true)
+              "$VERCEL_ENV_LIST_URL" 2>/dev/null || echo "{}")
+            ENV_ID=$(echo "$VERCEL_ENV_RESPONSE" \
+              | jq -r --arg key "$ENV_KEY" '.envs[] | select(.key == $key and .gitBranch == env.PR_GIT_BRANCH) | .id' 2>/dev/null || echo "")
 
             if [ -n "$ENV_ID" ]; then
               curl -sf -X DELETE \
