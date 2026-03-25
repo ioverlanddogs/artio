@@ -25,7 +25,9 @@ export function MySubNav() {
   const suffix = venueId ? `?venueId=${encodeURIComponent(venueId)}` : "";
 
   const renderTab = ([label, href]: readonly [string, string], tone: "primary" | "secondary") => {
-    const active = pathname === href;
+    const active = href === "/my"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
     const inactiveClass = tone === "secondary" ? "bg-muted/60 text-muted-foreground" : "bg-muted";
 
     return (

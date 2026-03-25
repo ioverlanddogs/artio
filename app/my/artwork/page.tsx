@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
@@ -13,6 +14,13 @@ import { DEFAULT_CURRENCY, formatPrice } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 type ArtworkSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
+
+function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
+  if (status === "Published" || status === "Live") return "default";
+  if (status === "Rejected") return "destructive";
+  if (status === "Submitted" || status === "Under review") return "secondary";
+  return "outline";
+}
 
 export default async function MyArtworkPage({ searchParams }: { searchParams: ArtworkSearchParams }) {
   const user = await getSessionUser();
@@ -92,21 +100,19 @@ export default async function MyArtworkPage({ searchParams }: { searchParams: Ar
               );
             })()}
             <h3 className="font-medium">{item.title}</h3>
-            <p className={`text-xs font-medium ${
-              item.deletedAt ? "text-muted-foreground"
-              : item.isPublished ? "text-emerald-700"
-              : item.status === "IN_REVIEW" ? "text-amber-700"
-              : item.status === "REJECTED" ? "text-destructive"
-              : item.status === "CHANGES_REQUESTED" ? "text-orange-600"
-              : "text-muted-foreground"
-            }`}>
-              {item.deletedAt ? "Archived"
-              : item.isPublished ? "Published"
-              : item.status === "IN_REVIEW" ? "In review"
-              : item.status === "REJECTED" ? "Rejected"
-              : item.status === "CHANGES_REQUESTED" ? "Changes requested"
-              : "Draft"}
-            </p>
+            {(() => {
+              const label = item.deletedAt ? "Archived"
+                : item.isPublished ? "Published"
+                : item.status === "IN_REVIEW" ? "In review"
+                : item.status === "REJECTED" ? "Rejected"
+                : item.status === "CHANGES_REQUESTED" ? "Changes requested"
+                : "Draft";
+              return (
+                <Badge variant={statusVariant(label)} className="text-xs">
+                  {label}
+                </Badge>
+              );
+            })()}
             {item.priceAmount != null && (
               <p className="text-xs text-muted-foreground">{formatPrice(item.priceAmount, item.currency ?? DEFAULT_CURRENCY)}</p>
             )}

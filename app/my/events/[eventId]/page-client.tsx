@@ -72,7 +72,11 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
   const [eventType, setEventType] = useState<EventTypeOption>(event.eventType ?? "OTHER");
   const [ticketingMode, setTicketingMode] = useState<"EXTERNAL" | "RSVP" | "PAID">(event.ticketingMode === "RSVP" ? "RSVP" : event.ticketingMode === "PAID" ? "PAID" : "EXTERNAL");
   const [capacity, setCapacity] = useState(event.capacity != null ? String(event.capacity) : "");
-  const [rsvpClosesAt, setRsvpClosesAt] = useState(event.rsvpClosesAt ? toUtcDatetimeLocal(event.rsvpClosesAt) : "");
+  const [rsvpClosesAt, setRsvpClosesAt] = useState(
+    event.rsvpClosesAt
+      ? toLocalDatetimeInput(event.rsvpClosesAt, event.venueTimezone)
+      : ""
+  );
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [tierName, setTierName] = useState("");
   const [tierCapacity, setTierCapacity] = useState("");
@@ -171,7 +175,11 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
         eventType,
         ticketingMode,
         capacity: ticketingMode === "RSVP" ? (capacity.trim() ? Number(capacity) : null) : null,
-        rsvpClosesAt: ticketingMode === "RSVP" ? (rsvpClosesAt ? new Date(`${rsvpClosesAt}:00Z`).toISOString() : null) : null,
+        rsvpClosesAt: ticketingMode === "RSVP"
+          ? (rsvpClosesAt
+              ? localInputToUtcIso(rsvpClosesAt, event.venueTimezone)
+              : null)
+          : null,
       }),
     });
 
@@ -269,7 +277,7 @@ export function EventEditorForm({ event, venues }: EventEditorProps) {
             {ticketingMode === "RSVP" ? (
               <>
                 <label className="block text-sm">Capacity (blank = unlimited)<input className="mt-1 w-full rounded border p-2" type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} /></label>
-                <label className="block text-sm">RSVP close at (UTC)<input className="mt-1 w-full rounded border p-2" type="datetime-local" value={rsvpClosesAt} onChange={(e) => setRsvpClosesAt(e.target.value)} /></label>
+                <label className="block text-sm">RSVP closes at ({event.venueTimezone})<input className="mt-1 w-full rounded border p-2" type="datetime-local" value={rsvpClosesAt} onChange={(e) => setRsvpClosesAt(e.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Stored as: {rsvpClosesAt ? localInputToUtcIso(rsvpClosesAt, event.venueTimezone) : "—"} UTC</p></label>
               </>
             ) : (
               <div className="rounded border bg-muted/30 p-3 text-sm">

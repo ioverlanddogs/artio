@@ -3,15 +3,12 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { resolveVenueFilterLabel } from "@/app/my/_components/resolve-venue-filter-label";
-import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
-import MyEventSubmitButton from "@/app/my/_components/MyEventSubmitButton";
-import MyEventCreateRevisionButton from "@/app/my/_components/MyEventCreateRevisionButton";
-import MyEventDuplicateButton from "@/app/my/_components/MyEventDuplicateButton";
 import { VenueFilterSelect } from "@/app/my/events/_components/VenueFilterSelect";
+import { EventRowActions } from "@/app/my/events/_components/EventRowActions";
 import { getPublisherStatusLabel, type UnifiedPublishStatus } from "@/lib/publish-intent";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +19,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 function formatDate(value: Date): string {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(value);
+}
+
+function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
+  if (status === "Published" || status === "Live") return "default";
+  if (status === "Rejected") return "destructive";
+  if (status === "Submitted" || status === "Under review") return "secondary";
+  return "outline";
 }
 
 function buildEventStatusWhere(status: string | undefined, showArchived: boolean): object {
@@ -115,16 +119,11 @@ export default async function MyEventsPage({ searchParams }: { searchParams: Eve
       <table className="w-full text-sm"><thead><tr className="border-b"><th className="p-2 text-left">Event</th><th className="p-2">Status</th><th className="p-2 text-right">Actions</th></tr></thead><tbody>
         {rows.map((event) => {
           const submitted = event.submissions[0]?.status;
-          return <tr className="border-b" key={event.id}><td className="p-2"><p className="font-medium">{event.title}</p><p className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"} · {formatDate(event.startAt)}</p></td><td className="p-2">{getPublisherStatusLabel(
-  (event.deletedAt ? "ARCHIVED" : event.isPublished ? "PUBLISHED" : (submitted ?? "DRAFT")) as UnifiedPublishStatus
-)}</td><td className="p-2 text-right"><div className="inline-flex items-center gap-1"><Button asChild size="sm"><Link href={`/my/events/${event.id}`}>Edit</Link></Button><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" size="icon" variant="ghost" aria-label="More actions">⋯</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><>
-  {event.isPublished && event.slug ? <DropdownMenuItem asChild><Link href={`/events/${event.slug}`}>View public page</Link></DropdownMenuItem> : null}
-  <div className="px-2 py-1"><MyEventDuplicateButton eventId={event.id} /></div>
-  <div className="px-2 py-1"><MyEventSubmitButton eventId={event.id} initialLabel="Submit / Resubmit" /></div>
-  {event.isPublished ? <div className="px-2 py-1"><MyEventCreateRevisionButton eventId={event.id} /></div> : null}
-  <DropdownMenuSeparator />
-  <div className="px-2 py-1"><MyArchiveActionButton entityLabel="event" endpointBase={`/api/my/events/${event.id}`} archived={!!event.deletedAt} /></div>
-</></DropdownMenuContent></DropdownMenu></div></td></tr>;
+          const statusLabel = getPublisherStatusLabel(
+            (event.deletedAt ? "ARCHIVED" : event.isPublished ? "PUBLISHED" : (submitted ?? "DRAFT")) as UnifiedPublishStatus
+          );
+
+          return <tr className="border-b" key={event.id}><td className="p-2"><p className="font-medium">{event.title}</p><p className="text-xs text-muted-foreground">{event.venue?.name ?? "No venue"} · {formatDate(event.startAt)}</p></td><td className="p-2"><Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge></td><td className="p-2 text-right"><EventRowActions eventId={event.id} slug={event.slug} isPublished={event.isPublished} isArchived={!!event.deletedAt} submissionStatus={event.submissions[0]?.status ?? null} /></td></tr>;
         })}
       </tbody></table>
     </main>
