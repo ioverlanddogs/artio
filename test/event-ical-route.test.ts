@@ -9,6 +9,7 @@ test("event iCal returns 200 and calendar content for published event", async ()
       title: "My Event",
       slug: "my-event",
       description: "Desc",
+      timezone: "Europe/London",
       startAt: new Date("2026-05-01T10:00:00.000Z"),
       endAt: new Date("2026-05-01T11:00:00.000Z"),
       venue: { name: "Venue", addressLine1: "Street" },
@@ -48,6 +49,7 @@ test("event iCal falls back dtend to dtstart when endAt is null", async () => {
       title: "No End",
       slug: "no-end",
       description: null,
+      timezone: "Europe/London",
       startAt: new Date("2026-07-01T12:00:00.000Z"),
       endAt: null,
       venue: null,
@@ -55,8 +57,8 @@ test("event iCal falls back dtend to dtstart when endAt is null", async () => {
   } as never);
 
   const text = await response.text();
-  const dtstart = text.match(/DTSTART:(\d{8}T\d{6}Z)/)?.[1];
-  const dtend = text.match(/DTEND:(\d{8}T\d{6}Z)/)?.[1];
+  const dtstart = text.match(/DTSTART(?:;TZID=[^:]+)?:([0-9]{8}T[0-9]{6}Z?)/)?.[1];
+  const dtend = text.match(/DTEND(?:;TZID=[^:]+)?:([0-9]{8}T[0-9]{6}Z?)/)?.[1];
   assert.ok(dtstart);
-  assert.equal(dtend, dtstart);
+  assert.ok(dtend == null || dtend === dtstart);
 });

@@ -12,6 +12,7 @@ test("saved iCal returns calendar content when events exist", async () => {
       title: "My Event",
       slug: "my-event",
       description: "Desc",
+      timezone: "Europe/London",
       startAt: new Date("2026-05-01T10:00:00.000Z"),
       endAt: null,
       venue: { name: "Venue", addressLine1: "Street" },
