@@ -26,8 +26,31 @@ export function deserializeFilters(value: string | null): SearchFilters {
   }
 }
 
+const FILTER_LABELS: Record<string, string> = {
+  query: "Search",
+  from: "From",
+  to: "To",
+  days: "Days",
+  tags: "Tags",
+  venue: "Venue",
+  artist: "Artist",
+  lat: "Lat",
+  lng: "Lng",
+  radiusKm: "Radius (km)",
+  limit: "Limit",
+};
+
 export function buildActiveFilterChips(filters: SearchFilters) {
   return Object.entries(filters)
     .filter(([, value]) => typeof value === "string" && value.trim() !== "")
-    .map(([key, value]) => ({ key, label: `${key}: ${value}` }));
+    .map(([key, value]) => {
+      let label = value as string;
+      if ((key === "from" || key === "to") && label) {
+        const date = new Date(label);
+        if (!Number.isNaN(date.getTime())) {
+          label = date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        }
+      }
+      return { key, label: `${FILTER_LABELS[key] ?? key}: ${label}` };
+    });
 }

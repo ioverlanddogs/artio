@@ -6,6 +6,7 @@ import { toApiImageField } from "@/lib/assets/image-contract";
 import { distanceKm, getBoundingBox, isWithinRadiusKm } from "@/lib/geo";
 import { nearbyVenuesQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
 import { publishedVenueWhere } from "@/lib/publish-status";
+import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,35 @@ type NearbyVenueRow = {
 export async function GET(req: NextRequest) {
   const parsed = nearbyVenuesQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
   if (!parsed.success) return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
-  const { lat, lng, radiusKm, limit, cursor, q } = parsed.data;
+  const { lat, lng, radiusKm, limit, cursor, q, tags, from, to, days } = parsed.data;
+  try {
+    await enforceRateLimit({
+      key: principalRateLimitKey(req, "venues:nearby"),
+      limit: RATE_LIMITS.expensiveReads.limit,
+      windowMs: RATE_LIMITS.expensiveReads.windowMs,
+    });
+  } catch (error) {
+    if (isRateLimitError(error)) return rateLimitErrorResponse(error);
+    throw error;
+  }
+
+  const now = new Date();
+  const windowStart = from ? new Date(from) : now;
+  const windowEnd = to ? new Date(to) : (days ? new Date(now.getTime() + days * 24 * 60 * 60 * 1000) : undefined);
+  const eventWindowFilter = (tags.length || from || to || days)
+    ? {
+      events: {
+        some: {
+          isPublished: true,
+          startAt: {
+            gte: windowStart,
+            ...(windowEnd ? { lte: windowEnd } : {}),
+          },
+          ...(tags.length ? { eventTags: { some: { tag: { slug: { in: tags } } } } } : {}),
+        },
+      },
+    }
+    : {};
   const box = getBoundingBox(lat, lng, radiusKm);
 
   const batch = (await db.venue.findMany({
@@ -33,6 +62,7 @@ export async function GET(req: NextRequest) {
       lng: { gte: box.minLng, lte: box.maxLng },
       ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       ...(cursor ? { id: { gt: cursor } } : {}),
+      ...eventWindowFilter,
     },
     orderBy: { id: "asc" },
     take: limit + 1,
@@ -41,10 +71,15 @@ export async function GET(req: NextRequest) {
     },
   })) as NearbyVenueRow[];
 
-  const filtered = batch.filter((venue) => venue.lat != null && venue.lng != null && isWithinRadiusKm(lat, lng, venue.lat, venue.lng, radiusKm));
+  const filtered = batch.filter(
+    (venue) =>
+      venue.lat != null &&
+      venue.lng != null &&
+      isWithinRadiusKm(lat, lng, venue.lat, venue.lng, radiusKm),
+  );
   const pageItems = filtered.slice(0, limit);
-  const hasMore = batch.length > limit;
-  const nextCursor = hasMore ? batch[limit - 1]?.id ?? null : null;
+  const hasMore = filtered.length > limit;
+  const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
 
   const response = NextResponse.json({
     items: pageItems.map((venue) => {

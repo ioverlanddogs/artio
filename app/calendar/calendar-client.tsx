@@ -269,7 +269,16 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
       </div>
 
       {error ? <ErrorCard message={error} onRetry={() => void fetchEvents()} /> : null}
-      {isTruncated ? <InlineBanner>Showing first 1,000 events — narrow your date range to see all results.</InlineBanner> : null}
+      {isTruncated ? (
+        <InlineBanner>
+          Showing the first 1,000 events.{" "}
+          {scope === "all"
+            ? "Narrow the date range or add a tag filter to see all results."
+            : scope === "following"
+              ? "You follow a lot of active venues/artists — try filtering by tag or date."
+              : "You have many saved events — filter by date or tag to narrow the view."}
+        </InlineBanner>
+      ) : null}
       {viewMode === "agenda" ? (
         events.length === 0 ? (
           scope === "saved" ? (

@@ -465,6 +465,10 @@ export const nearbyVenuesQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180),
   radiusKm: z.coerce.number().int().min(1).max(200),
   q: z.string().trim().min(1).max(100).optional(),
+  tags: z.string().optional().transform((v) => (v ?? "").split(",").map((t) => t.trim()).filter(Boolean).slice(0, 10)),
+  from: fromQueryDateSchema.optional(),
+  to: toQueryDateSchema.optional(),
+  days: z.enum(["7", "30", "90"]).optional().transform((v) => (v ? Number(v) as 7 | 30 | 90 : undefined)),
   cursor: z.string().max(512).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(24),
 });

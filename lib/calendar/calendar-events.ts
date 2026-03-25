@@ -91,7 +91,7 @@ export async function handleCalendarEventsGet(req: Request, deps: CalendarEventD
     return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
   }
 
-  const { scope, from, to, tags } = parsed.data;
+  const { scope, from, to, tags, q } = parsed.data;
   const fromDate = new Date(from);
   const toDate = new Date(to);
   const baseWhere: Prisma.EventWhereInput = { isPublished: true, ...rangePredicate(fromDate, toDate) };
@@ -99,8 +99,15 @@ export async function handleCalendarEventsGet(req: Request, deps: CalendarEventD
   if (tags) {
     const tagList = tags.split(",").map((tag) => tag.trim()).filter(Boolean);
     if (tagList.length > 0) {
-      baseWhere.eventTags = { some: { tag: { name: { in: tagList } } } };
+      baseWhere.eventTags = { some: { tag: { slug: { in: tagList } } } };
     }
+  }
+
+  if (q) {
+    baseWhere.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+    ];
   }
 
   if (scope === "all") {
@@ -129,7 +136,7 @@ export async function handleCalendarEventsGet(req: Request, deps: CalendarEventD
   if (followedArtistIds.length) orFilters.push({ eventArtists: { some: { artistId: { in: followedArtistIds } } } });
 
   const items = await deps.findEvents({
-    where: { ...baseWhere, OR: orFilters },
+    where: { AND: [baseWhere, { OR: orFilters }] },
     orderBy: [{ startAt: "asc" }, { id: "asc" }],
     take: 1000,
     select: eventSelect,
