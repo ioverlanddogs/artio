@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { SearchResultsList } from "@/app/search/search-results-list";
 import { SearchClient } from "@/app/search/search-client";
 import { PageHeader } from "@/components/ui/page-header";
+import { getBoundingBox } from "@/lib/geo";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   }
 
   const tagList = (filters.tags || "").split(",").map((t) => t.trim()).filter(Boolean);
+  const box = filters.lat != null && filters.lng != null && filters.radiusKm != null
+    ? getBoundingBox(filters.lat, filters.lng, filters.radiusKm)
+    : null;
   const items = await db.event.findMany({
     where: {
       isPublished: true,
@@ -34,11 +38,33 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       ...(filters.venue ? { venue: { slug: filters.venue } } : {}),
       ...(filters.artist ? { eventArtists: { some: { artist: { slug: filters.artist, isPublished: true } } } } : {}),
       ...(tagList.length ? { eventTags: { some: { tag: { slug: { in: tagList } } } } } : {}),
+      ...(box
+        ? {
+          AND: [
+            {
+              OR: [
+                {
+                  lat: { gte: box.minLat, lte: box.maxLat },
+                  lng: { gte: box.minLng, lte: box.maxLng },
+                },
+                {
+                  venue: {
+                    lat: { gte: box.minLat, lte: box.maxLat },
+                    lng: { gte: box.minLng, lte: box.maxLng },
+                  },
+                },
+              ],
+            },
+          ],
+        }
+        : {}),
+      ...(filters.cursor ? { id: { gt: filters.cursor } } : {}),
     },
     take: filters.limit,
-    orderBy: { startAt: "asc" },
+    orderBy: [{ startAt: "asc" }, { id: "asc" }],
     include: { venue: { select: { name: true, slug: true } } },
   });
+  const nextCursor = items.length === filters.limit ? items[items.length - 1]?.id : undefined;
 
   return (
     <main className="space-y-4 p-6">
@@ -46,6 +72,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <SearchClient filters={Object.fromEntries(Object.entries(filters).map(([k, v]) => [k, v == null ? "" : String(v)]))} />
       {user ? <SaveSearchCta /> : null}
       <form className="grid gap-2 md:grid-cols-2">
+        <input type="hidden" name="cursor" value={filters.cursor ?? ""} />
         {[
           ["query", "Query"], ["from", "From (ISO)"], ["to", "To (ISO)"], ["days", "Days"], ["lat", "Latitude"], ["lng", "Longitude"], ["radiusKm", "Radius (km)"], ["tags", "Tags (comma slugs)"], ["venue", "Venue slug"], ["artist", "Artist slug"], ["limit", "Limit"],
         ].map(([name, label]) => (
@@ -56,7 +83,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         ))}
         <button className="w-fit rounded border px-3 py-2">Apply</button>
       </form>
-      <SearchResultsList items={items.map((item) => ({ id: item.id, slug: item.slug, title: item.title, startAt: item.startAt.toISOString(), endAt: item.endAt?.toISOString(), venueName: item.venue?.name, venueSlug: item.venue?.slug }))} query={filters.query} />
+      <SearchResultsList
+        items={items.map((item) => ({ id: item.id, slug: item.slug, title: item.title, startAt: item.startAt.toISOString(), endAt: item.endAt?.toISOString(), venueName: item.venue?.name, venueSlug: item.venue?.slug }))}
+        query={filters.query}
+        nextCursor={nextCursor}
+      />
     </main>
   );
 }

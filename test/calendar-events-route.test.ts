@@ -91,7 +91,7 @@ test("GET /api/calendar-events scope=following requires auth and filters by foll
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(capturedArgs.orderBy, [{ startAt: "asc" }, { id: "asc" }]);
-  assert.deepEqual(capturedArgs.where.OR, [{ venueId: { in: ["venue-1"] } }]);
+  assert.deepEqual(capturedArgs.where.AND?.[1], { OR: [{ venueId: { in: ["venue-1"] } }] });
   assert.deepEqual(body.items.map((item: { id: string }) => item.id), ["a"]);
 });
 
@@ -108,7 +108,25 @@ test("GET /api/calendar-events applies tags filter when tags param is present", 
     },
   } as never);
 
-  assert.deepEqual(capturedArgs.where.eventTags, { some: { tag: { name: { in: ["music", "nightlife"] } } } });
+  assert.deepEqual(capturedArgs.where.eventTags, { some: { tag: { slug: { in: ["music", "nightlife"] } } } });
+});
+
+test("GET /api/calendar-events applies q filter when q param is present", async () => {
+  let capturedArgs: any;
+  await handleCalendarEventsGet(new NextRequest("http://localhost/api/calendar-events?scope=all&from=2026-04-01&to=2026-04-30&q=ceramics"), {
+    getUser: async () => ({ id: "user-1" }),
+    findFavorites: async () => [],
+    findFollows: async () => [],
+    findEvents: async (args) => {
+      capturedArgs = args;
+      return [];
+    },
+  } as never);
+
+  assert.deepEqual(capturedArgs.where.OR, [
+    { title: { contains: "ceramics", mode: "insensitive" } },
+    { description: { contains: "ceramics", mode: "insensitive" } },
+  ]);
 });
 
 test("GET /api/calendar-events omits tags filter when tags param is absent", async () => {
