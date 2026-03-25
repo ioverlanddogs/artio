@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { ActiveFiltersBar, type FilterPill } from "@/app/my/_components/ActiveFiltersBar";
 import { buildClearFiltersHref, buildRemoveFilterHref, getFirstSearchValue, toTitleCase, truncateFilterValue } from "@/app/my/_components/filter-href";
 import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButton";
@@ -12,6 +13,13 @@ import { MyArchiveActionButton } from "@/app/my/_components/MyArchiveActionButto
 export const dynamic = "force-dynamic";
 
 type VenuesSearchParams = Promise<{ q?: string; query?: string; status?: string; sort?: string; venueId?: string; showArchived?: string }>;
+
+function statusVariant(status: string): "default" | "destructive" | "secondary" | "outline" {
+  if (status === "Published" || status === "Live") return "default";
+  if (status === "Rejected") return "destructive";
+  if (status === "Submitted" || status === "Under review") return "secondary";
+  return "outline";
+}
 
 function buildVenueStatusWhere(status: string | undefined): Prisma.VenueWhereInput {
   if (!status) return {};
@@ -107,7 +115,9 @@ export default async function MyVenuesPage({ searchParams }: { searchParams: Ven
             return (
               <tr key={item.id} className="border-b">
                 <td className="p-2">{item.venue.name}</td>
-                <td className="p-2">{statusLabel}</td>
+                <td className="p-2">
+                  <Badge variant={statusVariant(statusLabel)}>{statusLabel}</Badge>
+                </td>
                 <td className="p-2 text-right">
                   <div className="inline-flex items-center gap-1">
                     <Button asChild size="sm">
