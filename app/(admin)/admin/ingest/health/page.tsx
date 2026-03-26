@@ -95,7 +95,7 @@ export default async function AdminIngestHealthPage() {
                     <td className="px-3 py-2">
                       <Link
                         href={`/admin/venues/${row.venueId}`}
-                        className="underline"
+                        className="underline hover:text-foreground"
                       >
                         {row.name}
                       </Link>
@@ -123,7 +123,10 @@ export default async function AdminIngestHealthPage() {
                     <td className="px-3 py-2">
                       {row.qualitySignal === "noise" ? (
                         <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
-                          noise
+                          noise ·{" "}
+                          <a href={`/admin/venues/${row.venueId}#ingest`} className="underline">
+                            adjust
+                          </a>
                         </span>
                       ) : row.qualitySignal === "low" ? (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">

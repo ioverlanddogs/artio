@@ -103,6 +103,7 @@ export default function IngestEventQueueClient({
     failed: number;
   } | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set());
 
   function initDraft(candidate: QueueCandidate) {
     const candidateEndAt =
@@ -127,7 +128,12 @@ export default function IngestEventQueueClient({
     .filter(
       (candidate) =>
         confidenceFilter === "all" || candidate.confidenceBand === confidenceFilter,
-    );
+    )
+    .sort((a, b) => {
+      const aSkipped = skippedIds.has(a.id) ? 1 : 0;
+      const bSkipped = skippedIds.has(b.id) ? 1 : 0;
+      return aSkipped - bSkipped;
+    });
 
   async function importImage(
     candidateId: string,
@@ -290,6 +296,15 @@ export default function IngestEventQueueClient({
         const row = document.querySelector(`[data-candidate-id="${candidate.id}"]`);
         const rejectBtn = row?.querySelector<HTMLButtonElement>("button[data-action='reject']");
         rejectBtn?.click();
+      } else if (e.key === "s" || e.key === "S") {
+        if (focusedIndex === null) return;
+        const candidate = pending[focusedIndex];
+        if (!candidate) return;
+        e.preventDefault();
+        setSkippedIds((prev) => new Set([...prev, candidate.id]));
+        setFocusedIndex((prev) =>
+          prev === null ? null : Math.min(prev, pending.length - 2),
+        );
       }
     }
 
@@ -565,17 +580,22 @@ export default function IngestEventQueueClient({
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <Link
-                      href={`/admin/ingest/runs/${candidate.run.id}`}
-                      className="underline"
-                    >
-                      Run details
-                    </Link>
-                    <div
-                      className="mt-1 max-w-[280px] truncate text-xs text-muted-foreground"
-                      title={candidate.run.sourceUrl}
-                    >
-                      {candidate.run.sourceUrl}
+                    <div className="flex flex-col gap-1">
+                      <Link
+                        href={`/admin/ingest/runs/${candidate.run.id}`}
+                        className="text-xs underline"
+                      >
+                        Run details
+                      </Link>
+                      <a
+                        href={candidate.run.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="max-w-[280px] truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                        title={candidate.run.sourceUrl}
+                      >
+                        ↗ {candidate.run.sourceUrl}
+                      </a>
                     </div>
                   </td>
                   <td className="px-3 py-2">
@@ -598,6 +618,10 @@ export default function IngestEventQueueClient({
                             }
                           : undefined
                       }
+                      onSkip={() => {
+                        setSkippedIds((prev) => new Set([...prev, candidate.id]));
+                        setFocusedIndex(null);
+                      }}
                     />
                   </td>
                 </tr>
@@ -857,7 +881,8 @@ export default function IngestEventQueueClient({
         <kbd className="rounded border px-1 font-mono">J</kbd>{" / "}
         <kbd className="rounded border px-1 font-mono">K</kbd> navigate{" · "}
         <kbd className="rounded border px-1 font-mono">A</kbd> approve{" · "}
-        <kbd className="rounded border px-1 font-mono">R</kbd> reject
+        <kbd className="rounded border px-1 font-mono">R</kbd> reject{" · "}
+        <kbd className="rounded border px-1 font-mono">S</kbd> skip
       </p>
     </section>
   );

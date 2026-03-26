@@ -49,6 +49,7 @@ export default function IngestCandidateActions({
   rejectionReason,
   userRole,
   patch,
+  onSkip,
 }: {
   candidateId: string;
   venueId: string;
@@ -64,6 +65,7 @@ export default function IngestCandidateActions({
     timezone?: string | null;
     locationText?: string | null;
   };
+  onSkip?: () => void;
 }) {
   const router = useRouter();
   const [openRejectModal, setOpenRejectModal] = useState(false);
@@ -293,6 +295,17 @@ export default function IngestCandidateActions({
         <Button data-action="reject" size="sm" variant="outline" onClick={() => setOpenRejectModal(true)} disabled={status !== "PENDING" || loadingAction !== null}>
           {loadingAction === "reject" ? "Rejecting…" : "Reject"}
         </Button>
+        {status === "PENDING" ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onSkip}
+            disabled={loadingAction !== null}
+            title="Move to bottom of queue"
+          >
+            Skip
+          </Button>
+        ) : null}
         {status === "REJECTED" ? (
           <Button size="sm" variant="outline" onClick={restore} disabled={loadingAction !== null}>
             {loadingAction === "restore" ? "Restoring…" : "Restore"}
