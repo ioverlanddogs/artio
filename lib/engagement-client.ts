@@ -53,7 +53,13 @@ export function trackEngagement(payload: EngagementPayload) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
       keepalive: true,
-    }).catch(() => undefined);
+    })
+      .then((res) => {
+        if (!res.ok) {
+          // best-effort analytics — silently discard failures
+        }
+      })
+      .catch(() => undefined);
   } catch {
     // best-effort analytics only
   }
