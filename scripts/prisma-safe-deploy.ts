@@ -28,6 +28,9 @@ const ALWAYS_RESOLVE_AS_ROLLED_BACK = new Set([
   "20260326120000_add_artwork_inquiry_read_at",
   // Old name before timestamp dedup rename
   "20260326120000_add_artist_cv_entries",
+  // Failed on first apply due to pre-existing CvEntryType —
+  // move to ALWAYS so it is resolved unconditionally
+  "20260327120000_add_artist_cv_entries",
 ]);
 
 const RESOLVABLE_FAILED_MIGRATIONS = new Set([
