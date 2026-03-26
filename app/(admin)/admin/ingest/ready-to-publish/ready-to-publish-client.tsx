@@ -62,6 +62,10 @@ export default function ReadyToPublishClient({
   const [publishedArtistName, setPublishedArtistName] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string>>({});
   const [blockingByArtworkId, setBlockingByArtworkId] = useState<Record<string, string[]>>({});
+  const [bulkPublishingArtists, setBulkPublishingArtists] = useState(false);
+  const [bulkArtistProgress, setBulkArtistProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkPublishingArtworks, setBulkPublishingArtworks] = useState(false);
+  const [bulkArtworkProgress, setBulkArtworkProgress] = useState<{ done: number; total: number } | null>(null);
 
   const total = artistRows.length + artworkRows.length;
 
@@ -115,6 +119,52 @@ export default function ReadyToPublishClient({
     }
   }
 
+  async function bulkPublishArtists() {
+    if (bulkPublishingArtists) return;
+    const eligible = artistRows.filter((artist) => !errorById[artist.id]);
+    if (!eligible.length) return;
+    if (!window.confirm(`Publish all ${eligible.length} artist${eligible.length === 1 ? "" : "s"}?`)) return;
+
+    setBulkPublishingArtists(true);
+    setBulkArtistProgress({ done: 0, total: eligible.length });
+
+    const BATCH_SIZE = 3;
+    let done = 0;
+
+    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
+      const batch = eligible.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(batch.map((artist) => publishArtist(artist.id)));
+      done += batch.length;
+      setBulkArtistProgress({ done, total: eligible.length });
+    }
+
+    setBulkPublishingArtists(false);
+    setBulkArtistProgress(null);
+  }
+
+  async function bulkPublishArtworks() {
+    if (bulkPublishingArtworks) return;
+    const eligible = artworkRows.filter((artwork) => !errorById[artwork.id]);
+    if (!eligible.length) return;
+    if (!window.confirm(`Publish all ${eligible.length} artwork${eligible.length === 1 ? "" : "s"}?`)) return;
+
+    setBulkPublishingArtworks(true);
+    setBulkArtworkProgress({ done: 0, total: eligible.length });
+
+    const BATCH_SIZE = 3;
+    let done = 0;
+
+    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
+      const batch = eligible.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(batch.map((artwork) => publishArtwork(artwork.id)));
+      done += batch.length;
+      setBulkArtworkProgress({ done, total: eligible.length });
+    }
+
+    setBulkPublishingArtworks(false);
+    setBulkArtworkProgress(null);
+  }
+
   if (total === 0) {
     return <div className="rounded-lg border bg-background p-10 text-center text-sm text-muted-foreground">Nothing waiting to publish.</div>;
   }
@@ -123,10 +173,28 @@ export default function ReadyToPublishClient({
     <div className="space-y-6">
       <section className="rounded-lg border bg-background">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">Artists</h2>
+          <h2 className="flex items-center text-sm font-semibold">
+            Artists
+            {artistRows.length > 0 ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
+                {artistRows.length}
+              </span>
+            ) : null}
+          </h2>
           <div className="flex items-center gap-3">
             {publishedArtistName ? <span className="text-xs text-emerald-700">Published {publishedArtistName}</span> : null}
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{artistRows.length}</span>
+            {artistRows.length > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkPublishingArtists}
+                onClick={() => void bulkPublishArtists()}
+              >
+                {bulkPublishingArtists
+                  ? `Publishing… ${bulkArtistProgress?.done ?? 0}/${bulkArtistProgress?.total ?? 0}`
+                  : `Publish all (${artistRows.length})`}
+              </Button>
+            ) : null}
           </div>
         </div>
         {artistRows.length === 0 ? (
@@ -178,8 +246,26 @@ export default function ReadyToPublishClient({
 
       <section className="rounded-lg border bg-background">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">Artworks</h2>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{artworkRows.length}</span>
+          <h2 className="flex items-center text-sm font-semibold">
+            Artworks
+            {artworkRows.length > 0 ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
+                {artworkRows.length}
+              </span>
+            ) : null}
+          </h2>
+          {artworkRows.length > 0 ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkPublishingArtworks}
+              onClick={() => void bulkPublishArtworks()}
+            >
+              {bulkPublishingArtworks
+                ? `Publishing… ${bulkArtworkProgress?.done ?? 0}/${bulkArtworkProgress?.total ?? 0}`
+                : `Publish all (${artworkRows.length})`}
+            </Button>
+          ) : null}
         </div>
         {artworkRows.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">No artworks waiting to publish.</p>
