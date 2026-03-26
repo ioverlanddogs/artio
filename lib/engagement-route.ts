@@ -34,6 +34,7 @@ export async function handleEngagementPost(req: NextRequest, deps: EngagementDep
       key: user?.id ? principalRateLimitKey(req, "engagement:write", user.id) : `engagement:write:session:${sessionId}:${principalRateLimitKey(req, "engagement", undefined)}`,
       limit: RATE_LIMITS.engagementWrite.limit,
       windowMs: RATE_LIMITS.engagementWrite.windowMs,
+      fallbackToMemory: true,
     });
 
 
