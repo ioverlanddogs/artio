@@ -49,6 +49,57 @@ function StatCard({
   );
 }
 
+function ConfidenceBar({
+  high,
+  medium,
+  low,
+}: {
+  high: number;
+  medium: number;
+  low: number;
+}) {
+  const total = high + medium + low;
+  if (total === 0) return null;
+
+  const highPct = Math.round((high / total) * 100);
+  const medPct = Math.round((medium / total) * 100);
+  const lowPct = 100 - highPct - medPct;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">Queue confidence ratio</p>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+        {highPct > 0 ? (
+          <div
+            className="bg-emerald-500 transition-all"
+            style={{ width: `${highPct}%` }}
+            title={`HIGH: ${high} (${highPct}%)`}
+          />
+        ) : null}
+        {medPct > 0 ? (
+          <div
+            className="bg-amber-400 transition-all"
+            style={{ width: `${medPct}%` }}
+            title={`MEDIUM: ${medium} (${medPct}%)`}
+          />
+        ) : null}
+        {lowPct > 0 ? (
+          <div
+            className="bg-rose-400 transition-all"
+            style={{ width: `${lowPct}%` }}
+            title={`LOW: ${low} (${lowPct}%)`}
+          />
+        ) : null}
+      </div>
+      <div className="flex gap-3 text-xs text-muted-foreground">
+        {highPct > 0 ? <span className="text-emerald-700">{highPct}% HIGH</span> : null}
+        {medPct > 0 ? <span className="text-amber-700">{medPct}% MEDIUM</span> : null}
+        {lowPct > 0 ? <span className="text-rose-700">{lowPct}% LOW</span> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function IngestShellClient({ stats, pipelineFlags, children }: Props) {
   const pathname = usePathname();
 
@@ -139,6 +190,8 @@ export default function IngestShellClient({ stats, pipelineFlags, children }: Pr
           />
         </Link>
       </section>
+
+      <ConfidenceBar high={stats.high} medium={stats.medium} low={stats.low} />
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground">Pipeline:</span>
