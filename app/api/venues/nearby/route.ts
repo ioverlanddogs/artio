@@ -20,6 +20,12 @@ type NearbyVenueRow = {
   images?: Array<{ url: string | null; asset?: { url: string | null; originalUrl?: string | null; processingStatus?: string | null; processingError?: string | null; variants?: Array<{ variantName: string; url: string | null }> } | null }>;
 };
 
+function isPrismaSchemaMismatch(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? (error as { code?: string }).code : undefined;
+  return code === "P2021" || code === "P2022";
+}
+
 export async function GET(req: NextRequest) {
   const parsed = nearbyVenuesQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
   if (!parsed.success) return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
@@ -54,54 +60,87 @@ export async function GET(req: NextRequest) {
     : {};
   const box = getBoundingBox(lat, lng, radiusKm);
 
-  const batch = (await db.venue.findMany({
-    where: {
-      ...publishedVenueWhere(),
-      deletedAt: null,
-      lat: { gte: box.minLat, lte: box.maxLat },
-      lng: { gte: box.minLng, lte: box.maxLng },
-      ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
-      ...(cursor ? { id: { gt: cursor } } : {}),
-      ...eventWindowFilter,
-    },
-    orderBy: { id: "asc" },
-    take: limit + 1,
-    include: {
-      images: { take: 1, orderBy: { sortOrder: "asc" }, include: { asset: { select: { url: true, originalUrl: true, processingStatus: true, processingError: true, variants: { select: { variantName: true, url: true } } } } } },
-    },
-  })) as NearbyVenueRow[];
+  const commonWhere = {
+    ...publishedVenueWhere(),
+    lat: { gte: box.minLat, lte: box.maxLat },
+    lng: { gte: box.minLng, lte: box.maxLng },
+    ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
+    ...(cursor ? { id: { gt: cursor } } : {}),
+    ...eventWindowFilter,
+  };
 
-  const filtered = batch.filter(
-    (venue) =>
-      venue.lat != null &&
-      venue.lng != null &&
-      isWithinRadiusKm(lat, lng, venue.lat, venue.lng, radiusKm),
-  );
-  const pageItems = filtered.slice(0, limit);
-  const hasMore = filtered.length > limit;
-  const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
-
-  const response = NextResponse.json({
-    items: pageItems.map((venue) => {
-      const imageDisplay = resolveAssetDisplay({
-        asset: venue.images?.[0]?.asset ?? null,
-        requestedVariant: "card",
-        legacyUrl: venue.images?.[0]?.url ?? null,
+  try {
+    let batch: NearbyVenueRow[];
+    try {
+      batch = (await db.venue.findMany({
+        where: {
+          ...commonWhere,
+          deletedAt: null,
+        },
+        orderBy: { id: "asc" },
+        take: limit + 1,
+        include: {
+          images: { take: 1, orderBy: { sortOrder: "asc" }, include: { asset: { select: { url: true, originalUrl: true, processingStatus: true, processingError: true, variants: { select: { variantName: true, url: true } } } } } },
+        },
+      })) as NearbyVenueRow[];
+    } catch (error) {
+      if (!isPrismaSchemaMismatch(error)) throw error;
+      console.error("venues_nearby_schema_mismatch_fallback", {
+        code: "code" in (error as object) ? (error as { code?: string }).code : undefined,
+        message: error instanceof Error ? error.message : String(error),
       });
-      return ({
-      id: venue.id,
-      slug: venue.slug,
-      name: venue.name,
-      city: venue.city,
-      lat: venue.lat,
-      lng: venue.lng,
-      distanceKm: venue.lat != null && venue.lng != null ? Number(distanceKm(lat, lng, venue.lat, venue.lng).toFixed(2)) : null,
-      image: toApiImageField(imageDisplay),
-      primaryImageUrl: imageDisplay.url,
+      batch = (await db.venue.findMany({
+        where: commonWhere,
+        orderBy: { id: "asc" },
+        take: limit + 1,
+        include: {
+          images: { take: 1, orderBy: { sortOrder: "asc" }, include: { asset: { select: { url: true } } } },
+        },
+      })) as NearbyVenueRow[];
+    }
+
+    const filtered = batch.filter(
+      (venue) =>
+        venue.lat != null &&
+        venue.lng != null &&
+        isWithinRadiusKm(lat, lng, venue.lat, venue.lng, radiusKm),
+    );
+    const pageItems = filtered.slice(0, limit);
+    const hasMore = filtered.length > limit;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
+
+    const response = NextResponse.json({
+      items: pageItems.map((venue) => {
+        const imageDisplay = resolveAssetDisplay({
+          asset: venue.images?.[0]?.asset ?? null,
+          requestedVariant: "card",
+          legacyUrl: venue.images?.[0]?.url ?? null,
+        });
+        return ({
+          id: venue.id,
+          slug: venue.slug,
+          name: venue.name,
+          city: venue.city,
+          lat: venue.lat,
+          lng: venue.lng,
+          distanceKm: venue.lat != null && venue.lng != null ? Number(distanceKm(lat, lng, venue.lat, venue.lng).toFixed(2)) : null,
+          image: toApiImageField(imageDisplay),
+          primaryImageUrl: imageDisplay.url,
+        });
+      }),
+      nextCursor,
     });
-    }),
-    nextCursor,
-  });
-  response.headers.set("Cache-Control", "no-store");
-  return response;
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  } catch (error) {
+    console.error("venues_nearby_unexpected_error", {
+      message: error instanceof Error ? error.message : String(error),
+      lat,
+      lng,
+      radiusKm,
+      limit,
+      cursor: cursor ?? null,
+    });
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
 }
