@@ -21,6 +21,11 @@ export const DEFAULT_CRON_JOBS: CronJobCreateInput[] = [
   { name: "geocode_venues", displayName: "Geocode Venues", endpoint: "/api/cron/geocode-venues", schedule: "0 4 * * *", enabled: false },
   { name: "ingest_backfill_artists", displayName: "Backfill Event Artists", endpoint: "/api/cron/ingest/backfill-artists", schedule: "20 4 * * *", enabled: true },
   { name: "ingest_backfill_artworks", displayName: "Backfill Event Artworks", endpoint: "/api/cron/ingest/backfill-artworks", schedule: "40 4 * * *", enabled: true },
+  { name: "artwork_score_completeness", displayName: "Artwork: Score Completeness", endpoint: "/api/cron/artworks/score-completeness", schedule: "0 3 * * *", enabled: true },
+  { name: "artwork_normalize_fields", displayName: "Artwork: Normalize Fields", endpoint: "/api/cron/artworks/normalize-fields", schedule: "10 3 * * *", enabled: true },
+  { name: "artwork_recover_images", displayName: "Artwork: Recover Images", endpoint: "/api/cron/artworks/recover-images", schedule: "20 3 * * *", enabled: true },
+  { name: "artwork_enrich_descriptions", displayName: "Artwork: Enrich Descriptions", endpoint: "/api/cron/artworks/enrich-descriptions", schedule: "30 3 * * *", enabled: true },
+  { name: "artwork_autotag", displayName: "Artwork: Auto-tag", endpoint: "/api/cron/artworks/autotag", schedule: "40 3 * * *", enabled: true },
   { name: "health", displayName: "Health Check", endpoint: "/api/cron/health", schedule: "*/15 * * * *", enabled: true },
 ];
 
