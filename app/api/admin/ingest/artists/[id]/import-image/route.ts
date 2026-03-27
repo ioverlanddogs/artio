@@ -55,6 +55,7 @@ export async function POST(
       sourceUrl: candidate.sourceUrl,
       instagramUrl: candidate.instagramUrl,
       requestId: `manual-import-artist-${candidate.id}`,
+      candidateId: candidate.id,
     });
 
     return NextResponse.json({

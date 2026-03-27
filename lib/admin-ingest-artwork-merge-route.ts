@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { importApprovedArtworkImage } from "@/lib/ingest/import-approved-artwork-image";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { resolveApiImageField } from "@/lib/assets/image-contract";
+import { markArtworkApprovalAttempt, markArtworkApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 const bodySchema = z.object({ existingArtworkId: z.string().uuid() });
@@ -80,6 +81,7 @@ export async function handleAdminIngestArtworkMerge(req: NextRequest, params: { 
 
     if (!candidate) return apiError(404, "not_found", "Candidate not found");
     if (candidate.status !== "PENDING") return apiError(409, "invalid_state", "Already processed");
+    await markArtworkApprovalAttempt(resolved.appDb, candidate.id);
     if (!existingArtwork) return apiError(404, "not_found", "Existing artwork not found");
 
     const result = await resolved.appDb.$transaction(async (tx) => {
@@ -90,7 +92,7 @@ export async function handleAdminIngestArtworkMerge(req: NextRequest, params: { 
 
       await tx.ingestExtractedArtwork.update({
         where: { id: candidate.id },
-        data: { status: "APPROVED", createdArtworkId: existingArtwork.id },
+        data: { status: "APPROVED", createdArtworkId: existingArtwork.id, lastApprovalError: null },
       });
 
       await tx.artworkEvent.createMany({
@@ -145,6 +147,9 @@ export async function handleAdminIngestArtworkMerge(req: NextRequest, params: { 
       imageImportWarning: imageImportResult.warning,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (params.id) {
+      await markArtworkApprovalFailure(resolved.appDb, params.id, normalizeApprovalError(error, "approval_failed"));
+    }
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");

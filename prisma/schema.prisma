@@ -1088,6 +1088,10 @@ model IngestExtractedArtist {
   confidenceScore    Int                          @default(0)
   confidenceBand     String                       @default("LOW")
   confidenceReasons  Json?
+  lastApprovalAttemptAt DateTime?                 @db.Timestamptz
+  lastApprovalError  String?
+  imageImportStatus  String?
+  imageImportWarning String?
   createdArtistId    String?                      @db.Uuid
   extractionProvider String
   createdAt          DateTime                     @default(now()) @db.Timestamptz
@@ -1139,6 +1143,10 @@ model IngestExtractedArtwork {
   confidenceScore    Int                 @default(0)
   confidenceBand     String              @default("LOW")
   confidenceReasons  Json?
+  lastApprovalAttemptAt DateTime?        @db.Timestamptz
+  lastApprovalError  String?
+  imageImportStatus  String?
+  imageImportWarning String?
   createdArtworkId   String?             @unique @db.Uuid
   extractionProvider String
   createdAt          DateTime            @default(now()) @db.Timestamptz

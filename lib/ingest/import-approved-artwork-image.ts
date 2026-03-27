@@ -3,6 +3,7 @@ import { discoverEventImageUrl } from "@/lib/ingest/image-discovery";
 import { fetchImageWithGuards } from "@/lib/ingest/fetch-image";
 import { uploadArtworkImageToBlob } from "@/lib/blob/upload-image";
 import { logWarn } from "@/lib/logging";
+import { markArtworkImageImportOutcome, normalizeImageImportWarning } from "@/lib/ingest/candidate-observability";
 
 type ImportResult = { attached: boolean; warning: string | null; imageUrl: string | null };
 
@@ -45,6 +46,12 @@ export async function importApprovedArtworkImage(params: {
         select: { id: true; url: true };
       }) => Promise<{ id: string; url: string }>;
     };
+    ingestExtractedArtwork?: {
+      updateMany: (args: {
+        where: { id: string };
+        data: { imageImportStatus: "not_attempted" | "imported" | "failed" | "no_image_found"; imageImportWarning: string | null };
+      }) => Promise<unknown>;
+    };
   };
   candidateId: string;
   runId: string;
@@ -62,7 +69,18 @@ export async function importApprovedArtworkImage(params: {
   uploadArtworkImageToBlob,
   fetchHtmlWithGuards,
 }) : Promise<ImportResult> {
+  const persistOutcome = async (status: "imported" | "failed" | "no_image_found", warning: string | null) => {
+    if (!params.appDb.ingestExtractedArtwork) return;
+    await markArtworkImageImportOutcome(
+      { ingestExtractedArtwork: params.appDb.ingestExtractedArtwork },
+      params.candidateId,
+      status,
+      normalizeImageImportWarning(warning),
+    );
+  };
+
   if (process.env.AI_INGEST_IMAGE_ENABLED !== "1") {
+    await persistOutcome("failed", "image-import disabled: set AI_INGEST_IMAGE_ENABLED=1 to enable");
     return { attached: false, warning: "image-import disabled: set AI_INGEST_IMAGE_ENABLED=1 to enable", imageUrl: null };
   }
 
@@ -72,6 +90,7 @@ export async function importApprovedArtworkImage(params: {
   });
 
   if (artwork?.featuredAssetId || artwork?.featuredAsset?.url) {
+    await persistOutcome("imported", null);
     return { attached: false, warning: null, imageUrl: artwork.featuredAsset?.url ?? null };
   }
 
@@ -92,6 +111,7 @@ export async function importApprovedArtworkImage(params: {
   }
 
   if (!imageUrl) {
+    await persistOutcome("no_image_found", "image-import skipped: no image URL and page discovery found nothing");
     return {
       attached: false,
       warning: "image-import skipped: no image URL and page discovery found nothing",
@@ -100,6 +120,7 @@ export async function importApprovedArtworkImage(params: {
   }
 
   if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
+    await persistOutcome("failed", "image-import skipped: resolved image URL is not absolute");
     return { attached: false, warning: "image-import skipped: resolved image URL is not absolute", imageUrl: null };
   }
 
@@ -143,6 +164,7 @@ export async function importApprovedArtworkImage(params: {
       data: { featuredAssetId: asset.id },
     });
 
+    await persistOutcome("imported", null);
     return { attached: true, warning: null, imageUrl: asset.url };
   } catch (error) {
     const warning = truncateWarning(`image-import failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -153,6 +175,7 @@ export async function importApprovedArtworkImage(params: {
       artworkId: params.artworkId,
       warning,
     });
+    await persistOutcome("failed", warning);
     return { attached: false, warning, imageUrl: null };
   }
 }
