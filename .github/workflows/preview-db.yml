@@ -184,16 +184,6 @@ jobs:
           DIRECT_URL: ${{ steps.normalize-urls.outputs.direct_url }}
         run: pnpm prisma migrate status
 
-      - name: Build app
-        if: ${{ steps.neon_secrets.outputs.has_neon_secrets == 'true' }}
-        timeout-minutes: 12
-        env:
-          DATABASE_URL: ${{ steps.normalize-urls.outputs.database_url }}
-          DIRECT_URL: ${{ steps.normalize-urls.outputs.direct_url }}
-          NEXTAUTH_URL: http://127.0.0.1:3000
-          CRON_SECRET: ci-preview-cron-secret
-        run: pnpm vercel:build
-
       - name: Seed preview DB
         if: ${{ steps.neon_secrets.outputs.has_neon_secrets == 'true' }}
         env:
