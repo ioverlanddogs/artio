@@ -1,68 +1,91 @@
 # Routes — Artpulse
 
-This document defines the user-facing routes (pages) for the Next.js app.
+This document summarizes the implemented Next.js page routes under `app/**/page.tsx`.
 
 ---
 
-## Public Routes
+## 1. Public Discovery Routes
 
-- `/` Home (nearby/upcoming)
-- `/search` Search + filters
-- `/events` Events list
-- `/events/[slug]` Event detail
-- `/venues` Venues list
-- `/venues/[slug]` Venue detail
-- `/artists` Artists list
-- `/artists/[slug]` Artist detail
-- `/calendar` Calendar view
-- `/privacy` Privacy (placeholder)
-- `/terms` Terms (placeholder)
+- `/`
+- `/search`
+- `/nearby`
+- `/for-you`
+- `/following`
+- `/following/manage`
+- `/events`
+- `/events/[slug]`
+- `/venues`
+- `/venues/[slug]`
+- `/artists`
+- `/artists/[slug]`
+- `/calendar`
+- `/tags`
+- `/tags/[category]`
+- `/collections/[slug]`
+- `/artwork`
+- `/artwork/[key]`
 
----
-
-## Auth & Account Routes
+## 2. Auth / Account / Preferences
 
 - `/login`
-- `/account` (saved favourites)
+- `/account`
+- `/preferences`
+- `/notifications`
+- `/saved-searches`
+- `/saved-searches/[id]`
+- `/unsubscribe`
+
+## 3. Access, Claim, Invite, and Utility Flows
+
+- `/checkin/[eventId]`
+- `/invite/[token]`
+- `/claim/[token]`
+- `/digests`
+- `/digests/[id]`
+- `/beta`
+- `/get-started`
+
+## 4. Publisher Self-Serve (`/my`)
+
+- `/my`
+- `/my/venues`, `/my/venues/new`, `/my/venues/[id]`
+- `/my/events`, `/my/events/new`, `/my/events/[eventId]`
+- `/my/artist`, `/my/artist/cv`, `/my/artist/inquiries`
+- `/my/artwork`, `/my/artwork/new`, `/my/artwork/[id]`
+- `/my/analytics`
+- `/my/team`
+- `/my/settings`
+- `/my/collection`
+
+## 5. Admin Routes (`(admin)` group)
+
+- `/admin`
+- `/admin/analytics`
+- `/admin/artists`
+- `/admin/artwork`
+- `/admin/artwork-inquiries`
+- `/admin/artwork-orders`
+- `/admin/beta`
+- `/admin/branding`
+- `/admin/curation`
+- `/admin/email`
+- `/admin/events`
+- `/admin/ingest`
+- `/admin/moderation`
+- `/admin/ops`
+- `/admin/perf`
+- `/admin/review`
+- `/admin/settings`
+- `/admin/submissions`
+- `/admin/tags`
+- `/admin/users`
+- `/admin/venue-claims`
+- `/admin/venues`
+- `/admin/artist-event-associations`
 
 ---
 
-## Admin Routes
+## Notes
 
-All require role `EDITOR` or `ADMIN`.
-
-- `/admin` Dashboard
-- `/admin/events` CRUD
-- `/admin/events/new` Create
-- `/admin/events/[id]` Edit
-- `/admin/venues` CRUD
-- `/admin/venues/new`
-- `/admin/venues/[id]`
-- `/admin/artists` CRUD
-- `/admin/artists/new`
-- `/admin/artists/[id]`
-
----
-
-## Suggested App Router Structure
-
-```
-app/
-  page.tsx
-  search/page.tsx
-  events/page.tsx
-  events/[slug]/page.tsx
-  venues/page.tsx
-  venues/[slug]/page.tsx
-  artists/page.tsx
-  artists/[slug]/page.tsx
-  calendar/page.tsx
-  login/page.tsx
-  account/page.tsx
-  admin/page.tsx
-  admin/events/page.tsx
-  admin/events/new/page.tsx
-  admin/events/[id]/page.tsx
-  admin/venues/...
-  admin/artists/...
-```
+- The app uses route groups (notably `(admin)`) and a large `/my` publisher dashboard surface.
+- This route list is intentionally source-aligned and should be updated whenever `app/**/page.tsx` changes materially.

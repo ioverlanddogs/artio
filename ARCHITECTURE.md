@@ -2,200 +2,108 @@
 
 ## 1. Goals
 
-- Ship an MVP that is **Vercel-native**, reliable, and easy to maintain.
-- Keep a clean separation between **public discovery** features and **admin publishing** tools.
-- Prioritize SEO and fast initial loads for event pages.
+- Keep a Vercel-native, maintainable Next.js platform
+- Serve both public discovery and authenticated publisher/admin workflows
+- Support SEO-focused public pages and operationally safe background processing
 
 ---
 
 ## 2. System Overview
 
-Artpulse is a **single Next.js application** deployed on Vercel.
+Artpulse is a **single Next.js App Router application** with integrated API handlers.
 
-- **Next.js App Router** provides:
-  - Server-rendered pages (SEO)
-  - API route handlers for CRUD/search
-- **Postgres** stores all persistent data
-- **Prisma** is the ORM + migration layer
-- **Auth** (Auth.js / NextAuth) handles sign-in and roles
-
-Optional (Post-MVP): background jobs, moderation queue, richer editorial pipeline.
-
----
-
-## 3. High-Level Components
-
-### 3.1 Web UI (Next.js)
-
-- Public pages: home, search, event detail, venue detail, artist detail, calendar
-- Auth pages: login, account
-- Admin pages: event/venue/artist CRUD, publish workflow
-
-**Rendering strategy**
-
-- Use **Server Components** for initial data fetching where possible.
-- Use **Client Components** for interactive filters, map, and calendar interactions.
-
-### 3.2 API Layer (Next.js Route Handlers)
-
-- Located under `app/api/**/route.ts`
-- Public endpoints for reads/search
-- Authenticated endpoints for favourites
-- Editor/Admin endpoints for CRUD
-
-**Key architectural choices**
-
-- Validate all input with **Zod**
-- Return consistent JSON error format
-- Prefer idempotent updates (`PATCH`) and soft delete where possible
-
-### 3.3 Data Layer
-
-- Prisma Client for DB access
-- Schema versioned via migrations
-- Seed scripts for initial data and admin user
+Core components:
+- **Next.js** for SSR pages + Route Handlers
+- **Postgres + Prisma** for persistence
+- **Auth.js/NextAuth** for sessions + RBAC
+- **Background systems (implemented)**:
+  - cron endpoints (`/api/cron/*`)
+  - ingest and venue generation pipelines
+  - notification/email outbox + digest execution flows
 
 ---
 
-## 4. Data Access Patterns
+## 3. Application Surfaces
 
-### Public reads
+### 3.1 Public Web
 
-- Home and list pages query **published** records only
-- Search endpoints support:
-  - keyword query
-  - date range
-  - location radius (lat/lng)
-  - tags
+Discovery pages (`/`, `/nearby`, `/for-you`, `/following`, `/events`, `/venues`, `/artists`, etc.) with SEO metadata and server-rendered shells.
 
-### Admin writes
+### 3.2 Publisher Web (`/my`)
 
-- CRUD operations gated by role checks
-- Draft/publish workflow via `isPublished` flag
-- Audit fields: `createdAt`, `updatedAt`, optional `publishedAt`
+Self-serve dashboard for venues/artists/events/artwork, team management, analytics, registrations, and settings.
 
----
+### 3.3 Admin Web (`(admin)` route group)
 
-## 5. Authentication & Authorization
+Moderation, ingest, curation, email ops, analytics, tags, branding, and operational tooling.
 
-### Authentication
+### 3.4 API Layer
 
-- Use Auth.js / NextAuth for session management
-- Providers:
-  - Google OAuth (recommended)
-  - Email magic link (optional)
-
-### Authorization
-
-Role-based access control (RBAC):
-
-- `USER` — can save favourites
-- `EDITOR` — can create/edit/publish content
-- `ADMIN` — all editor permissions + user/role management (later)
-
-**Enforcement points**
-
-- API route handlers perform the role check
-- Admin UI routes also guard at the page level
+Route handlers under `app/api/**/route.ts` for public reads, authenticated actions, publisher operations, admin tooling, webhooks, and cron.
 
 ---
 
-## 6. Search, Geo, and Indexing
+## 4. Data & Domain Architecture
 
-### MVP geo approach
-
-- Store `lat` and `lng` on venues (and optionally events)
-- Radius search:
-  - compute bounding box server-side
-  - apply coarse DB filter then refine by distance
-
-### Upgrade path
-
-- Add PostGIS for advanced geo queries
+Major domains:
+- Discovery content (events/venues/artists/tags/assets)
+- Commerce (ticket tiers, registrations, Stripe accounts, artwork orders/offers)
+- Personalization/retention (follows, saved searches, recommendations, digests, notifications)
+- Operations (ingest, enrichment, generation jobs, audit/perf telemetry)
 
 ---
 
-## 7. Performance & Caching
+## 5. AuthN/AuthZ
 
-- Use Next.js caching defaults for public pages where safe
-- Avoid caching personalised content (favourites)
-- Consider Vercel Edge caching for public lists (later)
+- Session-based auth via Auth.js
+- RBAC roles: `USER`, `EDITOR`, `ADMIN`
+- Publisher permissions additionally gated by ownership/membership checks and trusted-publisher logic
 
 ---
 
-## 8. File/Folder Layout (recommended)
+## 6. Mapping, Search, and Geo
 
-```
+- Map rendering: Leaflet + OpenStreetMap tiles
+- Geocoding providers include Mapbox and other configured providers
+- Search/recommendation APIs back discovery and personalized surfaces
+
+---
+
+## 7. Reliability & Observability
+
+- Sentry integration for error monitoring
+- Explicit health/ready endpoints
+- Job/cron tracking tables for operational insight
+
+---
+
+## 8. File/Folder Layout (actual shape)
+
+```text
 app/
-  (public)/
-    page.tsx
-    events/
-    venues/
-    artists/
-    calendar/
-  (auth)/
-    login/
-    account/
-  admin/
-    page.tsx
-    events/
-    venues/
-    artists/
-  api/
-    events/
-    venues/
-    artists/
-    favorites/
-    admin/
-      events/
-      venues/
-      artists/
+  (admin)/admin/**
+  api/**
+  my/**
+  events/**
+  venues/**
+  artists/**
+  artwork/**
+  nearby/**
+  for-you/**
+  following/**
 components/
 lib/
-  db.ts
-  auth.ts
-  geo.ts
-  slug.ts
 prisma/
   schema.prisma
   migrations/
+test/
+tests/e2e/
 ```
 
 ---
 
-## 9. Error Handling Conventions
+## 9. Deployment
 
-API error shape:
-
-```json
-{
-  "error": {
-    "code": "invalid_request",
-    "message": "Human readable message",
-    "details": {"field": "explanation"}
-  }
-}
-```
-
-- Use appropriate HTTP status codes
-- Never leak secrets or stack traces in production
-
----
-
-## 10. Deployment Architecture (Vercel)
-
-- Vercel builds the Next.js app
-- Postgres provisioned via:
-  - Vercel Postgres, or
-  - Neon / Supabase
-- Migrations executed via `prisma migrate deploy`
-
----
-
-## 11. Future Add-ons
-
-- Editorial posts and news
-- Featured events (curation)
-- Importers (Eventbrite, venue calendars)
-- Notifications (email digests)
-- Mobile app (React Native)
+- Hosted on Vercel
+- Prisma migrations deployed via CI/release workflows
+- Runtime integrations include Stripe, Resend, Sentry, and optional Upstash-backed rate limiting
