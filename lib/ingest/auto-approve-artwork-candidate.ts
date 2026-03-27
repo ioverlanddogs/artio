@@ -4,6 +4,7 @@ import { ensureUniqueArtistSlugWithDeps, slugifyArtistName } from "@/lib/artist-
 import { importApprovedArtworkImage } from "@/lib/ingest/import-approved-artwork-image";
 import { evaluateArtworkReadiness } from "@/lib/publish-readiness";
 import { logWarn } from "@/lib/logging";
+import { markArtworkApprovalAttempt, markArtworkApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
 export const autoApproveArtworkCandidateDeps = {
   importApprovedArtworkImage,
@@ -21,6 +22,8 @@ export async function autoApproveArtworkCandidate(args: {
     });
 
     if (!candidate || candidate.status !== "PENDING") return null;
+
+    await markArtworkApprovalAttempt(args.db, candidate.id);
 
     let artistId: string | null = null;
     if (candidate.artistName) {
@@ -87,7 +90,7 @@ export async function autoApproveArtworkCandidate(args: {
 
       await tx.ingestExtractedArtwork.update({
         where: { id: candidate.id },
-        data: { status: "APPROVED", createdArtworkId: createdArtwork.id },
+        data: { status: "APPROVED", createdArtworkId: createdArtwork.id, lastApprovalError: null },
       });
 
       return createdArtwork;
@@ -125,6 +128,7 @@ export async function autoApproveArtworkCandidate(args: {
 
     return { artworkId: newArtwork.id, published: false };
   } catch (error) {
+    await markArtworkApprovalFailure(args.db, args.candidateId, normalizeApprovalError(error, "approval_failed"));
     logWarn({ message: "auto_approve_artwork_failed",
       candidateId: args.candidateId,
       errorMessage: error instanceof Error ? error.message : String(error),

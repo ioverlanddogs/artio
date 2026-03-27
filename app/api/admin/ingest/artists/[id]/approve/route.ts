@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/admin";
 import { parseBody, zodDetails } from "@/lib/validators";
 import { z } from "zod";
 import { importApprovedArtistImage } from "@/lib/ingest/import-approved-artist-image";
+import { markArtistApprovalAttempt, markArtistApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!candidate) return apiError(404, "not_found", "Candidate not found");
     if (candidate.status !== "PENDING") return apiError(409, "invalid_state", "Already processed");
+
+    await markArtistApprovalAttempt(db, candidate.id);
 
     const name = patch.name ?? candidate.name;
     const bio = "bio" in patch ? patch.bio : candidate.bio;
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       await tx.ingestExtractedArtist.update({
         where: { id: candidate.id },
-        data: { status: "APPROVED", createdArtistId: newArtist.id },
+        data: { status: "APPROVED", createdArtistId: newArtist.id, lastApprovalError: null },
       });
 
       return {
@@ -140,6 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       sourceUrl: result.sourceUrl,
       instagramUrl: result.instagramUrl,
       requestId: `admin-approve-artist-${result.candidateId}`,
+      candidateId: result.candidateId,
     }).catch((err) => console.warn("admin_approve_artist_image_import_failed", { candidateId: result.candidateId, err }));
 
     // Retroactive artwork re-link
@@ -182,6 +186,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ artistId: result.artistId, linkedEventCount: result.linkedEventCount, published: result.published }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    const candidateId = (await params).id;
+    await markArtistApprovalFailure(db, candidateId, normalizeApprovalError(error, "approval_failed"));
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");

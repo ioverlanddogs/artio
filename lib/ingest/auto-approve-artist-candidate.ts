@@ -3,6 +3,7 @@ import { slugifyArtistName, ensureUniqueArtistSlugWithDeps } from "@/lib/artist-
 import { resolveArtistCandidate } from "@/lib/ingest/artist-resolution";
 import { importApprovedArtistImage } from "@/lib/ingest/import-approved-artist-image";
 import { logWarn } from "@/lib/logging";
+import { markArtistApprovalAttempt, markArtistApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
 export const autoApproveArtistCandidateDeps = {
   importApprovedArtistImage,
@@ -20,6 +21,8 @@ export async function autoApproveArtistCandidate(args: {
     });
 
     if (!candidate || candidate.status !== "PENDING") return null;
+
+    await markArtistApprovalAttempt(args.db, candidate.id);
 
     const newArtist = await args.db.$transaction(async (tx) => {
       const resolvedArtist = await resolveArtistCandidate({
@@ -78,7 +81,7 @@ export async function autoApproveArtistCandidate(args: {
 
       await tx.ingestExtractedArtist.update({
         where: { id: candidate.id },
-        data: { status: "APPROVED", createdArtistId: artistId },
+        data: { status: "APPROVED", createdArtistId: artistId, lastApprovalError: null },
       });
 
       return { id: artistId, createdNewArtist };
@@ -93,6 +96,7 @@ export async function autoApproveArtistCandidate(args: {
       sourceUrl: candidate.sourceUrl,
       instagramUrl: candidate.instagramUrl,
       requestId: `auto-approve-artist-${candidate.id}`,
+      candidateId: candidate.id,
     }).catch((err) => logWarn({ message: "auto_approve_artist_image_failed", candidateId: candidate.id, err }));
 
     // Retroactive artwork re-link
@@ -151,6 +155,7 @@ export async function autoApproveArtistCandidate(args: {
 
     return { artistId: newArtist.id, published: false };
   } catch (error) {
+    await markArtistApprovalFailure(args.db, args.candidateId, normalizeApprovalError(error, "approval_failed"));
     logWarn({ message: "auto_approve_artist_failed", candidateId: args.candidateId, error });
     return null;
   }

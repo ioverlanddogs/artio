@@ -9,6 +9,7 @@ import { isAuthError } from "@/lib/auth";
 import { parseBody } from "@/lib/validators";
 import { z } from "zod";
 import { resolveApiImageField } from "@/lib/assets/image-contract";
+import { markArtworkApprovalAttempt, markArtworkApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
 type ApproveArtworkDeps = {
   requireAdmin: typeof requireAdmin;
@@ -56,6 +57,8 @@ export async function handleAdminIngestArtworkApprove(
     if (!candidate) return apiError(404, "not_found", "Candidate not found");
     if (candidate.status !== "PENDING") return apiError(409, "invalid_state", `Candidate has already been processed (status: ${candidate.status})`);
 
+    await markArtworkApprovalAttempt(deps.db, candidate.id);
+
     const effectiveTitle = patch.title ?? candidate.title;
     const effectiveArtistName = patch.artistName ?? candidate.artistName;
     const effectiveMedium = "medium" in patch ? patch.medium : candidate.medium;
@@ -73,6 +76,7 @@ export async function handleAdminIngestArtworkApprove(
     }
 
     if (!artistId && !effectiveArtistName) {
+      await markArtworkApprovalFailure(deps.db, candidate.id, "approval_artist_name_missing");
       return apiError(409, "artist_name_missing", "This artwork candidate has no artist name. Provide one using the edit panel before approving.");
     }
 
@@ -95,6 +99,7 @@ export async function handleAdminIngestArtworkApprove(
     }
 
     if (!artistId) {
+      await markArtworkApprovalFailure(deps.db, candidate.id, "approval_artist_resolution_failed");
       return apiError(500, "internal_error", "Unable to resolve artist during approval");
     }
 
@@ -133,7 +138,7 @@ export async function handleAdminIngestArtworkApprove(
 
       await tx.ingestExtractedArtwork.update({
         where: { id: candidate.id },
-        data: { status: "APPROVED", createdArtworkId: newArtwork.id },
+        data: { status: "APPROVED", createdArtworkId: newArtwork.id, lastApprovalError: null },
       });
 
       return { artworkId: newArtwork.id, published: publishImmediately };
@@ -164,6 +169,8 @@ export async function handleAdminIngestArtworkApprove(
       published: result.published,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    const { id } = await params;
+    await markArtworkApprovalFailure(deps.db, id, normalizeApprovalError(error, "approval_failed"));
     if (isAuthError(error)) return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
     return apiError(500, "internal_error", "Unexpected server error");
