@@ -203,3 +203,14 @@ export function computeReadiness(entity: { startAt: Date | null; timezone?: stri
     blockers,
   };
 }
+
+export function computeReadinessScore(
+  blockers: string[],
+  warnings: string[],
+  completenessScore: number,
+): number {
+  const pct = Math.max(0, Math.min(100, completenessScore));
+  if (blockers.length > 0) return Math.min(pct, 39);
+  if (warnings.length > 0) return 40 + Math.round(pct * 0.59);
+  return Math.max(pct, 80);
+}

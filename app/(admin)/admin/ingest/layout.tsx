@@ -12,7 +12,7 @@ export default async function AdminIngestLayout({ children }: { children: React.
     redirect("/admin");
   }
 
-  const [bandCounts, failedLast24h, pendingArtists, pendingArtworks, activeRegions, venueGenRuns7d, pendingVenueImages, pendingOnboarding] = await Promise.all([
+  const [bandCounts, failedLast24h, pendingArtists, pendingArtworks, activeRegions, venueGenRuns7d, pendingVenueImages, pendingOnboarding, pendingVenuesInReview, pendingBlockedEvents] = await Promise.all([
     db.ingestExtractedEvent.groupBy({
       by: ["confidenceBand"],
       where: { status: "PENDING", duplicateOfId: null },
@@ -36,6 +36,20 @@ export default async function AdminIngestLayout({ children }: { children: React.
     db.venue.count({
       where: { status: "ONBOARDING", deletedAt: null },
     }),
+    db.venue.count({
+      where: {
+        status: { in: ["IN_REVIEW", "ONBOARDING"] },
+        deletedAt: null,
+      },
+    }),
+    db.event.count({
+      where: {
+        status: "DRAFT",
+        isAiExtracted: true,
+        deletedAt: null,
+        venue: { isPublished: false },
+      },
+    }),
   ]);
 
   const high = bandCounts.find((band) => band.confidenceBand === "HIGH")?._count.id ?? 0;
@@ -53,7 +67,7 @@ export default async function AdminIngestLayout({ children }: { children: React.
         failedLast24h,
         pendingArtists,
         pendingArtworks,
-        readyToPublish: pendingArtists + pendingArtworks,
+        readyToPublish: pendingArtists + pendingArtworks + pendingVenuesInReview + pendingBlockedEvents,
         activeRegions,
         venueGenRuns7d,
         pendingVenueImages,
