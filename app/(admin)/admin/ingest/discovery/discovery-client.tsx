@@ -50,6 +50,21 @@ function statusClassName(status: string): string {
 export default function DiscoveryClient({ initial }: { initial: DiscoveryListResponse }) {
   const [jobs, setJobs] = useState(initial.jobs);
   const [submitting, setSubmitting] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    provider: string;
+    durationMs: number;
+    resultsCount?: number;
+    results?: Array<{ url: string; title: string }>;
+    errorMessage?: string;
+    suggestion?: string | null;
+    keysConfigured?: {
+      googlePseApiKey: boolean;
+      googlePseCx: boolean;
+      braveSearchApiKey: boolean;
+    };
+  } | null>(null);
   const [entityType, setEntityType] = useState<"VENUE" | "ARTIST" | "EVENT">("VENUE");
   const [queryTemplate, setQueryTemplate] = useState(DEFAULT_TEMPLATES.VENUE);
   const [region, setRegion] = useState("");
@@ -126,6 +141,32 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
       enqueueToast({ title: "Failed to run discovery job", variant: "error" });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const params = new URLSearchParams({
+        provider: searchProvider,
+        query: queryTemplate.trim() || "contemporary art gallery",
+        maxResults: "3",
+      });
+      const res = await fetch(`/api/admin/ingest/search-test?${params}`);
+      const data = await res.json();
+      setTestResult(data);
+    } catch {
+      setTestResult({
+        ok: false,
+        provider: searchProvider,
+        durationMs: 0,
+        errorMessage: "Network error — could not reach the test endpoint",
+        suggestion: null,
+      });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -383,7 +424,10 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
           </label>
           <label className="space-y-1 text-sm">
             <span>Search provider</span>
-            <select className="w-full rounded-md border bg-background px-3 py-2" value={searchProvider} onChange={(e) => setSearchProvider(e.target.value as "google_pse" | "brave")}> 
+            <select className="w-full rounded-md border bg-background px-3 py-2" value={searchProvider} onChange={(e) => {
+                setSearchProvider(e.target.value as "google_pse" | "brave");
+                setTestResult(null);
+              }}> 
               <option value="google_pse">Google PSE</option>
               <option value="brave">Brave Search</option>
             </select>
@@ -400,8 +444,16 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
             <span>Max results</span>
             <input min={1} max={50} type="number" className="w-full rounded-md border bg-background px-3 py-2" value={maxResults} onChange={(e) => setMaxResults(e.target.value)} />
           </label>
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={submitting}>{submitting ? "Running…" : "Run discovery job"}</Button>
+            <button
+              type="button"
+              disabled={testing}
+              onClick={() => void testConnection()}
+              className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {testing ? "Testing…" : "Test connection"}
+            </button>
           </div>
           {entityType === "VENUE" ? (
             <p className="text-xs text-muted-foreground md:col-span-2">
@@ -414,6 +466,55 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
             </p>
           ) : null}
         </form>
+        {testResult !== null ? (
+          <div className={`mt-3 rounded-md border p-3 text-sm ${testResult.ok
+            ? "border-emerald-200 bg-emerald-50"
+            : "border-rose-200 bg-rose-50"
+            }`}>
+            <div className="mb-2 flex items-center gap-2">
+              <span className={`font-medium ${testResult.ok
+                ? "text-emerald-800"
+                : "text-rose-800"
+                }`}>
+                {testResult.ok ? "✓ Connection successful" : "✗ Connection failed"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {testResult.provider} · {testResult.durationMs}ms
+              </span>
+            </div>
+
+            {testResult.ok ? (
+              <div className="space-y-1">
+                <p className="text-xs text-emerald-700">
+                  {testResult.resultsCount} result(s) returned
+                </p>
+                {(testResult.results ?? []).map((r, i) => (
+                  <p key={i} className="truncate text-xs text-muted-foreground">
+                    <span className="font-medium">{r.title || "—"}</span>{" "}
+                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="break-all underline">
+                      {r.url}
+                    </a>
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-xs font-mono text-rose-800">{testResult.errorMessage}</p>
+                {testResult.suggestion ? (
+                  <p className="text-xs text-rose-700">→ {testResult.suggestion}</p>
+                ) : null}
+                {testResult.keysConfigured ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Keys saved:{" "}
+                    PSE key {testResult.keysConfigured.googlePseApiKey ? "✓" : "✗"}{" · "}
+                    CX {testResult.keysConfigured.googlePseCx ? "✓" : "✗"}{" · "}
+                    Brave {testResult.keysConfigured.braveSearchApiKey ? "✓" : "✗"}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-lg border bg-background p-4">
