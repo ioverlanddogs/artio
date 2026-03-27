@@ -26,6 +26,13 @@ const postSchema = z.object({
   statusFilter: z.enum(["ALL", "DRAFT", "ONBOARDING", "IN_REVIEW", "PUBLISHED"]),
   searchProvider: z.enum(["google_pse", "brave", "ai_only"]),
   limit: z.union([z.literal(10), z.literal(25), z.literal(50)]),
+  // NOTE: API defaults dryRun to false so programmatic
+  // callers (scripts, crons, goal discovery) write
+  // immediately without a staging step. The admin UI
+  // overrides this by always sending dryRun: true in
+  // its request body, which enables the staged review
+  // workflow. Any future programmatic caller that wants
+  // the staged review must explicitly pass dryRun: true.
   dryRun: z.boolean().default(false),
 });
 
