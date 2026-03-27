@@ -58,9 +58,54 @@ export async function runRegionDiscovery(args: {
       }
     }
 
-    if (queryFailCount === templates.length) {
+    // Artist discovery — only when flag is enabled
+    if (region.artistDiscoveryEnabled) {
+      const artistTemplates = [
+        `contemporary artists ${region.region} ${region.country}`,
+        `visual artists ${region.region} ${region.country}`,
+        `emerging artists ${region.region} ${region.country}`,
+      ];
+
+      for (const template of artistTemplates) {
+        const job = await args.db.ingestDiscoveryJob.create({
+          data: {
+            entityType: "ARTIST",
+            queryTemplate: template,
+            region: region.region,
+            regionId: args.regionId,
+            searchProvider: args.searchProvider ?? "google_pse",
+            maxResults: args.maxResultsPerQuery ?? 10,
+            status: "PENDING",
+          },
+          select: { id: true },
+        });
+
+        try {
+          await runDiscoveryJob({
+            db: args.db,
+            jobId: job.id,
+            env: args.env,
+          });
+          jobIds.push(job.id);
+        } catch (queryError) {
+          queryFailCount += 1;
+          logWarn({
+            message: "region_artist_discovery_query_failed",
+            regionId: args.regionId,
+            template,
+            jobId: job.id,
+            error: queryError instanceof Error
+              ? queryError.message
+              : String(queryError),
+          });
+        }
+      }
+    }
+
+    const attemptedTemplateCount = templates.length + (region.artistDiscoveryEnabled ? 3 : 0);
+    if (queryFailCount === attemptedTemplateCount) {
       throw new Error(
-        `All ${templates.length} discovery queries failed for region ${args.regionId}`,
+        `All ${attemptedTemplateCount} discovery queries failed for region ${args.regionId}`,
       );
     }
 
