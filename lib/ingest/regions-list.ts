@@ -10,6 +10,7 @@ export type RegionsListPayload = {
     status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "PAUSED";
     venueGenDone: boolean;
     discoveryDone: boolean;
+    artistDiscoveryEnabled: boolean;
     createdAt: string;
     lastRunAt: string | null;
     nextRunAt: string | null;

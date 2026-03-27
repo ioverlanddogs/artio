@@ -21,6 +21,7 @@ export type RegionListResponse = {
     status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "PAUSED";
     venueGenDone: boolean;
     discoveryDone: boolean;
+    artistDiscoveryEnabled: boolean;
     createdAt: string;
     lastRunAt: string | null;
     nextRunAt: string | null;
@@ -80,6 +81,9 @@ export default function RegionsClient({
   const [submitting, setSubmitting] = useState(false);
   const [pausing, setPausing] = useState<Record<string, boolean>>({});
   const [running, setRunning] = useState<Record<string, boolean>>({});
+  const [togglingArtist, setTogglingArtist] = useState<Record<string, boolean>>(
+    {},
+  );
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
 
@@ -102,6 +106,7 @@ export default function RegionsClient({
           status: "PENDING",
           venueGenDone: false,
           discoveryDone: false,
+          artistDiscoveryEnabled: false,
           createdAt: new Date().toISOString(),
           lastRunAt: null,
           nextRunAt: null,
@@ -151,6 +156,32 @@ export default function RegionsClient({
       enqueueToast({ title: "Failed to resume region", variant: "error" });
     } finally {
       setPausing((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  async function toggleArtistDiscovery(id: string, current: boolean) {
+    setTogglingArtist((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch(`/api/admin/ingest/regions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistDiscoveryEnabled: !current,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      setRegions((prev) =>
+        prev.map((row) =>
+          row.id === id ? { ...row, artistDiscoveryEnabled: !current } : row,
+        ),
+      );
+    } catch {
+      enqueueToast({
+        title: "Failed to update artist discovery",
+        variant: "error",
+      });
+    } finally {
+      setTogglingArtist((prev) => ({ ...prev, [id]: false }));
     }
   }
 
@@ -220,6 +251,7 @@ export default function RegionsClient({
               <TableHead>Status</TableHead>
               <TableHead>Venue Gen</TableHead>
               <TableHead>Discovery</TableHead>
+              <TableHead>Artists</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Last Run</TableHead>
               <TableHead>Next Run</TableHead>
@@ -250,6 +282,26 @@ export default function RegionsClient({
                   ) : (
                     <span className="text-muted-foreground">–</span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleArtistDiscovery(row.id, row.artistDiscoveryEnabled)
+                    }
+                    disabled={togglingArtist[row.id]}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                      row.artistDiscoveryEnabled
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {togglingArtist[row.id]
+                      ? "…"
+                      : row.artistDiscoveryEnabled
+                        ? "On"
+                        : "Off"}
+                  </button>
                 </TableCell>
                 <TableCell>
                   {new Date(row.createdAt).toLocaleString()}
@@ -313,7 +365,7 @@ export default function RegionsClient({
             ))}
             {regions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-muted-foreground">
+                <TableCell colSpan={11} className="text-muted-foreground">
                   No regions queued yet.
                 </TableCell>
               </TableRow>
