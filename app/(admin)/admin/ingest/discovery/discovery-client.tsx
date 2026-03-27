@@ -58,6 +58,8 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [candidateCache, setCandidateCache] = useState<Record<string, Candidate[]>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [queuingById, setQueuingById] = useState<Record<string, boolean>>({});
+  const [queueResultById, setQueueResultById] = useState<Record<string, "queued" | "error" | "already_queued" | "no_venue">>({});
 
   function handleEntityTypeChange(next: "VENUE" | "ARTIST" | "EVENT") {
     setEntityType(next);
@@ -134,6 +136,141 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
     setCandidateCache((prev) => ({ ...prev, [jobId]: data.candidates }));
   }
 
+  async function queueCandidate(jobId: string, candidateId: string) {
+    setQueuingById((prev) => ({
+      ...prev,
+      [candidateId]: true,
+    }));
+    try {
+      const res = await fetch(
+        `/api/admin/ingest/discovery/${jobId}/candidates/${candidateId}/queue`,
+        { method: "POST" },
+      );
+
+      if (res.ok) {
+        setQueueResultById((prev) => ({
+          ...prev,
+          [candidateId]: "queued",
+        }));
+        setCandidateCache((prev) => ({
+          ...prev,
+          [jobId]: (prev[jobId] ?? []).map((c) => (
+            c.id === candidateId
+              ? { ...c, status: "QUEUED" as const }
+              : c
+          )),
+        }));
+        return;
+      }
+
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      if (res.status === 409 || body.error === "already_queued") {
+        setQueueResultById((prev) => ({
+          ...prev,
+          [candidateId]: "already_queued",
+        }));
+      } else if (body.error === "venue_not_found") {
+        setQueueResultById((prev) => ({
+          ...prev,
+          [candidateId]: "no_venue",
+        }));
+      } else {
+        setQueueResultById((prev) => ({
+          ...prev,
+          [candidateId]: "error",
+        }));
+      }
+    } catch {
+      setQueueResultById((prev) => ({
+        ...prev,
+        [candidateId]: "error",
+      }));
+    } finally {
+      setQueuingById((prev) => ({
+        ...prev,
+        [candidateId]: false,
+      }));
+    }
+  }
+
+  function renderCandidateRows(job: DiscoveryListResponse["jobs"][number], candidates: Candidate[]) {
+    const pendingCount = candidates.filter((candidate) => candidate.status === "PENDING").length;
+    return (
+      <div>
+        {job.entityType === "VENUE" && pendingCount > 0 ? (
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {pendingCount} URL{pendingCount === 1 ? "" : "s"} pending
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const pending = (candidateCache[job.id] ?? []).filter((c) => c.status === "PENDING");
+                void Promise.allSettled(pending.map((candidate) => queueCandidate(job.id, candidate.id)));
+              }}
+            >
+              Queue all PENDING
+            </Button>
+          </div>
+        ) : null}
+        <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>URL</TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Skip reason</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {candidates.map((candidate) => (
+            <TableRow key={candidate.id}>
+              <TableCell className="max-w-[420px] truncate"><Link className="underline" href={candidate.url} target="_blank">{candidate.url}</Link></TableCell>
+              <TableCell>{candidate.title ?? "—"}</TableCell>
+              <TableCell><Badge className={statusClassName(candidate.status)}>{candidate.status}</Badge></TableCell>
+              <TableCell>{candidate.skipReason ?? "—"}</TableCell>
+              <TableCell>
+                {job.entityType === "VENUE" && candidate.status === "PENDING" ? (
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={queuingById[candidate.id]}
+                      onClick={() => void queueCandidate(job.id, candidate.id)}
+                    >
+                      {queuingById[candidate.id] ? "Queuing…" : "Queue for ingest"}
+                    </Button>
+                    {queueResultById[candidate.id] === "queued" ? (
+                      <span className="text-xs text-emerald-700">✓ Queued</span>
+                    ) : queueResultById[candidate.id] === "already_queued" ? (
+                      <span className="text-xs text-muted-foreground">Already queued</span>
+                    ) : queueResultById[candidate.id] === "no_venue" ? (
+                      <span className="text-xs text-amber-700">
+                        No venue found —{" "}
+                        <Link href="/admin/ingest/venue-generation" className="underline">
+                          generate venue first
+                        </Link>
+                      </span>
+                    ) : queueResultById[candidate.id] === "error" ? (
+                      <span className="text-xs text-destructive">Failed — try again</span>
+                    ) : null}
+                  </div>
+                ) : candidate.status === "QUEUED" ? (
+                  <span className="text-xs text-emerald-700">✓ Queued</span>
+                ) : null}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        </Table>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-lg border bg-background p-4">
@@ -170,6 +307,15 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
           <div className="md:col-span-2">
             <Button type="submit" disabled={submitting}>{submitting ? "Running…" : "Run discovery job"}</Button>
           </div>
+          {entityType === "VENUE" ? (
+            <p className="text-xs text-muted-foreground md:col-span-2">
+              Discovery finds venue URLs. To queue a URL for event scraping the venue must first exist in the
+              database.{" "}
+              <Link href="/admin/ingest/venue-generation" className="underline hover:text-foreground">
+                Generate venues from a region →
+              </Link>
+            </p>
+          ) : null}
         </form>
       </section>
 
@@ -216,26 +362,7 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
                 {expanded[job.id] ? (
                   <TableRow key={`${job.id}-panel`}>
                     <TableCell colSpan={8}>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>URL</TableHead>
-                            <TableHead>Title</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Skip reason</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(candidateCache[job.id] ?? []).map((candidate) => (
-                            <TableRow key={candidate.id}>
-                              <TableCell className="max-w-[420px] truncate"><Link className="underline" href={candidate.url} target="_blank">{candidate.url}</Link></TableCell>
-                              <TableCell>{candidate.title ?? "—"}</TableCell>
-                              <TableCell><Badge className={statusClassName(candidate.status)}>{candidate.status}</Badge></TableCell>
-                              <TableCell>{candidate.skipReason ?? "—"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      {renderCandidateRows(job, candidateCache[job.id] ?? [])}
                     </TableCell>
                   </TableRow>
                 ) : null}
