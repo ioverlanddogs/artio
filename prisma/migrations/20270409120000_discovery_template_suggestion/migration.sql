@@ -41,22 +41,25 @@ CREATE INDEX IF NOT EXISTS
   "DiscoveryTemplateSuggestion_regionId_idx"
   ON "DiscoveryTemplateSuggestion"("regionId");
 
-ALTER TABLE "DiscoveryTemplateSuggestion"
-  ADD CONSTRAINT IF NOT EXISTS
-  "DiscoveryTemplateSuggestion_createdById_fkey"
-  FOREIGN KEY ("createdById") REFERENCES "User"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "DiscoveryTemplateSuggestion"
+    ADD CONSTRAINT "DiscoveryTemplateSuggestion_createdById_fkey"
+    FOREIGN KEY ("createdById") REFERENCES "User"("id")
+    ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "DiscoveryTemplateSuggestion"
-  ADD CONSTRAINT IF NOT EXISTS
-  "DiscoveryTemplateSuggestion_goalId_fkey"
-  FOREIGN KEY ("goalId")
-  REFERENCES "DiscoveryGoal"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "DiscoveryTemplateSuggestion"
+    ADD CONSTRAINT "DiscoveryTemplateSuggestion_goalId_fkey"
+    FOREIGN KEY ("goalId")
+    REFERENCES "DiscoveryGoal"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-ALTER TABLE "DiscoveryTemplateSuggestion"
-  ADD CONSTRAINT IF NOT EXISTS
-  "DiscoveryTemplateSuggestion_regionId_fkey"
-  FOREIGN KEY ("regionId")
-  REFERENCES "IngestRegion"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "DiscoveryTemplateSuggestion"
+    ADD CONSTRAINT "DiscoveryTemplateSuggestion_regionId_fkey"
+    FOREIGN KEY ("regionId")
+    REFERENCES "IngestRegion"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
