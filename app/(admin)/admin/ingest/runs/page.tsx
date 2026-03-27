@@ -3,7 +3,9 @@ import AdminPageHeader from "@/app/(admin)/admin/_components/AdminPageHeader";
 import IngestStatusBadge from "@/app/(admin)/admin/ingest/_components/ingest-status-badge";
 import IngestTriggerClient from "@/app/(admin)/admin/ingest/_components/ingest-trigger-client";
 import { SchedulePanel } from "./schedule-panel";
+import { RunsFilters } from "./runs-filters";
 import { db } from "@/lib/db";
+import type { IngestStatus, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,37 @@ type IngestRun = {
   venue: { id: string; name: string };
 };
 
-export default async function AdminIngestRunsPage() {
-  const [runs, venues] = await Promise.all([
+const PAGE_SIZE = 50;
+const VALID_STATUSES: IngestStatus[] = ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"];
+
+export default async function AdminIngestRunsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    venueId?: string;
+    status?: string;
+    page?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const venueId = params.venueId ?? null;
+  const status = params.status ?? null;
+  const statusFilter: IngestStatus | null = status && VALID_STATUSES.includes(status as IngestStatus)
+    ? (status as IngestStatus)
+    : null;
+
+  const where: Prisma.IngestRunWhereInput = {
+    ...(venueId ? { venueId } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
+  };
+
+  const [runs, totalRuns, venues] = await Promise.all([
     db.ingestRun.findMany({
+      where,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 20,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       select: {
         id: true,
         createdAt: true,
@@ -34,6 +62,7 @@ export default async function AdminIngestRunsPage() {
         venue: { select: { id: true, name: true } },
       },
     }),
+    db.ingestRun.count({ where }),
     db.venue.findMany({
       where: { websiteUrl: { not: null }, deletedAt: null },
       orderBy: { name: "asc" },
@@ -48,12 +77,23 @@ export default async function AdminIngestRunsPage() {
     websiteUrl: venue.websiteUrl ?? "",
     ingestFrequency: venue.ingestFrequency,
   }));
+  const validVenueIds = new Set(venueOptions.map((venue) => venue.id));
+  const currentVenueId = venueId && validVenueIds.has(venueId) ? venueId : null;
+  const totalPages = Math.max(1, Math.ceil(totalRuns / PAGE_SIZE));
 
   return (
     <>
       <AdminPageHeader
         title="Ingest Runs"
         description="Trigger a manual extraction run or review recent run history."
+      />
+      <RunsFilters
+        venues={venueOptions.map((venue) => ({ id: venue.id, name: venue.name }))}
+        currentVenueId={currentVenueId}
+        currentStatus={statusFilter}
+        currentPage={page}
+        totalPages={totalPages}
+        totalRuns={totalRuns}
       />
 
       <IngestTriggerClient venues={venueOptions} />
