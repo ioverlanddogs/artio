@@ -14,6 +14,9 @@ const RESOLVABLE_AS_ROLLED_BACK = new Set([
   "20260326120000_add_artist_cv_entries",
   // May be recorded as failed on first apply
   "20260327120000_add_artist_cv_entries",
+  // Failed on first apply due to ADD CONSTRAINT IF NOT
+  // EXISTS syntax error — fixed in subsequent commit
+  "20270409120000_discovery_template_suggestion",
 ]);
 
 const RESOLVABLE_AS_APPLIED = new Set(["20261203105000_enrichment_provenance"]);
@@ -30,6 +33,9 @@ const ALWAYS_RESOLVE_AS_ROLLED_BACK = new Set([
   // Failed on first apply due to pre-existing CvEntryType —
   // move to ALWAYS so it is resolved unconditionally
   "20260327120000_add_artist_cv_entries",
+  // Failed on first apply — syntax error fixed,
+  // resolve unconditionally on all databases
+  "20270409120000_discovery_template_suggestion",
 ]);
 
 const RESOLVABLE_FAILED_MIGRATIONS = new Set([
