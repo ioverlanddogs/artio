@@ -119,9 +119,15 @@ export async function runCronEnrichArtworkDescriptions(
       where: {
         deletedAt: null,
         isPublished: true,
-        completenessScore: { lt: SCORE_THRESHOLD },
         completenessUpdatedAt: { not: null },
-        OR: [{ description: null }, { description: { not: null } }],
+        OR: [
+          { completenessScore: { lt: SCORE_THRESHOLD } },
+          {
+            completenessFlags: {
+              has: "LOW_CONFIDENCE_DESCRIPTION",
+            },
+          },
+        ],
       },
       select: {
         id: true,
@@ -131,13 +137,19 @@ export async function runCronEnrichArtworkDescriptions(
         dimensions: true,
         artist: { select: { name: true } },
         description: true,
+        completenessFlags: true,
       },
       orderBy: { completenessScore: "asc" },
       take: BATCH_SIZE,
     });
 
     const targets = artworks.filter(
-      (artwork) => !artwork.description || artwork.description.trim().length < MIN_DESCRIPTION_LENGTH,
+      (artwork) =>
+        !artwork.description ||
+        artwork.description.trim().length < MIN_DESCRIPTION_LENGTH ||
+        artwork.completenessFlags.includes(
+          "LOW_CONFIDENCE_DESCRIPTION"
+        ),
     );
 
     const provider = getProvider((settings?.artworkExtractionProvider as ProviderName | null) ?? "claude");
