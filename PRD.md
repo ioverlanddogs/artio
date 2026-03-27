@@ -2,9 +2,14 @@
 
 ## 1. Overview
 
-**Artpulse** is a web application for discovering, publishing, and following art-related events. It connects **art audiences**, **artists**, and **venues** (galleries, museums, pop-up spaces) through a location-aware, calendar-driven experience.
+**Artpulse** is a web platform for discovering, publishing, and transacting around art events and artwork.
 
-The MVP focuses on high-quality event discovery and publishing, not social networking.
+It supports:
+- public discovery for audiences,
+- self-serve publishing for venues and artists,
+- editorial/admin workflows,
+- registration + payment flows,
+- personalization and notification systems.
 
 ---
 
@@ -12,175 +17,150 @@ The MVP focuses on high-quality event discovery and publishing, not social netwo
 
 ### Vision
 
-Become the default place to answer: *“What art exhibitions, openings, and events are happening near me?”*
+Become the default place to answer:
+- *“What art exhibitions and events are happening near me?”*
+- *“How do I publish and grow my venue/artist presence?”*
 
-### Product goals (MVP)
+### Current product goals
 
-- Make art events easy to discover by **location and date**
-- Provide clean, editorial-quality event pages
-- Allow venues and artists to self-publish events
-- Support calendar-based planning
-- Deploy cleanly on Vercel with minimal ops overhead
+- Make art events easy to discover by **location, date, and relevance**
+- Provide rich event, venue, artist, and artwork pages
+- Enable **publisher self-serve** operations from `/my`
+- Support registrations, ticket tiers, promo codes, and Stripe-backed payments
+- Deliver personalized feeds, follows, notifications, and digests
+- Keep the system Vercel-native with pragmatic background automation
 
-### Non-goals (MVP)
+### Non-goals (current)
 
-- Ticket sales or payments
-- Messaging or social feeds
-- Recommendation algorithms beyond basic filters
+- Real-time chat or direct messaging between users
+- Full social-network style user-generated posting feeds
+- Native mobile apps (web-first currently)
 
 ---
 
 ## 3. User Types
 
 ### 1. Visitor / Art Fan
+- Discovers nearby and recommended events
+- Follows artists/venues, saves searches, and manages notifications
+- Registers for events and can purchase paid tickets where enabled
 
-- Wants to discover exhibitions and events nearby
-- Browses by date, location, venue, or artist
-- Saves favourites for later reference
+### 2. Venue Publisher
+- Manages venue profiles and teams
+- Publishes events, tracks registrations, and configures Stripe connect
+- Uses analytics and moderation workflows via `/my`
 
-### 2. Venue (Gallery / Museum)
-
-- Publishes exhibitions and events
-- Maintains a venue profile
-- Wants visibility to local audiences
-
-### 3. Artist
-
-- Maintains a public profile
-- Lists exhibitions, openings, and talks
-- Links out to personal sites and social profiles
+### 3. Artist Publisher
+- Maintains artist profile/CV and artwork inventory
+- Receives inquiries/offers and manages artwork sales-related flows
+- Connects Stripe for payouts where required
 
 ### 4. Editor / Admin
-
-- Curates and moderates content
-- Manages featured events
-- Ensures quality and consistency
-
----
-
-## 4. Core User Journeys (MVP)
-
-### A. Discover an event
-
-1. User lands on home page
-2. Sees upcoming events near their location
-3. Applies filters (date, category, distance)
-4. Clicks an event
-5. Views full event details and venue location
-
-### B. Browse by venue or artist
-
-1. User opens a venue or artist page
-2. Sees profile information
-3. Views upcoming and past events
-
-### C. Save favourites
-
-1. User signs in
-2. Clicks “Save” on an event / venue / artist
-3. Views saved items in account area
-
-### D. Publish an event (admin/editor)
-
-1. Admin signs in
-2. Creates or edits an event
-3. Saves as draft or publishes
-4. Event appears in public listings
+- Moderates and curates submissions
+- Runs ingest + operations tools
+- Manages campaigns, branding, taxonomy, and quality controls
 
 ---
 
-## 5. Feature Scope
+## 4. Core User Journeys
 
-### 5.1 Event Discovery
+### A. Discover and personalize
+1. User lands on `/`, `/nearby`, `/for-you`, or `/following`
+2. Applies filters or follows entities
+3. Saves searches and receives notification/digest updates
+4. Opens detail pages and converts (save/register/purchase)
 
-- Event list view (chronological)
-- Calendar view (month / week / list)
-- Map view (optional in MVP)
-- Search by keyword
-- Filters:
-  - Date range
-  - Location radius
-  - Free / paid (text-based)
-  - Tags / categories
+### B. Publish as venue or artist
+1. Publisher accesses `/my`
+2. Creates/updates entities (venue, artist, event, artwork)
+3. Submits items for review where required
+4. Monitors performance, registrations, and operational status
 
-### 5.2 Event Pages
+### C. Register and pay
+1. User opens event or artwork purchase flow
+2. Selects tier/quantity or offer acceptance path
+3. Completes checkout via Stripe
+4. System confirms via API/webhook and sends transactional email
 
-- Title, description
-- Date/time range
-- Venue and map location
-- Images (poster / exhibition images)
-- Ticket or info link
-- Tags
-- iCal export
-
-### 5.3 Venue Pages
-
-- Venue profile
-- Address and map
-- Website and social links
-- List of events
-
-### 5.4 Artist Pages
-
-- Artist bio
-- Links
-- Associated events
-- Optional image/avatar
-
-### 5.5 Accounts & Auth
-
-- Sign in with Google or email magic link
-- Save favourites
-- Minimal profile (name, email)
-
-### 5.6 Admin / Editorial Tools
-
-- CRUD for events, venues, artists
-- Draft / published state
-- Basic moderation (unpublish)
+### D. Curate and operate
+1. Admin manages moderation/curation/ingest queues
+2. Runs operational or cron-driven jobs
+3. Reviews analytics and campaign performance
 
 ---
 
-## 6. Content Rules
+## 5. Feature Scope (Shipped)
 
-- Only **published** content appears publicly
-- Drafts visible only to editors/admins
-- Past events remain visible but are marked as past
+### 5.1 Discovery & Search
+- Event discovery (list/calendar/map)
+- Nearby and for-you recommendation surfaces
+- Following feed and follow management
+- Saved searches and quick search
+
+### 5.2 Event, Venue, Artist, Artwork Surfaces
+- Detailed public pages
+- Featured and curated collection support
+- Artist-venue/event association layers
+
+### 5.3 Accounts, Auth, and Preferences
+- OAuth sign-in
+- Account, preferences, follows, notifications
+- Digest and unsubscribe support
+
+### 5.4 Publisher Self-Serve (`/my`)
+- Venue, event, series, artwork, team, analytics, settings, registrations
+- Stripe connect flows
+- Submission/publish workflows
+
+### 5.5 Commerce & Ticketing
+- Ticket tiers, registrations, promo code support
+- Stripe checkout + webhook reconciliation
+- Artwork order/inquiry/offer pipeline
+
+### 5.6 Admin Tooling
+- Ingest, moderation, curation, email, ops, analytics, tags, branding, beta/admin utilities
+
+---
+
+## 6. Content & Publishing Rules
+
+- Public surfaces expose published/approved content states
+- Submission workflow supports draft, review, approval, rejection, and revisions
+- Past events remain discoverable with temporal labeling
 
 ---
 
 ## 7. Success Metrics
 
-- Number of published events
-- Event detail page views
-- Saved favourites per user
-- Weekly active users
-- Returning users within 30 days
+- Discovery engagement (views, follows, saves)
+- Registration and ticket conversion
+- Publisher activation and retained publishing activity
+- Notification/digest engagement rates
+- Content quality and moderation throughput
 
 ---
 
 ## 8. Accessibility & UX Requirements
 
 - Mobile-first layout
-- Keyboard-accessible navigation
-- Accessible calendar controls
-- Readable typography and contrast
+- Keyboard-accessible interactions
+- Accessible map/calendar/list controls
+- Clear readability/contrast and robust empty/error states
 
 ---
 
 ## 9. Technical Constraints
 
-- Must deploy cleanly on Vercel
-- Must support server-side rendering for SEO
-- Database access via Prisma
-- No background jobs required for MVP
+- Deployed on Vercel
+- SSR/metadata strategy for SEO
+- Prisma-based data access
+- Background automation present (cron + outbox + ingest operations)
 
 ---
 
-## 10. Future (Post-MVP)
+## 10. Roadmap Direction
 
-- Editorial articles / art news
-- Featured events
-- Advanced recommendations
-- Multi-city support
-- Native mobile app
+- Expand personalization quality
+- Improve publisher analytics depth
+- Broaden campaign/notification orchestration
+- Continue ingest and curation quality improvements
