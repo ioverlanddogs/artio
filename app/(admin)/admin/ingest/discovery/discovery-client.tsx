@@ -60,6 +60,11 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
   const [refreshing, setRefreshing] = useState(false);
   const [queuingById, setQueuingById] = useState<Record<string, boolean>>({});
   const [queueResultById, setQueueResultById] = useState<Record<string, "queued" | "error" | "already_queued" | "no_venue">>({});
+  const [seedingById, setSeedingById] = useState<Record<string, boolean>>({});
+  const [seedResultById, setSeedResultById] = useState<Record<string,
+    | { ok: true; venueId: string; venueName: string; venueCreated: boolean }
+    | { ok: false; error: string }
+  >>({});
 
   function handleEntityTypeChange(next: "VENUE" | "ARTIST" | "EVENT") {
     setEntityType(next);
@@ -193,6 +198,58 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
     }
   }
 
+
+  async function seedVenue(jobId: string, candidateId: string) {
+    setSeedingById((prev) => ({ ...prev, [candidateId]: true }));
+    try {
+      const res = await fetch(
+        `/api/admin/ingest/discovery/${jobId}/candidates/${candidateId}/seed-venue`,
+        { method: "POST" },
+      );
+      const body = await res.json().catch(() => ({})) as {
+        venueId?: string;
+        venueName?: string;
+        venueCreated?: boolean;
+        error?: string;
+      };
+
+      if (res.ok) {
+        setSeedResultById((prev) => ({
+          ...prev,
+          [candidateId]: {
+            ok: true,
+            venueId: body.venueId ?? "",
+            venueName: body.venueName ?? "Venue",
+            venueCreated: body.venueCreated ?? false,
+          },
+        }));
+        setCandidateCache((prev) => ({
+          ...prev,
+          [jobId]: (prev[jobId] ?? []).map((c) => (
+            c.id === candidateId
+              ? { ...c, status: "QUEUED" as const }
+              : c
+          )),
+        }));
+      } else {
+        setSeedResultById((prev) => ({
+          ...prev,
+          [candidateId]: {
+            ok: false,
+            error: body.error ?? "Failed",
+          },
+        }));
+      }
+    } catch {
+      setSeedResultById((prev) => ({
+        ...prev,
+        [candidateId]: { ok: false, error: "Network error" },
+      }));
+    } finally {
+      setSeedingById((prev) => ({ ...prev, [candidateId]: false }));
+    }
+  }
+
   function renderCandidateRows(job: DiscoveryListResponse["jobs"][number], candidates: Candidate[]) {
     const pendingCount = candidates.filter((candidate) => candidate.status === "PENDING").length;
     return (
@@ -208,10 +265,10 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
               size="sm"
               onClick={() => {
                 const pending = (candidateCache[job.id] ?? []).filter((c) => c.status === "PENDING");
-                void Promise.allSettled(pending.map((candidate) => queueCandidate(job.id, candidate.id)));
+                void Promise.allSettled(pending.map((candidate) => seedVenue(job.id, candidate.id)));
               }}
             >
-              Queue all PENDING
+              Seed all PENDING
             </Button>
           </div>
         ) : null}
@@ -235,15 +292,54 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
               <TableCell>
                 {job.entityType === "VENUE" && candidate.status === "PENDING" ? (
                   <div className="flex flex-col gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={queuingById[candidate.id]}
-                      onClick={() => void queueCandidate(job.id, candidate.id)}
-                    >
-                      {queuingById[candidate.id] ? "Queuing…" : "Queue for ingest"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={seedingById[candidate.id]}
+                        onClick={() => void seedVenue(job.id, candidate.id)}
+                      >
+                        {seedingById[candidate.id] ? "Seeding…" : "Seed venue"}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">or</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={queuingById[candidate.id]}
+                        onClick={() => void queueCandidate(job.id, candidate.id)}
+                      >
+                        {queuingById[candidate.id] ? "Queuing…" : "Queue for ingest"}
+                      </Button>
+                    </div>
+                    {(() => {
+                      const seedResult = seedResultById[candidate.id];
+                      if (!seedResult) return null;
+                      if (seedResult.ok) {
+                        return seedResult.venueCreated ? (
+                          <span className="text-xs text-emerald-700">
+                            ✓ Venue created and queued for ingest{" "}
+                            <Link href={`/admin/venues/${seedResult.venueId}`} className="underline">
+                              view venue
+                            </Link>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-emerald-700">✓ Venue already existed — queued for ingest</span>
+                        );
+                      }
+                      return (
+                        <span className="text-xs text-destructive">
+                          Failed: {seedResult.error}{" "}
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() => void seedVenue(job.id, candidate.id)}
+                          >
+                            Try again
+                          </button>
+                        </span>
+                      );
+                    })()}
                     {queueResultById[candidate.id] === "queued" ? (
                       <span className="text-xs text-emerald-700">✓ Queued</span>
                     ) : queueResultById[candidate.id] === "already_queued" ? (
@@ -309,11 +405,12 @@ export default function DiscoveryClient({ initial }: { initial: DiscoveryListRes
           </div>
           {entityType === "VENUE" ? (
             <p className="text-xs text-muted-foreground md:col-span-2">
-              Discovery finds venue URLs. To queue a URL for event scraping the venue must first exist in the
-              database.{" "}
+              Discovery finds venue URLs. Use <strong className="font-medium">Seed venue</strong> on any candidate to create the
+              venue record and queue it for event scraping in one step. Or{" "}
               <Link href="/admin/ingest/venue-generation" className="underline hover:text-foreground">
-                Generate venues from a region →
-              </Link>
+                generate venues from a region
+              </Link>{" "}
+              first, then queue the candidates.
             </p>
           ) : null}
         </form>
