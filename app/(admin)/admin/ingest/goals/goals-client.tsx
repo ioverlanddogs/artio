@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 type GoalWithProgress = {
   id: string;
@@ -27,6 +26,12 @@ type GoalWithProgress = {
 type Props = {
   goals: GoalWithProgress[];
   statusCounts: { ACTIVE: number; PAUSED: number; COMPLETED: number; CANCELLED: number };
+};
+
+
+type RunFeedback = {
+  status: "idle" | "loading" | "success" | "error";
+  message: string | null;
 };
 
 function progressTone(seeded: number, target: number) {
@@ -55,6 +60,7 @@ export function GoalsClient({ goals: initialGoals, statusCounts }: Props) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [goals, setGoals] = useState(initialGoals);
+  const [runFeedbackByGoalId, setRunFeedbackByGoalId] = useState<Record<string, RunFeedback>>({});
   const [form, setForm] = useState({
     entityType: "VENUE" as "VENUE" | "ARTIST" | "EVENT",
     region: "",
@@ -107,6 +113,41 @@ export function GoalsClient({ goals: initialGoals, statusCounts }: Props) {
       setForm({ entityType: "VENUE", region: "", country: "", targetCount: 50, notes: "" });
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function runGoalNow(goalId: string) {
+    setRunFeedbackByGoalId((prev) => ({
+      ...prev,
+      [goalId]: { status: "loading", message: null },
+    }));
+
+    try {
+      const response = await fetch(`/api/admin/discovery/goals/${goalId}/run`, {
+        method: "POST",
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error("run_failed");
+      }
+
+      const queued = Number(json?.totalQueued ?? 0);
+      setRunFeedbackByGoalId((prev) => ({
+        ...prev,
+        [goalId]: { status: "success", message: `${queued} candidates queued` },
+      }));
+
+      window.setTimeout(() => {
+        setRunFeedbackByGoalId((prev) => ({
+          ...prev,
+          [goalId]: { status: "idle", message: null },
+        }));
+      }, 4000);
+    } catch {
+      setRunFeedbackByGoalId((prev) => ({
+        ...prev,
+        [goalId]: { status: "error", message: "Run failed" },
+      }));
     }
   }
 
@@ -271,9 +312,23 @@ export function GoalsClient({ goals: initialGoals, statusCounts }: Props) {
                         {goal.status === "ACTIVE" ? (
                           <button type="button" className="underline" onClick={() => updateGoalStatus(goal.id, "COMPLETED")}>Complete</button>
                         ) : null}
-                        <Link href={`/admin/ingest/discovery?region=${encodeURIComponent(goal.region)}`} className="underline">
-                          Run discovery →
-                        </Link>
+                        <button
+                          type="button"
+                          className="underline disabled:opacity-50"
+                          disabled={runFeedbackByGoalId[goal.id]?.status === "loading"}
+                          onClick={() => runGoalNow(goal.id)}
+                        >
+                          {runFeedbackByGoalId[goal.id]?.status === "loading" ? "Running..." : "Run now"}
+                        </button>
+                        {runFeedbackByGoalId[goal.id]?.message ? (
+                          <span
+                            className={runFeedbackByGoalId[goal.id]?.status === "error"
+                              ? "text-rose-600"
+                              : "text-muted-foreground"}
+                          >
+                            {runFeedbackByGoalId[goal.id]?.message}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

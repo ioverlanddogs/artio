@@ -1247,6 +1247,7 @@ model IngestRegion {
   status         IngestRegionStatus   @default(PENDING)
   venueGenDone   Boolean              @default(false)
   discoveryDone  Boolean              @default(false)
+  artistDiscoveryEnabled Boolean      @default(false)
   lastRunAt      DateTime?            @db.Timestamptz
   nextRunAt      DateTime?            @db.Timestamptz
   errorMessage   String?
