@@ -27,7 +27,14 @@ type Candidate = {
   createdArtist?: {
     featuredAsset: { url: string } | null;
   } | null;
-  eventLinks: Array<{ eventId: string; event: { title: string; slug: string } }>;
+  eventLinks: Array<{
+    eventId: string;
+    event: {
+      title: string;
+      slug: string;
+      venue: { name: string; slug: string } | null;
+    };
+  }>;
 };
 
 type EditDraft = {
@@ -79,6 +86,10 @@ export default function ArtistsClient({
   const [editingImageLoading, setEditingImageLoading] = useState<string | null>(null);
   const [editImageError, setEditImageError] = useState<Record<string, string>>({});
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [expandedEventLinks, setExpandedEventLinks] = useState<Record<string, boolean>>({});
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkResults, setBulkResults] = useState<{ approved: number; failed: number } | null>(null);
 
   function updateDraft(id: string, field: keyof EditDraft, value: string) {
     setEditDraftById((prev) => ({
@@ -121,6 +132,61 @@ export default function ArtistsClient({
       setWorkingId(null);
     }
   }, []);
+
+  async function bulkApproveHigh() {
+    const highCandidates = candidates.filter(
+      (c) => c.confidenceBand === "HIGH" && c.status === "PENDING",
+    );
+    if (highCandidates.length === 0) return;
+    if (
+      !window.confirm(
+        `Approve all ${highCandidates.length} HIGH ` +
+          `confidence artist candidate` +
+          `${highCandidates.length === 1 ? "" : "s"}? ` +
+          "This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    setBulkApproving(true);
+    setBulkResults(null);
+    setBulkProgress({ done: 0, total: highCandidates.length });
+
+    const BATCH_SIZE = 5;
+    let approved = 0;
+    let failed = 0;
+
+    for (let i = 0; i < highCandidates.length; i += BATCH_SIZE) {
+      const batch = highCandidates.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((candidate) =>
+          fetch(`/api/admin/ingest/artists/${candidate.id}/approve`, { method: "POST" })
+            .then((res) => (res.ok ? ("ok" as const) : ("fail" as const)))
+            .catch(() => "fail" as const),
+        ),
+      );
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value === "ok") {
+          approved += 1;
+        } else {
+          failed += 1;
+        }
+      }
+      setBulkProgress({
+        done: approved + failed,
+        total: highCandidates.length,
+      });
+    }
+
+    setBulkApproving(false);
+    setBulkProgress(null);
+    setBulkResults({ approved, failed });
+
+    setCandidates((prev) =>
+      prev.filter((c) => !(c.confidenceBand === "HIGH" && c.status === "PENDING")),
+    );
+  }
 
   async function approveWithPatch(id: string) {
     const draft = editDraftById[id];
@@ -319,6 +385,44 @@ export default function ArtistsClient({
   return (
     <section className="rounded-lg border bg-background p-4">
       {error ? <div className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">{error}</div> : null}
+      <div className="mb-3 flex flex-col gap-2">
+        {(() => {
+          const highCount = candidates.filter(
+            (c) => c.confidenceBand === "HIGH" && c.status === "PENDING",
+          ).length;
+          if (highCount === 0) return null;
+          return (
+            <button
+              type="button"
+              className="w-fit rounded border border-emerald-600 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+              disabled={bulkApproving}
+              onClick={() => void bulkApproveHigh()}
+            >
+              {bulkApproving
+                ? `Approving… ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? highCount}`
+                : `Approve all HIGH (${highCount})`}
+            </button>
+          );
+        })()}
+
+        {bulkResults ? (
+          <div
+            className={`flex items-center justify-between rounded border px-3 py-2 text-sm ${
+              bulkResults.failed > 0
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-800"
+                : "border-emerald-500/40 bg-emerald-500/10 text-emerald-800"
+            }`}
+          >
+            <span>
+              Bulk approve complete: {bulkResults.approved} approved
+              {bulkResults.failed > 0 ? `, ${bulkResults.failed} failed` : ""}
+            </span>
+            <button type="button" onClick={() => setBulkResults(null)}>
+              ×
+            </button>
+          </div>
+        ) : null}
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1560px] text-sm">
           <thead>
@@ -402,7 +506,25 @@ export default function ArtistsClient({
                     <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="underline">Source</a>
                   </td>
                   <td className="px-3 py-2">{candidate.extractionProvider}</td>
-                  <td className="px-3 py-2">{candidate.eventLinks.length}</td>
+                  <td className="px-3 py-2">
+                    {candidate.eventLinks.length > 0 ? (
+                      <button
+                        type="button"
+                        className="text-sm underline text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setExpandedEventLinks((prev) => ({
+                            ...prev,
+                            [candidate.id]: !prev[candidate.id],
+                          }))
+                        }
+                      >
+                        {candidate.eventLinks.length} event
+                        {candidate.eventLinks.length === 1 ? "" : "s"}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
                       <Button data-action="approve" size="sm" variant="outline" disabled={workingId === candidate.id || candidate.status !== "PENDING"} onClick={() => approve(candidate.id)}>Approve</Button>
@@ -456,6 +578,29 @@ export default function ArtistsClient({
                     ) : null}
                   </td>
                 </tr>
+                {expandedEventLinks[candidate.id] && candidate.eventLinks.length > 0 ? (
+                  <tr className="border-b bg-muted/20">
+                    <td colSpan={10} className="px-4 py-2">
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Events featuring this artist
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {candidate.eventLinks.map((link) => (
+                          <a
+                            key={link.eventId}
+                            href={`/admin/events/${link.eventId}`}
+                            className="rounded bg-muted px-2 py-1 text-xs hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {link.event.venue?.name ? `${link.event.venue.name} · ` : ""}
+                            {link.event.title}
+                          </a>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
                 {editOpenById[candidate.id] ? (
                   <tr className="border-b">
                     <td colSpan={10} className="px-3 pb-3">

@@ -46,7 +46,18 @@ export default async function AdminIngestArtistsPage() {
       eventLinks: {
         select: {
           eventId: true,
-          event: { select: { title: true, slug: true } },
+          event: {
+            select: {
+              title: true,
+              slug: true,
+              venue: {
+                select: {
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
         },
       },
     },
