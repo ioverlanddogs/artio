@@ -37,6 +37,19 @@ export function VenueOnboardingClient({ venues: initialVenues }: { venues: Onboa
   const [loadingCandidateId, setLoadingCandidateId] = useState<string | null>(null);
   const [candidateErrors, setCandidateErrors] = useState<Record<string, string>>({});
 
+  function activateOnboardingForVenue(venue: OnboardingVenue) {
+    setOnboardingVenueId(venue.id);
+    const detectedUrl = venue.generationRunItems[0]?.eventsPageStatus === "detected"
+      ? (venue.eventsPageUrl ?? "")
+      : "";
+    if (detectedUrl) {
+      setEventsUrlInputs((prev) => ({
+        ...prev,
+        [venue.id]: prev[venue.id] ?? detectedUrl,
+      }));
+    }
+  }
+
   async function selectCover(venueId: string, candidateId: string) {
     setLoadingCandidateId(candidateId);
     setCandidateErrors((prev) => {
@@ -139,6 +152,16 @@ export function VenueOnboardingClient({ venues: initialVenues }: { venues: Onboa
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {venue.homepageImageCandidates.length > 0 ? (
+                  <span className="text-amber-700">
+                    {venue.homepageImageCandidates.length} image{venue.homepageImageCandidates.length !== 1 ? "s" : ""} pending —{" "}
+                    <a href="/admin/ingest/venue-images" className="underline">
+                      select cover first
+                    </a>
+                  </span>
+                ) : (
+                  <span className="text-emerald-700">✓ Images ready</span>
+                )}
                 {venue.lat != null && venue.lng != null
                   ? <span className="text-emerald-700">✓ Geocoded</span>
                   : <span className="text-rose-700">✕ No coordinates</span>}
@@ -199,11 +222,19 @@ export function VenueOnboardingClient({ venues: initialVenues }: { venues: Onboa
                 className="w-full rounded border bg-background px-2 py-1 text-sm"
                 placeholder={venue.eventsPageUrl ?? "https://example.com/events"}
                 value={eventsUrlInputs[venue.id] ?? venue.eventsPageUrl ?? ""}
+                onFocus={() => activateOnboardingForVenue(venue)}
                 onChange={(e) => {
                   setEventsUrlInputs((prev) => ({ ...prev, [venue.id]: e.target.value }));
                   setOnboardingVenueId(venue.id);
                 }}
               />
+              {venue.generationRunItems[0]?.eventsPageStatus === "detected"
+              && venue.eventsPageUrl
+              && eventsUrlInputs[venue.id] === venue.eventsPageUrl ? (
+                <p className="mt-1 text-xs text-emerald-700">
+                  ✓ Auto-detected from venue generation
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 Leave blank to use the detected URL, or enter a custom one. Optional — venue can be
                 published without it.

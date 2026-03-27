@@ -33,21 +33,43 @@ function StatCard({
   value,
   note,
   accentClassName,
+  href,
+  urgent,
 }: {
   label: string;
   value: number;
   note: string;
   accentClassName?: string;
+  href?: string;
+  urgent?: boolean;
 }) {
-  return (
-    <article className="rounded-lg border bg-background p-3">
+  const content = (
+    <article
+      className={`rounded-lg border bg-background p-3 transition-colors ${
+        urgent && value > 0 ? "border-amber-300 bg-amber-50/50" : ""
+      } ${href ? "cursor-pointer hover:bg-muted/40" : ""}`}
+    >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      <p className={`text-xs ${accentClassName ?? "text-muted-foreground"}`}>
+      <p className={`mt-1 text-2xl font-semibold tabular-nums ${
+        urgent && value > 0
+          ? "text-amber-700"
+          : accentClassName ?? "text-muted-foreground"
+      }`}>{value}</p>
+      <p className={`text-xs ${
+        urgent && value > 0
+          ? "text-amber-700"
+          : accentClassName ?? "text-muted-foreground"
+      }`}>
         {note}
       </p>
     </article>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+
+  return content;
 }
 
 function ConfidenceBar({
@@ -143,9 +165,8 @@ export default function IngestShellClient({ stats, pipelineFlags, children }: Pr
           note={
             stats.failedLast24h > 0 ? "Needs attention" : "No recent failures"
           }
-          accentClassName={
-            stats.failedLast24h > 0 ? "text-rose-700" : "text-muted-foreground"
-          }
+          urgent
+          href="/admin/ingest/runs?status=FAILED"
         />
         <StatCard
           label="Active regions"
@@ -162,34 +183,30 @@ export default function IngestShellClient({ stats, pipelineFlags, children }: Pr
           label="Pending images"
           value={stats.pendingVenueImages}
           note={stats.pendingVenueImages > 0 ? "Awaiting review" : "All reviewed"}
-          accentClassName={stats.pendingVenueImages > 0 ? "text-amber-700" : "text-muted-foreground"}
+          urgent
+          href="/admin/ingest/venue-images"
         />
-        <Link href="/admin/ingest/venue-onboarding">
-          <StatCard
-            label="Venues to onboard"
-            value={stats.pendingOnboarding}
-            note={stats.pendingOnboarding > 0 ? "Awaiting review" : "Queue clear"}
-            accentClassName={
-              stats.pendingOnboarding > 0 ? "text-amber-700" : "text-muted-foreground"
-            }
-          />
-        </Link>
-        <Link href="/admin/ingest/artists">
-          <StatCard
-            label="Artist candidates"
-            value={stats.pendingArtists}
-            note={stats.pendingArtists > 0 ? "Awaiting review" : "Queue clear"}
-            accentClassName={stats.pendingArtists > 0 ? "text-amber-700" : "text-muted-foreground"}
-          />
-        </Link>
-        <Link href="/admin/ingest/artworks">
-          <StatCard
-            label="Artwork candidates"
-            value={stats.pendingArtworks}
-            note={stats.pendingArtworks > 0 ? "Awaiting review" : "Queue clear"}
-            accentClassName={stats.pendingArtworks > 0 ? "text-amber-700" : "text-muted-foreground"}
-          />
-        </Link>
+        <StatCard
+          label="Venues to onboard"
+          value={stats.pendingOnboarding}
+          note={stats.pendingOnboarding > 0 ? "Awaiting review" : "Queue clear"}
+          urgent
+          href="/admin/ingest/venue-onboarding"
+        />
+        <StatCard
+          label="Artist candidates"
+          value={stats.pendingArtists}
+          note={stats.pendingArtists > 0 ? "Awaiting review" : "Queue clear"}
+          urgent
+          href="/admin/ingest/artists"
+        />
+        <StatCard
+          label="Artwork candidates"
+          value={stats.pendingArtworks}
+          note={stats.pendingArtworks > 0 ? "Awaiting review" : "Queue clear"}
+          urgent
+          href="/admin/ingest/artworks"
+        />
       </section>
 
       <ConfidenceBar high={stats.high} medium={stats.medium} low={stats.low} />

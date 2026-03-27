@@ -31,6 +31,7 @@ export function VenueImagesClient(props: VenueImagesClientProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dismissingVenueId, setDismissingVenueId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "published">("all");
+  const [readyForOnboarding, setReadyForOnboarding] = useState<Set<string>>(new Set());
 
   async function selectCandidate(venueId: string, candidateId: string, setAsCover: boolean) {
     setLoadingId(candidateId);
@@ -58,6 +59,9 @@ export function VenueImagesClient(props: VenueImagesClientProps) {
           candidates: nextCandidates,
         }];
       }));
+      if (setAsCover) {
+        setReadyForOnboarding((prev) => new Set([...prev, venueId]));
+      }
     } finally {
       setLoadingId(null);
     }
@@ -248,6 +252,14 @@ export function VenueImagesClient(props: VenueImagesClientProps) {
                 })}
               </div>
             </div>
+            {readyForOnboarding.has(group.venueId) ? (
+              <div className="mt-2 flex items-center justify-between rounded border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <span className="text-xs text-emerald-800">Cover set — venue ready to onboard</span>
+                <a href="/admin/ingest/venue-onboarding" className="text-xs font-medium text-emerald-800 underline">
+                  Continue to onboarding →
+                </a>
+              </div>
+            ) : null}
           </section>
         );
       })}
