@@ -27,6 +27,7 @@ export type ArtworkCompletenessInput = {
 export type ArtworkCompletenessFlag =
   | "MISSING_IMAGE"
   | "LOW_CONFIDENCE_METADATA"
+  | "LOW_CONFIDENCE_DESCRIPTION"
   | "INCOMPLETE";
 
 export type ArtworkCompletenessResult = {
@@ -35,6 +36,31 @@ export type ArtworkCompletenessResult = {
   recommended: { ok: boolean; issues: ArtworkCompletenessIssue[] };
   flags: ArtworkCompletenessFlag[];
 };
+
+function descriptionSimilarToTitle(
+  description: string,
+  title: string,
+): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter((w) => w.length > 2);
+
+  const titleWords = new Set(normalize(title));
+  const descWords = normalize(description);
+
+  if (titleWords.size === 0 || descWords.length === 0)
+    return false;
+
+  const overlap = descWords.filter(
+    (w) => titleWords.has(w)
+  ).length;
+
+  // More than 60% of description words also appear
+  // in the title → likely just rephrasing the title
+  return overlap / descWords.length > 0.6;
+}
 
 export function computeArtworkCompleteness(artwork: ArtworkCompletenessInput, imageCount: number): ArtworkCompletenessResult {
   const requiredIssues: ArtworkCompletenessIssue[] = [];
@@ -108,6 +134,23 @@ export function computeArtworkCompleteness(artwork: ArtworkCompletenessInput, im
   if (!hasImage) flags.push("MISSING_IMAGE");
   if (scorePct < 60) flags.push("INCOMPLETE");
   if (requiredIssues.length > 0) flags.push("LOW_CONFIDENCE_METADATA");
+
+  const descriptionText =
+    (artwork.description ?? "").trim();
+  const titleText = (artwork.title ?? "").trim();
+
+  const hasLowConfidenceDescription =
+    descriptionText.length > 0 &&
+    descriptionText.length < 20
+      ? false
+      : descriptionText.length > 0 && (
+          descriptionText.length < 80 ||
+          descriptionSimilarToTitle(
+            descriptionText, titleText)
+        );
+
+  if (hasLowConfidenceDescription)
+    flags.push("LOW_CONFIDENCE_DESCRIPTION");
 
   return {
     scorePct,
