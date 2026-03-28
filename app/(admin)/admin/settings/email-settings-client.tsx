@@ -4,6 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
+type EmailTestResult = {
+  ok: boolean;
+  durationMs: number;
+  messageId?: string | null;
+  from?: string;
+  errorMessage?: string;
+  keyConfigured?: boolean;
+};
+
 type EmailSettingsProps = {
   initial: {
     emailEnabled: boolean;
@@ -24,6 +33,9 @@ export default function EmailSettingsClient(props: EmailSettingsProps) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [emailTestResult, setEmailTestResult] = useState<EmailTestResult | null>(null);
+  const [emailTesting, setEmailTesting] = useState(false);
+  const [testToAddress, setTestToAddress] = useState("");
 
   async function save() {
     setSaving(true);
@@ -52,6 +64,37 @@ export default function EmailSettingsClient(props: EmailSettingsProps) {
       setStatus("saved");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function sendTestEmail() {
+    if (!testToAddress.trim()) return;
+    setEmailTesting(true);
+    setEmailTestResult(null);
+    try {
+      const res = await fetch(
+        "/api/admin/email-test",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            toAddress: testToAddress.trim(),
+          }),
+        },
+      );
+      const data =
+        await res.json() as EmailTestResult;
+      setEmailTestResult(data);
+    } catch {
+      setEmailTestResult({
+        ok: false,
+        durationMs: 0,
+        errorMessage: "Network error",
+      });
+    } finally {
+      setEmailTesting(false);
     }
   }
 
@@ -179,6 +222,75 @@ export default function EmailSettingsClient(props: EmailSettingsProps) {
           placeholder="25"
           disabled={saving}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">
+          Test email delivery
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Sends a real email using the saved Resend key
+          and from-address. Verifies the key, sender
+          domain, and DNS configuration.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            value={testToAddress}
+            onChange={(e) =>
+              setTestToAddress(e.target.value)}
+            placeholder="your@email.com"
+            disabled={emailTesting}
+          />
+          <button
+            type="button"
+            disabled={
+              emailTesting ||
+              !testToAddress.trim() ||
+              !props.initial.resendApiKeySet
+            }
+            onClick={() => void sendTestEmail()}
+            className="rounded border px-3 py-2 text-sm disabled:opacity-50 hover:bg-muted whitespace-nowrap"
+          >
+            {emailTesting ? "Sending…" : "Send test"}
+          </button>
+        </div>
+        {!props.initial.resendApiKeySet && (
+          <p className="text-xs text-muted-foreground">
+            Save a Resend API key first.
+          </p>
+        )}
+        {emailTestResult !== null ? (
+          <div className={`rounded border p-2 text-xs ${emailTestResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}>
+            {emailTestResult.ok ? (
+              <span>
+                <span className="font-medium">
+                  ✓ Email sent
+                </span>
+                {" · "}{emailTestResult.durationMs}ms
+                {emailTestResult.from && (
+                  <span className="ml-1 text-emerald-700">
+                    · from {emailTestResult.from}
+                  </span>
+                )}
+                {emailTestResult.messageId && (
+                  <span className="ml-1 text-emerald-700 font-mono">
+                    · {emailTestResult.messageId}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span>
+                <span className="font-medium">
+                  ✗ Failed
+                </span>
+                {" · "}
+                {emailTestResult.errorMessage}
+              </span>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <p className="text-xs text-muted-foreground">
