@@ -71,7 +71,7 @@ export default async function FollowingPage({ searchParams }: { searchParams: Se
       },
       { userId: user.id, days, type, limit: 50 },
     ),
-    db.follow.count({ where: { userId: user.id } }),
+    db.follow.count({ where: { userId: user.id } }).catch(() => 0),
     setOnboardingFlagForSession(user, "hasVisitedFollowing", true, { path: "/following" }),
   ]);
 

@@ -35,7 +35,7 @@ export default async function ForYouPage() {
   }
 
   const [followCount, savedSearchCount] = await Promise.all([
-    db.follow.count({ where: { userId: user.id } }),
+    db.follow.count({ where: { userId: user.id } }).catch(() => 0),
     db.savedSearch.count({ where: { userId: user.id } }),
   ]);
 

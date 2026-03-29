@@ -210,7 +210,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ slug: 
   if (!venue) notFound();
 
   const [followersCount, artworks, artworkCount, pastEventsRaw] = await Promise.all([
-    db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }),
+    db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }).catch(() => 0),
     listPublishedArtworksByVenue(venue.id, 6),
     countPublishedArtworksByVenue(venue.id),
     db.event.findMany({

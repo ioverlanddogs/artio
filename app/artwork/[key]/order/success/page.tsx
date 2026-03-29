@@ -64,7 +64,7 @@ export default async function ArtworkOrderSuccessPage({ params }: { params: Prom
         select: { id: true },
       }).then(Boolean)
       : Promise.resolve(false),
-    db.follow.count({ where: { targetType: "ARTIST", targetId: artwork.artist.id } }),
+    db.follow.count({ where: { targetType: "ARTIST", targetId: artwork.artist.id } }).catch(() => 0),
     db.artwork.findMany({
       where: {
         artistId: artwork.artistId,
