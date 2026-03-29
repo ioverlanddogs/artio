@@ -81,7 +81,7 @@ export default async function CheckoutSuccessPage(
   const now = new Date();
 
   const [venueFollowersCount, isFollowingVenue, moreVenueEvents, artistFollowerRows, followedArtists] = await Promise.all([
-    venue ? db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }) : Promise.resolve(0),
+    venue ? db.follow.count({ where: { targetType: "VENUE", targetId: venue.id } }).catch(() => 0) : Promise.resolve(0),
     user && venue
       ? db.follow.findUnique({
         where: { userId_targetType_targetId: { userId: user.id, targetType: "VENUE", targetId: venue.id } },

@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 const deps = {
   requireAuth,
   ensureEventExists: async (eventId: string) => {
-    const event = await db.event.findFirst({ where: { id: eventId, ...publishedEventWhere() }, select: { id: true } });
+    const event = await db.event.findFirst({ where: { id: eventId, deletedAt: null, ...publishedEventWhere() }, select: { id: true } });
     return Boolean(event);
   },
   saveEvent: async ({ userId, eventId }: { userId: string; eventId: string }) => {

@@ -154,7 +154,7 @@ export default async function ArtistDetail({ params }: { params: Promise<{ slug:
   }));
 
   const [followersCount, artworkCount, showcaseResult, forSaleCount, pastEventArtists, artworkCountsByEvent] = await Promise.all([
-    db.follow.count({ where: { targetType: "ARTIST", targetId: artist.id } }),
+    db.follow.count({ where: { targetType: "ARTIST", targetId: artist.id } }).catch(() => 0),
     countPublishedArtworksByArtist(artist.id),
     getArtistArtworks(slug, { limit: 24, sort: "newest", resolvedArtistId: artist.id }),
     db.artwork.count({ where: { artistId: artist.id, isPublished: true, deletedAt: null, priceAmount: { not: null } } }),

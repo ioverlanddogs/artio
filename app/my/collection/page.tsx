@@ -37,7 +37,7 @@ export default async function MyCollectionPage() {
       orderBy: { createdAt: "desc" },
       select: { id: true, targetId: true },
     }),
-    db.follow.count({ where: { userId: user.id, targetType: "ARTIST" } }),
+    db.follow.count({ where: { userId: user.id, targetType: "ARTIST" } }).catch(() => 0),
   ]);
 
   const favoriteArtworkIds = favorites.map((favorite) => favorite.targetId);

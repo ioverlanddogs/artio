@@ -8,6 +8,7 @@ import { followBodySchema, parseBody, zodDetails } from "@/lib/validators";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { setOnboardingFlagForSession } from "@/lib/onboarding";
 import { followCountCacheTag } from "@/lib/follow-counts";
+import { logError } from "@/lib/logging";
 import { publishedVenueWhere } from "@/lib/publish-status";
 
 export const runtime = "nodejs";
@@ -63,7 +64,15 @@ export async function POST(req: NextRequest) {
 
     if (!result.ok) return apiError(404, "not_found", "Follow target not found");
     revalidateTag(followCountCacheTag(parsed.data.targetType, parsed.data.targetId));
-    await setOnboardingFlagForSession(user, "hasFollowedSomething", true, { path: "/api/follows" });
+    try {
+      await setOnboardingFlagForSession(user, "hasFollowedSomething", true, { path: "/api/follows" });
+    } catch {
+      logError({
+        message: "onboarding_flag_failed",
+        userId: user.id,
+        flag: "hasFollowedSomething",
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isRateLimitError(error)) return rateLimitErrorResponse(error);

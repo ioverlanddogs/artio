@@ -145,7 +145,7 @@ export default async function ArtworkDetailPage({ params }: { params: Promise<{ 
         select: { id: true },
       }).then(Boolean)
       : Promise.resolve(false),
-    db.follow.count({ where: { targetType: "ARTIST", targetId: artwork.artist.id } }),
+    db.follow.count({ where: { targetType: "ARTIST", targetId: artwork.artist.id } }).catch(() => 0),
   ]);
 
   const coverDisplay = resolveAssetDisplay({
