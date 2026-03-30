@@ -18,6 +18,9 @@ if (!shouldEnforce) {
 const requiredInDeploy = ["AUTH_SECRET", "DATABASE_URL"];
 const optional = ["DIRECT_URL"];
 requiredInDeploy.push("CRON_SECRET");
+if (process.env.VERCEL === "1") {
+  requiredInDeploy.push("AI_INGEST_IMAGE_ENABLED");
+}
 
 const geocoderProvider = process.env.GEOCODER_PROVIDER?.trim().toLowerCase() || "mapbox";
 const isGoogleGeocoder = geocoderProvider === "google";
