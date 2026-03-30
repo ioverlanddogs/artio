@@ -86,6 +86,7 @@ If missing in production-like environments, auth boot will fail fast with a clea
    - `AUTH_SECRET`
    - `NEXTAUTH_URL`
    - `CRON_SECRET`
+   - `AI_INGEST_IMAGE_ENABLED` (set to `1`; without this, event/artist/artwork image import is silently skipped during enrichment and ingest approval)
    - `AUTH_GOOGLE_ID`
    - `AUTH_GOOGLE_SECRET`
    - `GEOCODER_PROVIDER` (`mapbox` default, set to `google` to use Google server-side geocoding)
