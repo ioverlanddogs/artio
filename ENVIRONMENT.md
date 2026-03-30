@@ -36,7 +36,12 @@ GOOGLE_MAPS_API_KEY=
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=
 
 # Blob storage (required for venue gallery + uploads)
+# Vercel Blob server token. Copy from Vercel → Storage → Blob store → `.env.local` tab.
 BLOB_READ_WRITE_TOKEN=
+
+# Required to enable event/artist/artwork image import during enrichment + ingest approval.
+# Without AI_INGEST_IMAGE_ENABLED=1, image import is silently skipped with attached=false.
+AI_INGEST_IMAGE_ENABLED=1
 
 # Email (Resend)
 # Deprecated (moved to /admin/settings):
@@ -101,6 +106,7 @@ Optional:
 - `AI_VENUE_ENRICHMENT_ENABLED` (set to `1` to enable Phase 1 venue enrichment ingest path)
 - `AI_ARTIST_INGEST_ENABLED` (set to `1` to enable Phase 3 artist ingest pipeline)
 - `AI_ARTWORK_INGEST_ENABLED` (set to `1` to enable Phase 4 artwork ingest pipeline)
+- `AI_INGEST_IMAGE_ENABLED` (set to `1` to enable event/artist/artwork image import during enrichment + ingest approval; without this, image import is silently skipped with `attached: false`)
 - `GEMINI_API_KEY` (required for Gemini provider in Phase 2/3)
 - `ANTHROPIC_API_KEY` (required for Claude provider in Phase 2/4)
 - `GOOGLE_PSE_API_KEY` (required for Google Programmable Search usage in Phase 3/5)
@@ -120,7 +126,7 @@ Optional:
 - `GEOCODER_PROVIDER` (`mapbox` default; set to `google` to use Google Geocoding API server-side)
 - `GOOGLE_MAPS_API_KEY` (required only when `GEOCODER_PROVIDER=google`; server-side only)
 - `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (enables `/nearby` map view)
-- `BLOB_READ_WRITE_TOKEN` (required for Blob image uploads)
+- `BLOB_READ_WRITE_TOKEN` (required for Blob image uploads; copy from Vercel → Storage → Blob store → `.env.local` tab)
 - `RATE_LIMIT_VENUE_IMAGES_WRITE_PER_MINUTE` (defaults to `60`)
 - `RATE_LIMIT_VENUE_IMAGES_WRITE_WINDOW_MS` (defaults to `60000`)
 - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (strongly recommended in production — without these, rate limiting is in-memory and not shared across instances)
@@ -136,6 +142,7 @@ Optional:
 - `vercel:build` runs `scripts/check-env.mjs --mode=vercel-build` before `next build`.
 - The check prints only variable names with set status (`true` / `false`), never secret values.
 - Required at build/deploy time: `AUTH_SECRET` and `DATABASE_URL`.
+- Required at build/deploy time on Vercel (`VERCEL=1`): `AI_INGEST_IMAGE_ENABLED` (to avoid silent image import skip during enrichment/approval).
 - Also required at build/deploy time when `GEOCODER_PROVIDER=google`: `GOOGLE_MAPS_API_KEY`.
 - Optional at build/deploy time: `DIRECT_URL` (reported for parity visibility, not required).
 - Cron scheduling is DB-driven via `/api/cron/tick` and external pings (UptimeRobot/Better Uptime/GitHub Actions), not `vercel.json` cron entries.
