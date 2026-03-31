@@ -5,7 +5,7 @@ import { CreateEventForm } from "@/app/my/events/_components/CreateEventForm";
 
 export default async function NewEventPage({ searchParams }: { searchParams?: Promise<{ venueId?: string | string[] | undefined }> }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/events/new");
+  if (!user) return redirectToLogin("/my/events/new");
 
   const memberships = await db.venueMembership.findMany({
     where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] } },

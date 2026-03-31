@@ -52,6 +52,11 @@ export function getAuthSecret(): string {
     if (nextAuthSecret && authSecret && nextAuthSecret !== authSecret && !hasWarnedAboutSecretMismatch) {
       hasWarnedAboutSecretMismatch = true;
       console.warn("[auth] NEXTAUTH_SECRET and AUTH_SECRET differ. Using NEXTAUTH_SECRET; align both values to avoid session decryption issues.");
+      logWarn({
+        message: "auth_secret_mismatch",
+        nextAuthSecretSet: true,
+        authSecretSet: true,
+      });
     }
   }
 

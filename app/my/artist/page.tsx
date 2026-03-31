@@ -20,7 +20,7 @@ import { ProfileCompletenessSidebar } from "@/components/my/artist/profile-compl
 
 export default async function MyArtistPage() {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/artist");
+  if (!user) return redirectToLogin("/my/artist");
 
   if (!hasDatabaseUrl()) {
     return (

@@ -31,7 +31,7 @@ function buildVenueStatusWhere(status: string | undefined): Prisma.VenueWhereInp
 
 export default async function MyVenuesPage({ searchParams }: { searchParams: VenuesSearchParams }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/venues");
+  if (!user) return redirectToLogin("/my/venues");
   const params = await searchParams;
   const query = getFirstSearchValue(params, ["q", "query"]) ?? "";
   const status = params.status;

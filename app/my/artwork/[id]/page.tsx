@@ -14,7 +14,7 @@ export default async function MyArtworkDetailPage({
 }) {
   const { id } = await params;
   const user = await getSessionUser();
-  if (!user) redirectToLogin(`/my/artwork/${id}`);
+  if (!user) return redirectToLogin(`/my/artwork/${id}`);
   if (!user) return null;
 
   try {

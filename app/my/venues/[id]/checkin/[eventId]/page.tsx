@@ -12,7 +12,7 @@ export default async function VenueEventCheckinPage({
 }) {
   const { id, eventId } = await params;
   const user = await getSessionUser();
-  if (!user) redirectToLogin(`/my/venues/${id}/checkin/${eventId}`);
+  if (!user) return redirectToLogin(`/my/venues/${id}/checkin/${eventId}`);
 
   const routeVenue = await resolveVenueIdFromRouteParam(id, db);
   if (!routeVenue) notFound();

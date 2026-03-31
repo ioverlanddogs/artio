@@ -25,7 +25,7 @@ function formatArtworkPrice(item: ArtworkStat) {
 
 export default async function MyAnalyticsPage({ searchParams }: { searchParams?: Promise<{ windowDays?: string }> }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/analytics");
+  if (!user) return redirectToLogin("/my/analytics");
 
   const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
   if (!artist) {

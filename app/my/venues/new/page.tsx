@@ -4,7 +4,7 @@ import { CreateVenueForm } from "@/app/my/venues/_components/CreateVenueForm";
 
 export default async function CreateVenuePage() {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/venues/new");
+  if (!user) return redirectToLogin("/my/venues/new");
 
   return (
     <main className="space-y-4 p-6">

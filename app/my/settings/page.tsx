@@ -3,7 +3,7 @@ import { redirectToLogin } from "@/lib/auth-redirect";
 
 export default async function MySettingsPage() {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/settings");
+  if (!user) return redirectToLogin("/my/settings");
 
   return (
     <main className="space-y-6">

@@ -36,7 +36,7 @@ function buildEventStatusWhere(status: string | undefined, showArchived: boolean
 
 export default async function MyEventsPage({ searchParams }: { searchParams: EventsSearchParams }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/events");
+  if (!user) return redirectToLogin("/my/events");
   const params = await searchParams;
   const query = getFirstSearchValue(params, ["q", "query"]) ?? "";
   const { status, dateFrom, dateTo } = params;

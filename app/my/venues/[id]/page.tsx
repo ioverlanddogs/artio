@@ -31,7 +31,7 @@ export default async function MyVenueEditPage({
   const { id } = await params;
   const query = (await searchParams) ?? {};
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/venues");
+  if (!user) return redirectToLogin("/my/venues");
 
   if (!hasDatabaseUrl()) {
     return (
