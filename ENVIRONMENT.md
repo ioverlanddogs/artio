@@ -1,6 +1,6 @@
-# Environment Configuration — Artpulse
+# Environment Configuration — Artio
 
-This document defines all environment variables required to run Artpulse locally and on Vercel.
+This document defines all environment variables required to run Artio locally and on Vercel.
 
 ---
 
@@ -14,7 +14,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NODE_ENV=development
 
 # Database (Postgres)
-DATABASE_URL=postgresql://artpulse:artpulse@localhost:5432/artpulse
+DATABASE_URL=postgresql://artio:artio@localhost:5432/artio
 
 # Authentication (Auth.js / NextAuth)
 AUTH_SECRET=replace-with-long-random-string
@@ -46,7 +46,7 @@ AI_INGEST_IMAGE_ENABLED=1
 # Email (Resend)
 # Deprecated (moved to /admin/settings):
 # RESEND_API_KEY=
-# RESEND_FROM_ADDRESS=Artpulse <noreply@mail.artpulse.co>
+# RESEND_FROM_ADDRESS=Artio <noreply@mail.artio.co>
 RESEND_WEBHOOK_SECRET=
 UNSUBSCRIBE_TOKEN_SECRET=replace-with-long-random-string
 

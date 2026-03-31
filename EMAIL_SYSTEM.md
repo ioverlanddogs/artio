@@ -3,7 +3,7 @@
 > **Status:** Not started  
 > **Provider:** Resend  
 > **Delivery:** 10 weeks, one Codex session per week  
-> **Reference plan:** `artpulse-codex-upgrade-bundle/docs/` (email system plan, March 2026)
+> **Reference plan:** `artio-codex-upgrade-bundle/docs/` (email system plan, March 2026)
 
 ---
 
@@ -36,7 +36,7 @@ Add all of these to `ENVIRONMENT.md` and `scripts/check-env.mjs`:
 | Variable | Required in prod | Purpose |
 |---|---|---|
 | `RESEND_API_KEY` | Yes | Resend API authentication |
-| `RESEND_FROM_ADDRESS` | Yes | Default from address e.g. `Artpulse <noreply@mail.artpulse.co>` |
+| `RESEND_FROM_ADDRESS` | Yes | Default from address e.g. `Artio <noreply@mail.artio.co>` |
 | `RESEND_WEBHOOK_SECRET` | Yes | Verify signature on POST `/api/webhooks/resend` |
 | `UNSUBSCRIBE_TOKEN_SECRET` | Yes | HMAC secret for unsubscribe link tokens — **never rotate**, rotating invalidates all existing unsubscribe links |
 
@@ -147,7 +147,7 @@ const { subject, html, text } = await renderEmailTemplate(
 const fromAddress =
   (await getSiteSettings()).emailFromAddress ??
   process.env.RESEND_FROM_ADDRESS ??
-  'Artpulse <noreply@mail.artpulse.co>';
+  'Artio <noreply@mail.artio.co>';
 
 const resend = getResendClient();
 await resend.emails.send({
@@ -255,7 +255,7 @@ The digest cron (`20 2 * * *`) stays unchanged — it is a separate route.
 
 ### DNS (ops task)
 
-Use the Resend dashboard to generate SPF, DKIM, and DMARC DNS records for the sending domain (e.g. `mail.artpulse.co`). Set DMARC to `p=none` initially to monitor without blocking. Run [mail-tester.com](https://mail-tester.com) before production launch.
+Use the Resend dashboard to generate SPF, DKIM, and DMARC DNS records for the sending domain (e.g. `mail.artio.co`). Set DMARC to `p=none` initially to monitor without blocking. Run [mail-tester.com](https://mail-tester.com) before production launch.
 
 ---
 
@@ -290,7 +290,7 @@ export function EmailLayout({
           {/* Header */}
           <Section style={{ backgroundColor: '#1A1A2E', padding: '20px 24px' }}>
             <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: 'bold', margin: 0 }}>
-              Artpulse
+              Artio
             </Text>
           </Section>
           {/* Body */}
@@ -298,7 +298,7 @@ export function EmailLayout({
           {/* CAN-SPAM footer — required by law */}
           <Section style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px' }}>
             <Text style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>
-              Artpulse · 123 Example Street, London, UK
+              Artio · 123 Example Street, London, UK
             </Text>
             {unsubscribeUrl && (
               <Link href={unsubscribeUrl} style={{ fontSize: 12, color: '#9ca3af' }}>
@@ -386,10 +386,10 @@ Create one file per template. Each exports a default React component and a named
 |---|---|---|
 | `venue-invite.tsx` | `INVITE_CREATED` | `You're invited to manage [Venue]` |
 | `submission-submitted.tsx` | `SUBMISSION_SUBMITTED` | `Your [event/venue] submission is in review` |
-| `submission-approved.tsx` | `SUBMISSION_APPROVED` | `[Event] is now published on Artpulse` |
+| `submission-approved.tsx` | `SUBMISSION_APPROVED` | `[Event] is now published on Artio` |
 | `submission-rejected.tsx` | `SUBMISSION_REJECTED` | `Changes needed for [Event]` |
 | `saved-search-match.tsx` | `SAVED_SEARCH_MATCH` | `New event matches your search: [name]` |
-| `weekly-digest.tsx` | `DIGEST_READY` | `Your Artpulse digest — [date range]` |
+| `weekly-digest.tsx` | `DIGEST_READY` | `Your Artio digest — [date range]` |
 
 Template structure (use for all):
 
@@ -435,7 +435,7 @@ Run `pnpm test` after each template to ensure existing tests pass.
 | File | NotificationType | Subject pattern | Notes |
 |---|---|---|---|
 | `venue-claim-verify.tsx` | `VENUE_CLAIM_VERIFY` | `Verify your claim for [Venue]` | Prominent CTA, warn token expires in 60 min |
-| `venue-claim-approved.tsx` | `VENUE_CLAIM_APPROVED` | `You now manage [Venue] on Artpulse` | CTA: Go to dashboard |
+| `venue-claim-approved.tsx` | `VENUE_CLAIM_APPROVED` | `You now manage [Venue] on Artio` | CTA: Go to dashboard |
 | `venue-claim-rejected.tsx` | `VENUE_CLAIM_REJECTED` | `Your claim for [Venue] was not approved` | Show optional reason. CTA: Try again |
 
 Add each to the `renderEmailTemplate` dispatcher in `lib/email/render.ts`.
@@ -471,7 +471,7 @@ EVENT_REMINDER_24H
 **`lib/email/templates/new-user-welcome.tsx`** — new file.
 
 - `NotificationType`: `NEW_USER_WELCOME` (add to enum + migration)
-- Subject: `Welcome to Artpulse`
+- Subject: `Welcome to Artio`
 - Short intro, single CTA: `Explore events near you`
 
 ### C15 — Trigger welcome email on first sign-in
@@ -599,7 +599,7 @@ export default async function UnsubscribePage({
     update: {},
   });
 
-  return <p>You've been unsubscribed. You won't receive further emails from Artpulse.</p>;
+  return <p>You've been unsubscribed. You won't receive further emails from Artio.</p>;
 }
 ```
 
@@ -865,7 +865,7 @@ Add a dedicated Email section to `ENVIRONMENT.md`:
 | Variable                  | Required in prod | Description                                                    |
 |---------------------------|-----------------|----------------------------------------------------------------|
 | RESEND_API_KEY            | Yes             | Resend API key                                                 |
-| RESEND_FROM_ADDRESS       | Yes             | Default from address: Artpulse <noreply@mail.artpulse.co>      |
+| RESEND_FROM_ADDRESS       | Yes             | Default from address: Artio <noreply@mail.artio.co>      |
 | RESEND_WEBHOOK_SECRET     | Yes             | Webhook signature verification secret from Resend dashboard    |
 | UNSUBSCRIBE_TOKEN_SECRET  | Yes             | HMAC-SHA256 secret for unsubscribe tokens. Never rotate.       |
 ```
@@ -878,7 +878,7 @@ Apply to every template:
 
 - **Subject lines** — short and specific. `Your RSVP for Gillian Wearing at Whitechapel Gallery` not `You're registered!`
 - **Preheader** — every template includes a `<Preview>` component (inbox preview text)
-- **One CTA per email** — use Artpulse brand colour `#E63946`. Include a plain-text fallback URL below every button for clients that block images
+- **One CTA per email** — use Artio brand colour `#E63946`. Include a plain-text fallback URL below every button for clients that block images
 - **Footer** — every template uses `EmailLayout` which includes the physical address and unsubscribe link (CAN-SPAM / GDPR required)
 - **Plain text** — `renderAsync(..., { plainText: true })` produces the text fallback automatically; always send both via Resend's `text` field
 - **No flexbox or CSS grid** — email clients don't support them; use table-based layout via React Email's `Row`/`Column` components
