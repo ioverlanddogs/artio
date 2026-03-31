@@ -14,7 +14,7 @@ async function getTeamData(venueId?: string) {
 
 export default async function MyTeamPage({ searchParams }: { searchParams: Promise<{ venueId?: string }> }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/team");
+  if (!user) return redirectToLogin("/my/team");
   const { venueId } = await searchParams;
   const data = await getTeamData(venueId);
 

@@ -17,7 +17,7 @@ type ArtworkSearchParams = Promise<{ q?: string; query?: string; status?: string
 
 export default async function MyArtworkPage({ searchParams }: { searchParams: ArtworkSearchParams }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/artwork");
+  if (!user) return redirectToLogin("/my/artwork");
   const params = await searchParams;
   const query = getFirstSearchValue(params, ["q", "query"]) ?? "";
   const status = params.status;

@@ -13,7 +13,7 @@ import { ReadinessChecklist } from "@/components/publishing/ReadinessChecklist";
 
 export default async function MyEventEditPage({ params }: { params: Promise<{ eventId: string }> }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/events");
+  if (!user) return redirectToLogin("/my/events");
 
   const { eventId } = await params;
 

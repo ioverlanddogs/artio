@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MyArtistCvPage() {
   const user = await requireAuth().catch(() => null);
-  if (!user) redirectToLogin("/my/artist/cv");
+  if (!user) return redirectToLogin("/my/artist/cv");
 
   const artist = await db.artist.findUnique({
     where: { userId: user.id },

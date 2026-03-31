@@ -22,7 +22,7 @@ async function getStripeStatus(userId: string) {
 
 export default async function ArtistStripeReturnPage() {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/artist/stripe/return");
+  if (!user) return redirectToLogin("/my/artist/stripe/return");
 
   const status = await getStripeStatus(user.id);
 

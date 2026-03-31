@@ -9,6 +9,22 @@ function parseMode(argv) {
 const mode = parseMode(process.argv.slice(2));
 const isDeployContext = process.env.VERCEL === "1" || process.env.CI === "true";
 const shouldEnforce = mode === "vercel-build" || mode === "deploy" || (mode === "auto" && isDeployContext);
+const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+const authSecret = process.env.AUTH_SECRET;
+const hasNextAuthSecret = Boolean(nextAuthSecret && String(nextAuthSecret).trim().length > 0);
+const hasAuthSecret = Boolean(authSecret && String(authSecret).trim().length > 0);
+
+if (hasNextAuthSecret && hasAuthSecret && nextAuthSecret !== authSecret) {
+  console.error("[check-env] AUTH_SECRET and NEXTAUTH_SECRET are both set but differ.");
+  console.error("[check-env] This can cause a silent auth loop: middleware token verification and server session decryption use different keys.");
+  console.error("[check-env] Set AUTH_SECRET and NEXTAUTH_SECRET to the same value.");
+  process.exit(1);
+}
+
+if (hasNextAuthSecret && !hasAuthSecret) {
+  console.warn("[check-env] NEXTAUTH_SECRET is set but AUTH_SECRET is missing.");
+  console.warn("[check-env] Set AUTH_SECRET to the same value so middleware token verification works consistently.");
+}
 
 if (!shouldEnforce) {
   console.log("[check-env] non-deploy context detected; skipping strict checks");

@@ -6,7 +6,7 @@ import { AttendeesClient } from "@/app/my/events/[eventId]/attendees/attendees-c
 
 export default async function EventAttendeesPage({ params }: { params: Promise<{ eventId: string }> }) {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/events");
+  if (!user) return redirectToLogin("/my/events");
 
   const { eventId } = await params;
 

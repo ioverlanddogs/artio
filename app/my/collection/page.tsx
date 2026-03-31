@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MyCollectionPage() {
   const user = await getSessionUser();
-  if (!user) redirectToLogin("/my/collection");
+  if (!user) return redirectToLogin("/my/collection");
 
   const [orders, favorites, followedArtistsCount] = await Promise.all([
     db.artworkOrder.findMany({
