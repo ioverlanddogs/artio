@@ -46,7 +46,7 @@ Seed payload includes:
 - 3 artists
 - 10 events
 - tags and event links
-- optional admin user if `ARTPULSE_ADMIN_EMAIL` is provided
+- optional admin user if `ARTIO_ADMIN_EMAIL` is provided
 
 ## Preview lifecycle
 1. PR opened/synchronized/reopened:

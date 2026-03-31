@@ -23,8 +23,8 @@ async function run() {
     return result;
   }
 
-  const adminEmail = process.env.ARTPULSE_ADMIN_EMAIL;
-  const adminName = process.env.ARTPULSE_ADMIN_NAME || "Preview Admin";
+  const adminEmail = process.env.ARTIO_ADMIN_EMAIL;
+  const adminName = process.env.ARTIO_ADMIN_NAME || "Preview Admin";
 
   if (adminEmail) {
     await trackedUpsert(db.user, {

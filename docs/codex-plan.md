@@ -1,6 +1,6 @@
 # ARTIST_ARTWORK_SHOWCASE — Codex Agent Implementation Pack
 > Feature: Option B — Full Artwork Showcase on Public Artist Profile  
-> Repo: artpulse-demo-main  
+> Repo: artio-demo-main  
 > Stack: Next.js App Router · TypeScript · Prisma · Tailwind · shadcn/ui
 
 ---
@@ -493,7 +493,7 @@ Copy the block below verbatim as your Codex prompt:
 ---
 
 ```
-You are implementing the ARTIST_ARTWORK_SHOWCASE feature for the artpulse-demo-main Next.js repository.
+You are implementing the ARTIST_ARTWORK_SHOWCASE feature for the artio-demo-main Next.js repository.
 
 Full implementation spec is in this handoff document. Follow every instruction exactly.
 

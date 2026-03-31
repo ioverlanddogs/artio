@@ -9,8 +9,8 @@ const originalNodeEnv = process.env.NODE_ENV;
 const originalBetaMode = process.env.BETA_MODE;
 
 test("getCanonicalHost returns host parsed from NEXTAUTH_URL", () => {
-  process.env.NEXTAUTH_URL = "https://artpulse-demo.vercel.app";
-  assert.equal(getCanonicalHost(), "artpulse-demo.vercel.app");
+  process.env.NEXTAUTH_URL = "https://artio-demo.vercel.app";
+  assert.equal(getCanonicalHost(), "artio-demo.vercel.app");
 });
 
 test("getCanonicalHost returns null when NEXTAUTH_URL is invalid", () => {
@@ -30,7 +30,7 @@ test("shouldEnforceCanonicalHost only enforces in production and non-local hosts
 
 test("middleware redirects non-api requests to canonical host and preserves path/query", async () => {
   process.env.NODE_ENV = "production";
-  process.env.NEXTAUTH_URL = "https://artpulse-demo.vercel.app";
+  process.env.NEXTAUTH_URL = "https://artio-demo.vercel.app";
   process.env.BETA_MODE = "0";
 
   const req = new NextRequest("https://preview-abc.vercel.app/for-you?tab=latest", {
@@ -42,12 +42,12 @@ test("middleware redirects non-api requests to canonical host and preserves path
   const res = await middleware(req);
 
   assert.equal(res.status, 308);
-  assert.equal(res.headers.get("location"), "https://artpulse-demo.vercel.app/for-you?tab=latest");
+  assert.equal(res.headers.get("location"), "https://artio-demo.vercel.app/for-you?tab=latest");
 });
 
 test("middleware does not redirect localhost", async () => {
   process.env.NODE_ENV = "production";
-  process.env.NEXTAUTH_URL = "https://artpulse-demo.vercel.app";
+  process.env.NEXTAUTH_URL = "https://artio-demo.vercel.app";
   process.env.BETA_MODE = "0";
 
   const req = new NextRequest("http://localhost:3000/for-you?tab=latest");
@@ -59,7 +59,7 @@ test("middleware does not redirect localhost", async () => {
 
 test("middleware skips canonical-host redirects for /api routes", async () => {
   process.env.NODE_ENV = "production";
-  process.env.NEXTAUTH_URL = "https://artpulse-demo.vercel.app";
+  process.env.NEXTAUTH_URL = "https://artio-demo.vercel.app";
   process.env.BETA_MODE = "0";
 
   const req = new NextRequest("https://preview-abc.vercel.app/api/notifications?unread=1");
