@@ -66,10 +66,10 @@ type Deps = {
 };
 
 const bodySchema = z.object({
-  guestName: z.string().trim().min(1),
+  guestName: z.string().trim().min(1).max(200),
   guestEmail: z.string().trim().email().transform((value) => value.toLowerCase()),
   tierId: z.string().uuid().optional(),
-  quantity: z.number().int().positive().default(1),
+  quantity: z.number().int().positive().max(20).default(1),
 });
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };

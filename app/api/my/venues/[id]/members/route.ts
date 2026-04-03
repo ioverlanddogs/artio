@@ -3,7 +3,7 @@ import { apiError } from "@/lib/api";
 import { isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireVenueMemberManager } from "@/lib/venue-access";
-import { parseBody, venueIdParamSchema, venueMemberCreateSchema, zodDetails } from "@/lib/validators";
+import { parseBody, venueIdParamSchema, venueMemberDirectAddSchema, zodDetails } from "@/lib/validators";
 
 export const runtime = "nodejs";
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     await requireVenueMemberManager(parsedId.data.id);
 
-    const parsedBody = venueMemberCreateSchema.safeParse(await parseBody(req));
+    const parsedBody = venueMemberDirectAddSchema.safeParse(await parseBody(req));
     if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedBody.error));
 
     const targetUser = await db.user.findUnique({

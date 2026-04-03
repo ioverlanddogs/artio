@@ -11,8 +11,8 @@ type Deps = {
   updateStripeAccount: (id: string, data: { chargesEnabled?: boolean; payoutsEnabled?: boolean; status: "ACTIVE" | "RESTRICTED" | "DEAUTHORIZED" }) => Promise<unknown>;
   findArtistStripeAccountByStripeAccountId: (stripeAccountId: string) => Promise<{ id: string } | null>;
   updateArtistStripeAccount: (id: string, data: { chargesEnabled?: boolean; payoutsEnabled?: boolean; status: "ACTIVE" | "RESTRICTED" | "DEAUTHORIZED" }) => Promise<unknown>;
-  findRegistrationByPaymentIntentId: (paymentIntentId: string) => Promise<{ id: string; status: "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED" } | null>;
-  findRegistrationById: (registrationId: string) => Promise<{ id: string; status: "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED" } | null>;
+  findRegistrationByPaymentIntentId: (paymentIntentId: string) => Promise<{ id: string; status: "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED"; guestEmail: string } | null>;
+  findRegistrationById: (registrationId: string) => Promise<{ id: string; status: "PENDING" | "CONFIRMED" | "CANCELLED" | "WAITLISTED"; guestEmail: string } | null>;
   updateRegistrationStatus: (registrationId: string, status: "CONFIRMED") => Promise<unknown>;
   findArtworkOrderBySessionId: (sessionId: string) => Promise<{ id: string; artworkId: string; status: ArtworkOrderStatus } | null>;
   confirmArtworkOrder: (orderId: string, artworkId: string, paymentIntentId: string | null) => Promise<void>;
@@ -90,9 +90,12 @@ export async function handleStripeWebhook(req: Request, deps: Deps) {
 
     if (registration && registration.status === "PENDING") {
       await deps.updateRegistrationStatus(registration.id, "CONFIRMED");
+      // NOTE: checkout-confirm.ts also enqueues this notification with the same dedupeKey.
+      // The outbox upsert is idempotent — whichever path fires first wins.
+      // Both paths now use the real guestEmail (see findRegistrationBy* deps above).
       await deps.enqueueNotification({
         type: "REGISTRATION_CONFIRMED",
-        toEmail: "noreply@localhost",
+        toEmail: registration.guestEmail,
         payload: { registrationId: registration.id },
         dedupeKey: `registration-confirmed:${registration.id}`,
       });

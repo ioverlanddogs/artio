@@ -652,9 +652,9 @@ export const myEventCreateSchema = z.object(myEventShape).superRefine((data, ctx
 });
 
 export const myEventPatchSchema = z.object({
-  title: z.string().trim().min(1).optional(),
+  title: z.string().trim().min(1).max(120).optional(),
   slug: slugSchema.optional(),
-  description: z.string().optional().nullable(),
+  description: z.string().trim().max(4000).optional().nullable(),
   timezone: z.string().trim().min(1).optional(),
   startAt: isoDatetimeSchema.optional(),
   endAt: isoDatetimeSchema.optional().nullable(),
@@ -751,6 +751,11 @@ export const adminModerationRejectSchema = z.object({
 export const venueMemberCreateSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   role: z.enum(["OWNER", "EDITOR"]),
+});
+
+export const venueMemberDirectAddSchema = z.object({
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  role: z.literal("EDITOR"),
 });
 
 export const venueMemberPatchSchema = z.object({

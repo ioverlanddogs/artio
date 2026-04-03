@@ -15,8 +15,8 @@ export async function POST(req: Request) {
     updateStripeAccount: (id, data) => db.stripeAccount.update({ where: { id }, data }),
     findArtistStripeAccountByStripeAccountId: (stripeAccountId) => db.artistStripeAccount.findUnique({ where: { stripeAccountId }, select: { id: true } }),
     updateArtistStripeAccount: (id, data) => db.artistStripeAccount.update({ where: { id }, data }),
-    findRegistrationByPaymentIntentId: (stripePaymentIntentId) => db.registration.findFirst({ where: { stripePaymentIntentId }, select: { id: true, status: true } }),
-    findRegistrationById: (id) => db.registration.findUnique({ where: { id }, select: { id: true, status: true } }),
+    findRegistrationByPaymentIntentId: (stripePaymentIntentId) => db.registration.findFirst({ where: { stripePaymentIntentId }, select: { id: true, status: true, guestEmail: true } }),
+    findRegistrationById: (id) => db.registration.findUnique({ where: { id }, select: { id: true, status: true, guestEmail: true } }),
     updateRegistrationStatus: (id, status) => db.registration.update({ where: { id }, data: { status } }),
     findArtworkOrderBySessionId: (sessionId) => db.artworkOrder.findFirst({
       where: { stripeSessionId: sessionId },

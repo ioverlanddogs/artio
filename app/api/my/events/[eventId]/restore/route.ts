@@ -20,8 +20,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ eventId: 
           { submissions: { some: { submitterUserId: userId, type: "EVENT", OR: [{ kind: "PUBLISH" }, { kind: null }] } } },
         ],
       },
-      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
+      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true },
     }),
-    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true } }),
   });
 }

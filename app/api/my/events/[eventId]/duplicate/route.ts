@@ -50,7 +50,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ eventId: 
         ticketUrl: sourceEvent.ticketUrl,
         priceText: sourceEvent.priceText,
         isFree: sourceEvent.isFree,
-        startAt: null,
+        startAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         endAt: null,
         isPublished: false,
         status: "DRAFT",

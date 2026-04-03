@@ -15,8 +15,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     requireAuth,
     getEntityForUser: (id, userId) => db.venue.findFirst({
       where: { id, memberships: { some: { userId, role: { in: ["OWNER", "EDITOR"] } } } },
-      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
+      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true },
     }),
-    updateEntity: (id, data) => db.venue.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    updateEntity: (id, data) => db.venue.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true } }),
   });
 }

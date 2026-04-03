@@ -23,6 +23,7 @@ type TierRecord = {
   priceAmount: number;
   currency: string;
   isActive: boolean;
+  capacity: number | null;
 };
 
 type StripeAccountRecord = {
@@ -35,6 +36,7 @@ type Deps = {
   getSessionUser: () => Promise<SessionUser | null>;
   findPublishedEventBySlug: (slug: string) => Promise<EventRecord | null>;
   findTicketTierById: (tierId: string) => Promise<TierRecord | null>;
+  countConfirmedAndPendingForTier: (tierId: string) => Promise<number>;
   findStripeAccountByVenueId: (venueId: string) => Promise<StripeAccountRecord | null>;
   findPromoCodeByEventIdAndCode: (eventId: string, code: string) => Promise<PromoCodeRecord | null>;
   getPlatformFeePercent: () => Promise<number>;
@@ -74,8 +76,8 @@ type Deps = {
 
 const bodySchema = z.object({
   tierId: z.string().uuid(),
-  quantity: z.number().int().positive().default(1),
-  guestName: z.string().trim().min(1),
+  quantity: z.number().int().positive().max(20).default(1),
+  guestName: z.string().trim().min(1).max(200),
   guestEmail: z.string().trim().email().transform((value) => value.toLowerCase()),
   promoCode: z.string().trim().min(1).optional(),
 });
@@ -94,6 +96,12 @@ export async function handlePostCheckoutSession(req: NextRequest, slug: string, 
   if (!tier || tier.eventId !== event.id) return apiError(404, "not_found", "Ticket tier not found");
   if (!tier.isActive) return apiError(400, "invalid_request", "Ticket tier is not active");
   if (tier.priceAmount === 0) return apiError(400, "invalid_request", "Free tiers must use RSVP registration");
+  if (tier.capacity != null) {
+    const used = await deps.countConfirmedAndPendingForTier(tier.id);
+    if (used + parsedBody.data.quantity > tier.capacity) {
+      return apiError(400, "sold_out", "This ticket tier is sold out");
+    }
+  }
 
   if (!event.venueId) {
     return apiError(400, "invalid_request", "Venue does not have an active Stripe account");
