@@ -14,6 +14,13 @@ function signatureFor(payload: string, secret: string) {
 }
 
 async function getAlertSettings() {
+  if (process.env.ALERT_WEBHOOK_URL) {
+    return {
+      webhookUrl: process.env.ALERT_WEBHOOK_URL,
+      webhookSecret: process.env.ALERT_WEBHOOK_SECRET,
+    };
+  }
+
   const settings = await db.siteSettings.findUnique({
     where: { id: "default" },
     select: { alertWebhookUrl: true, alertWebhookSecret: true },
