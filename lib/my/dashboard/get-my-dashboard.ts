@@ -47,6 +47,7 @@ export async function getMyDashboard({ userId, venueId }: { userId: string; venu
   const allowedVenueIds = memberships.map((m) => m.venueId);
   const selectedVenueId = venueId && allowedVenueIds.includes(venueId) ? venueId : null;
   const scopedVenueIds = selectedVenueId ? [selectedVenueId] : allowedVenueIds;
+  const scopedVenueIdFilter = { in: scopedVenueIds.length ? scopedVenueIds : ["00000000-0000-0000-0000-000000000000"] };
 
   const artist = await db.artist.findUnique({ where: { userId }, select: { id: true } });
 
@@ -93,16 +94,16 @@ export async function getMyDashboard({ userId, venueId }: { userId: string; venu
       ? db.venueInvite.findMany({ where: { venueId: { in: scopedVenueIds }, status: "PENDING", expiresAt: { gt: new Date() } }, select: { id: true, venueId: true, createdAt: true } })
       : Promise.resolve([]),
     Promise.all([
-      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIds.length ? { in: scopedVenueIds } : undefined, isPublished: true } }),
-      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIds.length ? { in: scopedVenueIds } : undefined, isPublished: false, submissions: { some: { type: "EVENT", status: "IN_REVIEW" } } } }),
-      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIds.length ? { in: scopedVenueIds } : undefined, isPublished: false, submissions: { some: { type: "EVENT", status: "REJECTED" } } } }),
-      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIds.length ? { in: scopedVenueIds } : undefined, isPublished: false, NOT: { submissions: { some: { type: "EVENT", status: { in: ["IN_REVIEW", "REJECTED"] } } } } } }),
+      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIdFilter, isPublished: true } }),
+      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIdFilter, isPublished: false, submissions: { some: { type: "EVENT", status: "IN_REVIEW" } } } }),
+      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIdFilter, isPublished: false, submissions: { some: { type: "EVENT", status: "REJECTED" } } } }),
+      db.event.count({ where: { deletedAt: null, venueId: scopedVenueIdFilter, isPublished: false, NOT: { submissions: { some: { type: "EVENT", status: { in: ["IN_REVIEW", "REJECTED"] } } } } } }),
     ]),
     Promise.all([
-      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null, isPublished: true, ...(selectedVenueId ? { id: selectedVenueId } : {}) } } }),
-      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null, isPublished: false, submissions: { some: { type: "VENUE", status: "IN_REVIEW" } }, ...(selectedVenueId ? { id: selectedVenueId } : {}) } } }),
-      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null, isPublished: false, submissions: { some: { type: "VENUE", status: "REJECTED" } }, ...(selectedVenueId ? { id: selectedVenueId } : {}) } } }),
-      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null, isPublished: false, NOT: { submissions: { some: { type: "VENUE", status: { in: ["IN_REVIEW", "REJECTED"] } } } }, ...(selectedVenueId ? { id: selectedVenueId } : {}) } } }),
+      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { id: scopedVenueIdFilter, deletedAt: null, isPublished: true } } }),
+      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { id: scopedVenueIdFilter, deletedAt: null, isPublished: false, submissions: { some: { type: "VENUE", status: "IN_REVIEW" } } } } }),
+      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { id: scopedVenueIdFilter, deletedAt: null, isPublished: false, submissions: { some: { type: "VENUE", status: "REJECTED" } } } } }),
+      db.venueMembership.count({ where: { userId, role: { in: ["OWNER", "EDITOR"] }, venue: { id: scopedVenueIdFilter, deletedAt: null, isPublished: false, NOT: { submissions: { some: { type: "VENUE", status: { in: ["IN_REVIEW", "REJECTED"] } } } } } } }),
     ]),
     artist?.id ? db.artwork.count({ where: { artistId: artist.id, deletedAt: null, isPublished: false } }) : Promise.resolve(0),
     artist?.id ? db.artwork.count({ where: { artistId: artist.id, deletedAt: null, isPublished: true } }) : Promise.resolve(0),

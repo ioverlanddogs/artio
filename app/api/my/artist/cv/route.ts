@@ -60,6 +60,14 @@ export async function POST(req: NextRequest) {
     const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
     if (!artist) return NextResponse.json({ error: "not_found", message: "Artist profile not found" }, { status: 404 });
 
+    const existingCount = await db.artistCvEntry.count({ where: { artistId: artist.id } });
+    if (existingCount >= 200) {
+      return NextResponse.json(
+        { error: "limit_reached", message: "CV entry limit of 200 reached" },
+        { status: 400 },
+      );
+    }
+
     const parsed = cvPayloadSchema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_request", message: "Invalid payload", details: parsed.error.flatten() }, { status: 400 });

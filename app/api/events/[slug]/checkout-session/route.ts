@@ -31,8 +31,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }),
     findTicketTierById: (tierId) => db.ticketTier.findUnique({
       where: { id: tierId },
-      select: { id: true, eventId: true, name: true, priceAmount: true, currency: true, isActive: true },
+      select: { id: true, eventId: true, name: true, priceAmount: true, currency: true, isActive: true, capacity: true },
     }),
+    countConfirmedAndPendingForTier: (tierId) =>
+      db.registration.aggregate({
+        where: { tierId, status: { in: ["CONFIRMED", "PENDING"] } },
+        _sum: { quantity: true },
+      }).then((result) => result._sum.quantity ?? 0),
     findStripeAccountByVenueId: (venueId) => db.stripeAccount.findUnique({
       where: { venueId },
       select: { stripeAccountId: true, status: true, chargesEnabled: true },

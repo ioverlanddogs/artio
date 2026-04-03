@@ -52,7 +52,7 @@ const tierParamsSchema = z.object({ eventId: z.string().uuid(), tierId: z.string
 const createTierSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().trim().max(500).optional().nullable(),
-  priceAmount: z.number().int().min(0),
+  priceAmount: z.number().int().min(0).max(100_000_00),
   currency: z.string().trim().min(1).max(16).default("GBP"),
   capacity: z.number().int().positive().optional().nullable(),
   sortOrder: z.number().int().optional(),

@@ -22,9 +22,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
           { submissions: { some: { submitterUserId: userId, type: "EVENT", OR: [{ kind: "PUBLISH" }, { kind: null }] } } },
         ],
       },
-      select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
+      select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true },
     }),
-    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    updateEntity: (id, data) => db.event.update({ where: { id }, data, select: { id: true, slug: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true } }),
     onArchived: async (item) => {
       const slug = (item as { slug?: string | null }).slug;
       if (!slug) return;

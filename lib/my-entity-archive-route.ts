@@ -6,7 +6,7 @@ type SessionUser = { id: string };
 
 type ArchivePayload = { reason?: string | null };
 
-type EntityRecord = { id: string; deletedAt: Date | null; deletedReason: string | null; deletedByAdminId: string | null };
+type EntityRecord = { id: string; deletedAt: Date | null; deletedReason: string | null; deletedByAdminId: string | null; isPublished: boolean };
 
 type Deps = {
   requireAuth: () => Promise<SessionUser>;
@@ -55,6 +55,7 @@ export async function handleMyEntityRestore(params: { id: string }, deps: Deps) 
       deletedAt: null,
       deletedReason: null,
       deletedByAdminId: null,
+      isPublished: false,
     });
     return NextResponse.json({ item });
   } catch (error) {

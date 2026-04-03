@@ -14,8 +14,8 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
     requireAuth,
     getEntityForUser: (id, userId) => db.artwork.findFirst({
       where: { id, artist: { userId } },
-      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true },
+      select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true },
     }),
-    updateEntity: (id, data) => db.artwork.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true } }),
+    updateEntity: (id, data) => db.artwork.update({ where: { id }, data, select: { id: true, deletedAt: true, deletedReason: true, deletedByAdminId: true, isPublished: true } }),
   });
 }
