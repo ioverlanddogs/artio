@@ -91,8 +91,8 @@ export default async function EventDetail({ params }: { params: Promise<{ slug: 
       ? listPublishedEventsInSeriesWithDeps({ findMany: (args) => db.event.findMany(args) }, { seriesId: event.seriesId, excludeEventId: event.id })
       : Promise.resolve([]),
     user ? db.favorite.findUnique({ where: { userId_targetType_targetId: { userId: user.id, targetType: "EVENT", targetId: event.id } }, select: { id: true } }) : Promise.resolve(null),
-    db.favorite.count({ where: { targetType: "EVENT", targetId: event.id } }),
-    db.collectionItem.count({ where: { entityType: "EVENT", entityId: event.id } }),
+    db.favorite.count({ where: { targetType: "EVENT", targetId: event.id } }).catch(() => 0),
+    db.collectionItem.count({ where: { entityType: "EVENT", entityId: event.id } }).catch(() => 0),
 ]);
 
   const isAuthenticated = Boolean(user);

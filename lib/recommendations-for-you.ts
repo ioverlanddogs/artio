@@ -33,7 +33,7 @@ type CandidateEvent = {
     lng: number | null;
     subscription: { status: "ACTIVE" | "INACTIVE" | "PAST_DUE" } | null;
   } | null;
-  promotions: Array<{ priority: number }>;
+  promotions: Array<{ priority: number; tier: number; maxDailySlots: number; slotsUsedToday: number; endsAt: Date }>;
   images: Array<{ url: string; asset: { url: string } | null }>;
   eventArtists: Array<{ artistId: string }>;
   eventTags: Array<{ tagId: string; tag: { slug: string; category: string } }>;
@@ -91,6 +91,11 @@ function freshnessReason(now: Date, startAt: Date) {
   return "Upcoming soon";
 }
 
+function isMissingTableError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  return code === "P2021" || code === "P2010";
+}
+
 
 function feedbackFromMeta(metaJson: Prisma.JsonValue | null | undefined) {
   if (!metaJson || typeof metaJson !== "object" || Array.isArray(metaJson)) return null;
@@ -120,6 +125,8 @@ export function scoreForYouEvents(args: {
   radiusKm?: number;
   followedCollectionEventIds?: Set<string>;
 }) {
+  const sociallySavedEventIds = args.sociallySavedEventIds ?? new Set<string>();
+  const sociallyCollectedEventIds = args.sociallyCollectedEventIds ?? new Set<string>();
   const scored = args.events.map((event) => {
     let score = 0;
     const reasons: string[] = [];
@@ -134,11 +141,11 @@ export function scoreForYouEvents(args: {
       reasons.push("Includes an artist you follow");
     }
 
-    if (args.sociallySavedEventIds.has(event.id)) {
+    if (sociallySavedEventIds.has(event.id)) {
       score += DEFAULT_FEED_SCORE_WEIGHTS.socialWeight * saveDecay;
       reasons.push("Saved by people you follow");
     }
-    if (args.sociallyCollectedEventIds.has(event.id)) {
+    if (sociallyCollectedEventIds.has(event.id)) {
       score += DEFAULT_FEED_SCORE_WEIGHTS.socialWeight * 0.9;
       reasons.push("In collections from people you follow");
     }
@@ -253,12 +260,13 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   to.setDate(to.getDate() + args.days);
 
   const cacheFreshAfter = new Date(now.getTime() - 45 * 60 * 1000);
-  const cached = await db.userFeedCache.findMany({
+  const userFeedCache = (db as { userFeedCache?: { findMany: (...args: unknown[]) => Promise<Array<{ eventId: string }>> } }).userFeedCache;
+  const cached = userFeedCache ? await userFeedCache.findMany({
     where: { userId: args.userId, createdAt: { gte: cacheFreshAfter } },
     orderBy: [{ score: "desc" }, { createdAt: "desc" }],
     take: args.limit,
     select: { eventId: true },
-  }).catch(() => []);
+  }).catch(() => []) : [];
   if (cached.length) {
     const ids = cached.map((c) => c.eventId);
     const cachedEvents = await db.event.findMany({
@@ -291,7 +299,10 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     db.user.findUnique({ where: { id: args.userId }, select: { locationLat: true, locationLng: true, locationRadiusKm: true, locationLabel: true } }),
     db.follow.findMany({ where: { userId: args.userId }, select: { targetType: true, targetId: true } }),
     db.savedSearch.findMany({ where: { userId: args.userId, isEnabled: true, frequency: "WEEKLY" }, orderBy: { updatedAt: "desc" }, take: 2, select: { id: true, name: true, type: true, paramsJson: true } }),
-    db.collectionFollow.findMany({ where: { userId: args.userId }, select: { collectionId: true } }),
+    db.collectionFollow.findMany({ where: { userId: args.userId }, select: { collectionId: true } }).catch((err: unknown) => {
+      if (isMissingTableError(err)) return [];
+      throw err;
+    }),
   ]);
   const followedCollectionIds = followedCollections.map((item) => item.collectionId);
 
@@ -316,6 +327,9 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
       where: { collectionId: { in: followedCollectionIds }, entityType: "EVENT" },
       select: { entityId: true },
       take: 300,
+    }).catch((err: unknown) => {
+      if (isMissingTableError(err)) return [];
+      throw err;
     });
     for (const item of followedCollectionItems) followedCollectionEventIds.add(item.entityId);
     addIds(candidateIds, seenIds, Array.from(followedCollectionEventIds), SOURCE_CAPS.follows + SOURCE_CAPS.social);
@@ -324,7 +338,10 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     const followedIds = Array.from(followedUserIds);
     const [savedByFollowed, collectionEvents] = await Promise.all([
       db.favorite.findMany({ where: { userId: { in: followedIds }, targetType: "EVENT" }, select: { targetId: true }, take: SOURCE_CAPS.social }),
-      db.collectionItem.findMany({ where: { entityType: "EVENT", collection: { isPublic: true, userId: { in: followedIds } } }, select: { entityId: true }, take: SOURCE_CAPS.social }),
+      db.collectionItem.findMany({ where: { entityType: "EVENT", collection: { isPublic: true, userId: { in: followedIds } } }, select: { entityId: true }, take: SOURCE_CAPS.social }).catch((err: unknown) => {
+        if (isMissingTableError(err)) return [];
+        throw err;
+      }),
     ]);
     for (const item of savedByFollowed) sociallySavedEventIds.add(item.targetId);
     for (const item of collectionEvents) sociallyCollectedEventIds.add(item.entityId);
@@ -490,26 +507,35 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   }
 
   const trimmed = candidateIds.filter((id) => !dislikedEventIds.has(id) && !hiddenEventIds.has(id)).slice(0, MAX_CANDIDATES);
-  const events = await db.event.findMany({
-    where: { id: { in: trimmed }, isPublished: true, startAt: { gte: now, lte: to } },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      startAt: true,
-      lat: true,
-      lng: true,
-      venueId: true,
-      venue: { select: { name: true, slug: true, city: true, lat: true, lng: true, subscription: { select: { status: true } } } },
-      promotions: {
-        where: { startsAt: { lte: now }, endsAt: { gte: now } },
-        select: { priority: true, tier: true, maxDailySlots: true, slotsUsedToday: true, endsAt: true },
+  let events: CandidateEvent[] = [];
+  try {
+    events = (await db.event.findMany({
+      where: { id: { in: trimmed }, isPublished: true, startAt: { gte: now, lte: to } },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        startAt: true,
+        lat: true,
+        lng: true,
+        venueId: true,
+        venue: { select: { name: true, slug: true, city: true, lat: true, lng: true, subscription: { select: { status: true } } } },
+        promotions: {
+          where: { startsAt: { lte: now }, endsAt: { gte: now } },
+          select: { priority: true, tier: true, maxDailySlots: true, slotsUsedToday: true, endsAt: true },
+        },
+        images: { take: 1, orderBy: { sortOrder: "asc" }, select: { url: true, asset: { select: { url: true } } } },
+        eventArtists: { select: { artistId: true } },
+        eventTags: { select: { tagId: true, tag: { select: { slug: true, category: true } } } },
       },
-      images: { take: 1, orderBy: { sortOrder: "asc" }, select: { url: true, asset: { select: { url: true } } } },
-      eventArtists: { select: { artistId: true } },
-      eventTags: { select: { tagId: true, tag: { select: { slug: true, category: true } } } },
-    },
-  });
+    })) as CandidateEvent[];
+  } catch (err) {
+    if (isMissingTableError(err)) {
+      events = [];
+    } else {
+      throw err;
+    }
+  }
 
   const candidateFeedbackEvents = await db.engagementEvent.findMany({
     where: {
@@ -531,6 +557,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   const eventsWithFeedback = events.map((event) => ({
     ...event,
     promotions: event.promotions.filter((promo) => promo.slotsUsedToday < promo.maxDailySlots).map((promo) => ({
+      ...promo,
       priority: Math.max(0, promo.priority + promo.tier - Math.min(1, Math.max(0, (now.getTime() - promo.endsAt.getTime()) / (24 * 60 * 60 * 1000)))),
     })),
     fromCuratorCollectionCount: 0,
@@ -580,6 +607,9 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
       by: ["entityId"],
       where: { entityType: "EVENT", entityId: { in: eventIds } },
       _count: { _all: true },
+    }).catch((err: unknown) => {
+      if (isMissingTableError(err)) return [];
+      throw err;
     }),
   ]);
   const saveCountMap = new Map(saveCounts.map((row) => [row.targetId, row._count._all]));
@@ -601,8 +631,8 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     },
   }));
   if (items.length) {
-    await db.userFeedCache.deleteMany({ where: { userId: args.userId } }).catch(() => undefined);
-    await db.userFeedCache.createMany({
+    await (db as { userFeedCache?: { deleteMany: (...args: unknown[]) => Promise<unknown> } }).userFeedCache?.deleteMany({ where: { userId: args.userId } }).catch(() => undefined);
+    await (db as { userFeedCache?: { createMany: (...args: unknown[]) => Promise<unknown> } }).userFeedCache?.createMany({
       data: topItems.map((item) => ({ userId: args.userId, eventId: item.event.id, score: item.score })),
     }).catch(() => undefined);
   }
