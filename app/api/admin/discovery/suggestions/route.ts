@@ -23,8 +23,8 @@ const postSchema = z.object({
   region: z.string().min(1).max(100),
   country: z.string().min(1).max(100),
   count: z.number().int().min(1).max(10).default(5),
-  goalId: z.string().uuid().optional(),
-  regionId: z.string().uuid().optional(),
+  goalId: z.guid().optional(),
+  regionId: z.guid().optional(),
 });
 
 export async function GET(req: NextRequest) {

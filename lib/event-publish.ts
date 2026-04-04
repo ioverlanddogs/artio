@@ -26,7 +26,7 @@ const eventPublishSchema = z.object({
   ticketUrl: httpUrlSchema.optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.endAt && data.endAt <= data.startAt) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "End date must be after start date" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "End date must be after start date" });
   }
 });
 

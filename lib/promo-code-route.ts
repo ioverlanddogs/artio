@@ -44,15 +44,15 @@ type Deps = {
   deletePromoCode: (id: string) => Promise<void>;
 };
 
-const paramsSchema = z.object({ eventId: z.string().uuid() });
-const promoParamsSchema = z.object({ eventId: z.string().uuid(), cid: z.string().uuid() });
+const paramsSchema = z.object({ eventId: z.guid() });
+const promoParamsSchema = z.object({ eventId: z.guid(), cid: z.guid() });
 
 const createSchema = z.object({
   code: z.string().trim().min(1),
   discountType: z.enum(["PERCENT", "FIXED"]),
   value: z.number().int().positive(),
   maxUses: z.number().int().positive().nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional(),
+  expiresAt: z.iso.datetime().nullable().optional(),
 }).superRefine((value, ctx) => {
   if (value.discountType === "PERCENT" && (value.value < 1 || value.value > 100)) {
     ctx.addIssue({ code: "custom", path: ["value"], message: "PERCENT value must be between 1 and 100" });
@@ -62,7 +62,7 @@ const createSchema = z.object({
 const updateSchema = z.object({
   isActive: z.boolean().optional(),
   maxUses: z.number().int().positive().nullable().optional(),
-  expiresAt: z.string().datetime().nullable().optional(),
+  expiresAt: z.iso.datetime().nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, "At least one field is required");
 
 async function requireManagedEvent(eventId: string, userId: string, deps: Deps) {

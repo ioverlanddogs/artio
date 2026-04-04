@@ -17,7 +17,7 @@ const nearbyParamsSchema = z.object({
   view: z.enum(["list", "map"]).optional(),
 }).superRefine((data, ctx) => {
   if (data.days != null && (data.from != null || data.to != null)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["days"], message: "Provide either days or from/to, not both" });
+    ctx.addIssue({ code: "custom", path: ["days"], message: "Provide either days or from/to, not both" });
   }
 });
 
@@ -36,10 +36,10 @@ const eventsFilterParamsSchema = z.object({
   const hasLng = data.lng != null;
   const hasRadius = data.radiusKm != null;
   if (hasLat !== hasLng) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [hasLat ? "lng" : "lat"], message: "lat and lng must be provided together" });
+    ctx.addIssue({ code: "custom", path: [hasLat ? "lng" : "lat"], message: "lat and lng must be provided together" });
   }
   if ((hasLat || hasLng) && !hasRadius) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["radiusKm"], message: "radiusKm is required when lat/lng are provided" });
+    ctx.addIssue({ code: "custom", path: ["radiusKm"], message: "radiusKm is required when lat/lng are provided" });
   }
 });
 
@@ -47,9 +47,9 @@ const eventsFilterParamsSchema = z.object({
 const artworkParamsSchema = z.object({
   provider: z.literal("ARTWORKS").optional(),
   query: z.string().trim().min(1).max(120).optional(),
-  artistId: z.string().uuid().optional().nullable(),
-  venueId: z.string().uuid().optional().nullable(),
-  eventId: z.string().uuid().optional().nullable(),
+  artistId: z.guid().optional().nullable(),
+  venueId: z.guid().optional().nullable(),
+  eventId: z.guid().optional().nullable(),
   medium: z.array(z.string().trim().min(1).max(120)).optional().default([]),
   mediumCsv: z.string().optional().nullable(),
   yearFrom: z.coerce.number().int().min(1000).max(3000).optional().nullable(),

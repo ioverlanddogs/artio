@@ -25,7 +25,7 @@ type Deps = {
 
 const schema = z.object({
   promoCode: z.string().trim().min(1),
-  tierId: z.string().uuid(),
+  tierId: z.guid(),
   quantity: z.number().int().positive().default(1),
 });
 

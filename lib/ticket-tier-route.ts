@@ -46,8 +46,8 @@ type Deps = {
   updateTier: (tierId: string, data: UpdateTierInput) => Promise<TicketTierRecord>;
 };
 
-const paramsSchema = z.object({ eventId: z.string().uuid() });
-const tierParamsSchema = z.object({ eventId: z.string().uuid(), tierId: z.string().uuid() });
+const paramsSchema = z.object({ eventId: z.guid() });
+const tierParamsSchema = z.object({ eventId: z.guid(), tierId: z.guid() });
 
 const createTierSchema = z.object({
   name: z.string().trim().min(1),

@@ -9,7 +9,7 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const assetIdParamSchema = z.object({ assetId: z.string().uuid() });
+const assetIdParamSchema = z.object({ assetId: z.guid() });
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ assetId: string }> }) {
   try {

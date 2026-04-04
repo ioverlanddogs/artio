@@ -8,7 +8,7 @@ import { requireAdmin } from "@/lib/admin";
 export const runtime = "nodejs";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 export async function PATCH(_req: NextRequest, context: { params: Promise<{ id: string }> }) {

@@ -8,7 +8,7 @@ import { idParamSchema, parseBody, zodDetails } from "@/lib/validators";
 import { z } from "zod";
 export const runtime = "nodejs";
 
-const bodySchema = z.object({ eventIds: z.array(z.string().uuid()) });
+const bodySchema = z.object({ eventIds: z.array(z.guid()) });
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const parsedId = idParamSchema.safeParse(await params);

@@ -13,7 +13,7 @@ type AdminImportMappingPresetsDeps = {
 
 const entityTypeSchema = z.enum(["venues", "events", "artists"]);
 const listQuerySchema = z.object({ entityType: entityTypeSchema });
-const presetIdSchema = z.object({ id: z.string().uuid() });
+const presetIdSchema = z.object({ id: z.guid() });
 const savePresetBodySchema = z.object({
   entityType: entityTypeSchema,
   name: z.string().trim().min(2).max(60),

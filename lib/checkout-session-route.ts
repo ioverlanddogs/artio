@@ -75,7 +75,7 @@ type Deps = {
 };
 
 const bodySchema = z.object({
-  tierId: z.string().uuid(),
+  tierId: z.guid(),
   quantity: z.number().int().positive().max(20).default(1),
   guestName: z.string().trim().min(1).max(200),
   guestEmail: z.string().trim().email().transform((value) => value.toLowerCase()),

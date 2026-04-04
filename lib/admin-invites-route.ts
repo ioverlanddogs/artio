@@ -11,7 +11,7 @@ const inviteCreateSchema = z.object({
   role: z.enum(["USER", "EDITOR", "ADMIN"]).optional(),
 });
 
-const revokeParamsSchema = z.object({ id: z.string().uuid() });
+const revokeParamsSchema = z.object({ id: z.guid() });
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 

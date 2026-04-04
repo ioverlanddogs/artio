@@ -13,7 +13,7 @@ export const explainRequestSchema = z.object({
 export const listSnapshotsSchema = z.object({
   name: z.enum(explainQueryNames).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  cursor: z.string().uuid().optional(),
+  cursor: z.guid().optional(),
 });
 
 export async function createPerfSnapshotWithDeps(

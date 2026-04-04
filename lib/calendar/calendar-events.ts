@@ -16,10 +16,10 @@ const calendarEventsQuerySchema = z.object({
   sort: z.string().optional(),
 }).superRefine((value, ctx) => {
   if (new Date(value.from).getTime() > new Date(value.to).getTime()) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["from"], message: "from must be <= to" });
+    ctx.addIssue({ code: "custom", path: ["from"], message: "from must be <= to" });
   }
   if (new Date(value.to).getTime() - new Date(value.from).getTime() > 366 * 24 * 60 * 60 * 1000) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["to"], message: "Date range cannot exceed 366 days" });
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Date range cannot exceed 366 days" });
   }
 });
 

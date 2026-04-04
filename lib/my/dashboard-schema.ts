@@ -20,8 +20,8 @@ export const AttentionItemSchema = z.object({
   ctaLabel: z.string(),
   ctaHref: z.string().startsWith("/my"),
   venueId: z.string().optional(),
-  createdAtISO: z.string().datetime().optional(),
-  updatedAtISO: z.string().datetime().optional(),
+  createdAtISO: z.iso.datetime().optional(),
+  updatedAtISO: z.iso.datetime().optional(),
 }).refine((value) => Boolean(value.createdAtISO ?? value.updatedAtISO), {
   message: "Attention item requires at least one timestamp",
 });
@@ -31,7 +31,7 @@ export const ActivityItemSchema = z.object({
   id: z.string(),
   label: z.string(),
   href: z.string().startsWith("/my"),
-  occurredAtISO: z.string().datetime(),
+  occurredAtISO: z.iso.datetime(),
 });
 export type ActivityItem = z.infer<typeof ActivityItemSchema>;
 
@@ -40,7 +40,7 @@ export const VenueSummarySchema = z.object({
   name: z.string(),
   role: z.enum(["OWNER", "EDITOR"]),
   status: PublisherStatusSchema,
-  updatedAtISO: z.string().datetime(),
+  updatedAtISO: z.iso.datetime(),
   completeness: z.object({
     percent: z.number().int().min(0).max(100),
     missing: z.array(z.string()),
@@ -54,8 +54,8 @@ export const EventSummarySchema = z.object({
   venueId: z.string().nullable(),
   venueName: z.string().nullable(),
   status: PublisherStatusSchema,
-  startAtISO: z.string().datetime(),
-  updatedAtISO: z.string().datetime(),
+  startAtISO: z.iso.datetime(),
+  updatedAtISO: z.iso.datetime(),
 });
 export type EventSummary = z.infer<typeof EventSummarySchema>;
 
@@ -63,7 +63,7 @@ export const ArtworkSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
   status: z.enum(["Draft", "Published"]),
-  updatedAtISO: z.string().datetime(),
+  updatedAtISO: z.iso.datetime(),
   imageUrl: z.string().url().nullable(),
 });
 export type ArtworkSummary = z.infer<typeof ArtworkSummarySchema>;
@@ -109,7 +109,7 @@ export const MyTeamResponseSchema = z.object({
   members: z.array(z.object({
     id: z.string(),
     role: z.enum(["OWNER", "EDITOR"]),
-    createdAtISO: z.string().datetime(),
+    createdAtISO: z.iso.datetime(),
     user: z.object({ id: z.string(), email: z.string().email(), name: z.string().nullable() }),
   })),
   invites: z.array(z.object({
@@ -117,8 +117,8 @@ export const MyTeamResponseSchema = z.object({
     email: z.string().email(),
     role: z.enum(["OWNER", "EDITOR"]),
     status: z.enum(["PENDING", "ACCEPTED", "REVOKED", "EXPIRED"]),
-    createdAtISO: z.string().datetime(),
-    expiresAtISO: z.string().datetime(),
+    createdAtISO: z.iso.datetime(),
+    expiresAtISO: z.iso.datetime(),
   })),
 });
 export type MyTeamResponse = z.infer<typeof MyTeamResponseSchema>;

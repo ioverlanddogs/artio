@@ -42,7 +42,7 @@ function appendWarningDetail(existing: string | null | undefined, warning: strin
   return combined.length > MAX_WARNING_DETAIL ? `${combined.slice(0, MAX_WARNING_DETAIL - 1)}…` : combined;
 }
 
-const runParamsSchema = z.object({ venueId: z.string().uuid() });
+const runParamsSchema = z.object({ venueId: z.guid() });
 const runBodySchema = z.object({
   sourceUrl: z.string().trim().url().optional(),
   model: z.string().trim().min(1).max(120).optional(),
@@ -50,14 +50,14 @@ const runBodySchema = z.object({
 });
 
 const runsQuerySchema = z.object({
-  venueId: z.string().uuid().optional(),
+  venueId: z.guid().optional(),
   status: z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]).optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.guid().optional(),
   take: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-const runIdSchema = z.object({ runId: z.string().uuid() });
-const candidateIdSchema = z.object({ id: z.string().uuid() });
+const runIdSchema = z.object({ runId: z.guid() });
+const candidateIdSchema = z.object({ id: z.guid() });
 const rejectBodySchema = z.object({ rejectionReason: z.string().trim().min(1).max(500) });
 const approveBodySchema = z.object({
   publishImmediately: z.boolean().optional().default(false),
@@ -65,8 +65,8 @@ const approveBodySchema = z.object({
 const eventApprovePatchSchema = z.object({
   title: z.string().trim().min(1).max(300).optional(),
   description: z.string().trim().max(5000).nullable().optional(),
-  startAt: z.string().datetime().nullable().optional(),
-  endAt: z.string().datetime().nullable().optional(),
+  startAt: z.iso.datetime().nullable().optional(),
+  endAt: z.iso.datetime().nullable().optional(),
   timezone: z.string().trim().min(1).max(100).nullable().optional(),
   locationText: z.string().trim().max(300).nullable().optional(),
 }).strict();

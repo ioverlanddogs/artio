@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 const maxYear = new Date().getUTCFullYear() + 5;
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 const cvUpdateSchema = z.object({

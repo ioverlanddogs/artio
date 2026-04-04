@@ -22,7 +22,7 @@ export async function handleGetVenueSeries(params: Promise<{ id: string }>, deps
 
 const createSeriesSchema = z.object({
   title: z.string().trim().min(1).max(160),
-  venueId: z.string().uuid(),
+  venueId: z.guid(),
 });
 
 type CreateSeriesDeps = {
