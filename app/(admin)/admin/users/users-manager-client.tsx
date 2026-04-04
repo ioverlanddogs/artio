@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { enqueueToast } from "@/lib/toast";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { formatDate } from "@/lib/format-date";
 
 type Role = "USER" | "EDITOR" | "ADMIN";
 
@@ -31,6 +33,7 @@ type AdminInvite = {
   id: string;
   email: string;
   intendedRole: Role;
+  inviteUrl: string | null;
   createdAt: string;
   expiresAt: string;
   acceptedAt: string | null;
@@ -76,7 +79,7 @@ export function UsersManagerClient() {
       const res = await fetch("/api/admin/invites", { method: "GET" });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message ?? "Failed to load invites");
-      setInvites(body.invites ?? []);
+      setInvites((body.invites ?? []).map((invite: AdminInvite) => ({ ...invite, inviteUrl: invite.inviteUrl ?? null })));
     } catch {
       // Non-fatal for users management table.
     }
@@ -173,6 +176,21 @@ export function UsersManagerClient() {
 
       setInviteUrl(body.inviteUrl ?? null);
       setInviteExpiresAt(body.expiresAt ?? null);
+      setInvites((current) => {
+        const nextInvite: AdminInvite = {
+          id: body.inviteId,
+          email: body.email,
+          intendedRole: body.intendedRole,
+          inviteUrl: body.inviteUrl ?? null,
+          createdAt: new Date().toISOString(),
+          expiresAt: body.expiresAt,
+          acceptedAt: null,
+          revokedAt: null,
+          status: "active",
+        };
+        const remaining = current.filter((invite) => invite.id !== body.inviteId);
+        return [nextInvite, ...remaining];
+      });
       if (body.reused) {
         setInviteNotice("An active invite already exists for this email. Existing invite returned.");
       } else {
@@ -208,10 +226,11 @@ export function UsersManagerClient() {
     }
   }
 
-  async function copyInviteLink() {
-    if (!inviteUrl) return;
+  async function copyInviteLink(value: string | null = inviteUrl) {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(value);
+      enqueueToast({ title: "Link copied" });
       setInviteNotice("Invite link copied.");
     } catch {
       setInviteNotice("Copy failed. Please copy manually.");
@@ -252,7 +271,7 @@ export function UsersManagerClient() {
               <input readOnly value={inviteUrl} className="w-full rounded border px-2 py-1 text-xs" />
               <button type="button" onClick={() => void copyInviteLink()} className="rounded border px-3 py-1 text-sm">Copy link</button>
             </div>
-            {inviteExpiresAt ? <p className="text-xs text-muted-foreground">Expires: {new Date(inviteExpiresAt).toISOString()}</p> : null}
+            {inviteExpiresAt ? <p className="text-xs text-muted-foreground">Expires: {formatDate(inviteExpiresAt)}</p> : null}
           </div>
         ) : null}
       </div>
@@ -322,7 +341,7 @@ export function UsersManagerClient() {
                 <td className="px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-xs font-medium">Trusted Publisher: {user.isTrustedPublisher ? "Enabled" : "Disabled"}</p>
-                    <p className="text-xs text-muted-foreground">Granted since: {user.trustedPublisherSince ? new Date(user.trustedPublisherSince).toISOString() : "—"}</p>
+                    <p className="text-xs text-muted-foreground">Granted since: {user.trustedPublisherSince ? formatDate(user.trustedPublisherSince) : "—"}</p>
                     <p className="text-xs text-muted-foreground">Granted by: {user.trustedPublisherBy?.email ?? "—"}</p>
                     <button
                       type="button"
@@ -334,7 +353,7 @@ export function UsersManagerClient() {
                     </button>
                   </div>
                 </td>
-                <td className="px-3 py-2">{new Date(user.createdAt).toISOString()}</td>
+                <td className="px-3 py-2">{formatDate(user.createdAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -362,10 +381,15 @@ export function UsersManagerClient() {
                 <td className="px-3 py-2">{invite.email}</td>
                 <td className="px-3 py-2">{invite.intendedRole}</td>
                 <td className="px-3 py-2">{invite.status}</td>
-                <td className="px-3 py-2">{new Date(invite.expiresAt).toISOString()}</td>
+                <td className="px-3 py-2">{formatDate(invite.expiresAt)}</td>
                 <td className="px-3 py-2">
                   {invite.status === "active" ? (
-                    <button type="button" onClick={() => void revokeInvite(invite.id)} className="rounded border px-2 py-1 text-xs">Revoke</button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => void revokeInvite(invite.id)} className="rounded border px-2 py-1 text-xs">Revoke</button>
+                      {invite.inviteUrl ? (
+                        <Button size="sm" variant="outline" onClick={() => void copyInviteLink(invite.inviteUrl)}>Copy link</Button>
+                      ) : null}
+                    </div>
                   ) : "—"}
                 </td>
               </tr>

@@ -316,6 +316,12 @@ export default function AdminInlineRowActions<T extends Record<string, unknown>>
     setRowError(null);
     setIsAdvancing(true);
     try {
+      if (advanceToStatus === "APPROVED") {
+        const confirmed = window.confirm(
+          "Move to APPROVED? This is one step before publishing and cannot be undone automatically."
+        );
+        if (!confirmed) return;
+      }
       const res = await requestInlinePatch(patchUrl, { status: advanceToStatus });
       if (!res.ok) {
         const message = actionErrorMessage(res.status, "Advance failed");

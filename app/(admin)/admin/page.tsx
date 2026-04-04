@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AdminPageHeader from "./_components/AdminPageHeader";
 import { db } from "@/lib/db";
+import { formatRelativeTime } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 
 async function getDbHealth() {
@@ -66,17 +67,6 @@ function formatAction(action: string): string {
     .replace(/_/g, " ");
 }
 
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
 function StatCard({ label, value, href }: {
   label: string;
   value: number | string | null;
@@ -106,7 +96,7 @@ export default async function AdminHomePage() {
   return (
     <main className="space-y-6">
       <AdminPageHeader title="Dashboard" description="Operational overview for administrators." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-9">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9">
         <StatCard label="DB health" value={dbHealth} />
         <StatCard label="Users" value={counts.users} href="/admin/users" />
         <StatCard label="Artists" value={counts.artists} href="/admin/artists" />

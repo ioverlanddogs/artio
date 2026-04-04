@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ImageGalleryManager from "@/app/(admin)/admin/_components/ImageGalleryManager";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   title: string;
@@ -126,7 +127,7 @@ export default function AdminEntityForm({
           Published
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button className="rounded border px-3 py-1">Save</button>
+        <Button type="submit">Save</Button>
       </form>
       {uploadTargetId === "new" ? <p className="text-sm text-muted-foreground">Save first to add images.</p> : <ImageGalleryManager entityType={uploadTargetType} entityId={uploadTargetId} altRequired={altRequired} />}
     </main>
