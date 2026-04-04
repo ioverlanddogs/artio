@@ -17,8 +17,9 @@ type Assoc = {
 
 export function ArtistVenuesPanel() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<VenueOption[]>([]);
+  const [selectedVenueId, setSelectedVenueId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<VenueOption[]>([]);
   const [searching, setSearching] = useState(false);
   const [role, setRole] = useState(DEFAULT_ASSOCIATION_ROLE);
   const [message, setMessage] = useState("");
@@ -45,37 +46,34 @@ export function ArtistVenuesPanel() {
   }, []);
 
   useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
       return;
     }
-
-    const timeout = window.setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/search/quick?q=${encodeURIComponent(trimmed)}`, { cache: "no-store" });
-        if (!res.ok) {
-          setResults([]);
-          return;
-        }
-        const payload = await res.json().catch(() => ({ venues: [] }));
-        const venues = Array.isArray(payload.venues) ? payload.venues : [];
-        setResults(venues.slice(0, 10).map((venue: VenueOption) => ({ id: venue.id, name: venue.name, slug: venue.slug })));
+        const res = await fetch(`/api/search/quick?q=${encodeURIComponent(searchQuery)}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => ({}));
+        setSearchResults(Array.isArray(body.venues) ? body.venues : []);
       } finally {
         setSearching(false);
       }
     }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    return () => window.clearTimeout(timeout);
-  }, [query]);
+  async function handleRequest() {
+    if (!selectedVenueId) {
+      enqueueToast({ title: "Select a venue first", variant: "error" });
+      return;
+    }
 
-  async function handleRequest(venueId: string) {
     const res = await fetch("/api/my/artist/venues/request", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ venueId, role, message: message || undefined }),
+      body: JSON.stringify({ venueId: selectedVenueId, role, message: message || undefined }),
     });
     if (res.status === 401) {
       window.location.href = buildLoginRedirectUrl("/my/artist");
@@ -89,8 +87,9 @@ export function ArtistVenuesPanel() {
     enqueueToast({ title: "Association requested", variant: "success" });
     setMessage("");
     setRole(DEFAULT_ASSOCIATION_ROLE);
-    setQuery("");
-    setResults([]);
+    setSelectedVenueId("");
+    setSearchQuery("");
+    setSearchResults([]);
     await loadAssociations();
     router.refresh();
   }
@@ -109,39 +108,52 @@ export function ArtistVenuesPanel() {
     await loadAssociations();
   }
 
+  const selectedVenue = searchResults.find((venue) => venue.id === selectedVenueId);
+
   return (
     <section className="space-y-3 rounded border p-4">
       <h2 className="text-lg font-semibold">Venues</h2>
       <div className="space-y-2">
-        <input
-          type="text"
-          className="w-full rounded border p-2 text-sm"
-          placeholder="Search for a venue by name…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
-        {results.length > 0 && query.trim().length >= 2 && (
-          <ul className="divide-y rounded border text-sm">
-            {results.map((venue) => (
-              <li key={venue.id} className="flex items-center justify-between p-2">
-                <span>{venue.name}</span>
-                <button
-                  type="button"
-                  className="rounded border px-2 py-1 text-xs"
-                  onClick={() => void handleRequest(venue.id)}
-                >
-                  Request association
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="space-y-2">
+          <input
+            type="text"
+            className="w-full rounded border p-2 text-sm"
+            placeholder="Search for a venue by name…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
+          {searchResults.length > 0 && (
+            <ul className="divide-y rounded border text-sm">
+              {searchResults.map((venue) => (
+                <li key={venue.id} className="flex items-center justify-between p-2">
+                  <span>{venue.name}</span>
+                  <button
+                    type="button"
+                    className="rounded border px-2 py-1 text-xs"
+                    onClick={() => {
+                      setSelectedVenueId(venue.id);
+                    }}
+                  >
+                    Select
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <select className="w-full rounded border px-2 py-1" value={role} onChange={(e) => setRole(normalizeAssociationRole(e.target.value))}>
           {ASSOCIATION_ROLES.map((roleKey) => <option key={roleKey} value={roleKey}>{roleLabel(roleKey)}</option>)}
         </select>
         <textarea className="w-full rounded border px-2 py-1" rows={3} placeholder="Optional note" value={message} onChange={(e) => setMessage(e.target.value)} />
+        {selectedVenueId && selectedVenue ? (
+          <p className="text-xs text-muted-foreground">
+            Selected: {selectedVenue.name}
+          </p>
+        ) : null}
         <div className="flex gap-2">
+          <button className="rounded border px-3 py-1" onClick={() => void handleRequest()}>Request association</button>
           <button className="rounded border px-3 py-1" onClick={loadAssociations}>Refresh list</button>
         </div>
       </div>
@@ -161,7 +173,7 @@ export function ArtistVenuesPanel() {
                       <div className="font-medium">{item.venue.name}</div>
                       <div className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{roleLabel(normalizedRole)}</div>
                       {item.message ? <div className="text-muted-foreground">{item.message}</div> : null}
-                      {item.status === "PENDING" ? <button className="mt-1 rounded border px-2 py-1" onClick={() => cancelAssociation(item.id)}>Cancel</button> : null}
+                      {item.status === "PENDING" ? <button className="mt-1 rounded border px-2 py-1" onClick={() => void cancelAssociation(item.id)}>Cancel</button> : null}
                     </li>
                   );
                 })}

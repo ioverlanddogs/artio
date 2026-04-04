@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { computeArtworkAnalytics, type ArtworkStat } from "@/lib/artwork-analytics";
 import { RegistrationsAnalyticsSection } from "@/app/my/analytics/registrations-section";
 
@@ -28,27 +29,37 @@ export default async function MyAnalyticsPage({ searchParams }: { searchParams?:
   if (!user) return redirectToLogin("/my/analytics");
 
   const artist = await db.artist.findUnique({ where: { userId: user.id }, select: { id: true } });
-  // No early return — venue publishers see registration analytics even without an artist profile
-
-  const artworks = artist
-    ? await db.artwork.findMany({ where: { artistId: artist.id }, select: { id: true, title: true, slug: true, isPublished: true } })
-    : [];
-  const start90 = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 89));
-  const rows = artist && artworks.length
-    ? await db.pageViewDaily.findMany({ where: { entityType: "ARTWORK", entityId: { in: artworks.map((item) => item.id) }, day: { gte: start90 } }, select: { entityId: true, day: true, views: true } })
-    : [];
-
-  const analytics = computeArtworkAnalytics(artworks, rows);
 
   const params = searchParams ? await searchParams : undefined;
   const windowDays = parseWindowDays(params?.windowDays);
 
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const origin = host ? `${protocol}://${host}` : null;
+
+  let artworks: Prisma.ArtworkGetPayload<{ select: { id: true; title: true; slug: true; isPublished: true } }>[] = [];
+  let rows: Array<{ entityId: string; day: Date; views: number }> = [];
   let artworkStats: ArtworkStat[] = [];
+
   if (artist) {
-    const headerStore = await headers();
-    const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
-    const protocol = headerStore.get("x-forwarded-proto") ?? "http";
-    const origin = host ? `${protocol}://${host}` : null;
+    artworks = await db.artwork.findMany({
+      where: { artistId: artist.id },
+      select: { id: true, title: true, slug: true, isPublished: true },
+    });
+
+    const start90 = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 89));
+
+    rows = artworks.length
+      ? await db.pageViewDaily.findMany({
+          where: {
+            entityType: "ARTWORK",
+            entityId: { in: artworks.map((item) => item.id) },
+            day: { gte: start90 },
+          },
+          select: { entityId: true, day: true, views: true },
+        })
+      : [];
 
     if (origin) {
       const response = await fetch(`${origin}/api/my/analytics/artwork?windowDays=${windowDays}`, {
@@ -61,6 +72,8 @@ export default async function MyAnalyticsPage({ searchParams }: { searchParams?:
       }
     }
   }
+
+  const analytics = computeArtworkAnalytics(artworks, rows);
 
   return (
     <main className="space-y-6 p-6">

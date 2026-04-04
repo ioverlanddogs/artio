@@ -1,7 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { redirectToLogin } from "@/lib/auth-redirect";
 import { db } from "@/lib/db";
-import { NotificationPrefsForm } from "@/app/my/settings/notification-prefs-form";
+import { NotificationPrefsForm } from "./notification-prefs-form";
 
 export default async function MySettingsPage() {
   const user = await getSessionUser();
