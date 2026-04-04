@@ -10,7 +10,7 @@ export default async function MySettingsPage() {
   const prefs = await db.userNotificationPrefs.findUnique({
     where: { userId: user.id },
     select: { emailOnSubmissionResult: true, emailOnTeamInvite: true, weeklyDigest: true },
-  });
+  }).catch(() => null);
   const initialPrefs = {
     emailOnSubmissionResult: prefs?.emailOnSubmissionResult ?? true,
     emailOnTeamInvite: prefs?.emailOnTeamInvite ?? true,
