@@ -124,7 +124,10 @@ test("candidate pool cap and published filtering are respected", async () => {
   const db = {
     user: { findUnique: async () => ({ locationLat: null, locationLng: null, locationRadiusKm: 25, locationLabel: null }) },
     follow: { findMany: async () => [{ targetType: "VENUE", targetId: "v-1" }] },
+    favorite: { groupBy: async () => [] },
     savedSearch: { findMany: async () => [] },
+    collectionFollow: { findMany: async () => [] },
+    collectionItem: { findMany: async () => [], groupBy: async () => [] },
     engagementEvent: { findMany: async () => [] },
     event: {
       findMany: async (args: any) => {
@@ -142,6 +145,7 @@ test("candidate pool cap and published filtering are respected", async () => {
           venueId: e.venueId,
           venue: e.venue,
           images: e.images,
+          promotions: [],
           eventArtists: e.eventArtists,
           eventTags: e.eventTags,
         }));
@@ -164,7 +168,10 @@ test("recommendations exclude explicitly disliked events for 30 days", async () 
   const db = {
     user: { findUnique: async () => ({ locationLat: null, locationLng: null, locationRadiusKm: 25, locationLabel: null }) },
     follow: { findMany: async () => [{ targetType: "VENUE", targetId: "v-1" }] },
+    favorite: { groupBy: async () => [] },
     savedSearch: { findMany: async () => [] },
+    collectionFollow: { findMany: async () => [] },
+    collectionItem: { findMany: async () => [], groupBy: async () => [] },
     engagementEvent: {
       findMany: async (args: any) => {
         if (args?.where?.action === "HIDE") {
@@ -198,6 +205,7 @@ test("recommendations exclude explicitly disliked events for 30 days", async () 
           lng: null,
           venue: { name: "Venue", slug: "venue", city: null, lat: null, lng: null },
           images: [],
+          promotions: [],
           eventArtists: [],
           eventTags: [],
         }));
@@ -215,6 +223,7 @@ test("recommendations continue when a saved search cannot be parsed", async () =
   const db = {
     user: { findUnique: async () => ({ locationLat: null, locationLng: null, locationRadiusKm: 25, locationLabel: null }) },
     follow: { findMany: async () => [{ targetType: "VENUE", targetId: "v-1" }] },
+    favorite: { groupBy: async () => [] },
     savedSearch: {
       findMany: async () => [
         {
@@ -225,6 +234,8 @@ test("recommendations continue when a saved search cannot be parsed", async () =
         },
       ],
     },
+    collectionFollow: { findMany: async () => [] },
+    collectionItem: { findMany: async () => [], groupBy: async () => [] },
     engagementEvent: { findMany: async () => [] },
     event: {
       findMany: async (args: any) => {
@@ -241,6 +252,7 @@ test("recommendations continue when a saved search cannot be parsed", async () =
           lng: null,
           venue: { name: "Venue", slug: "venue", city: null, lat: null, lng: null },
           images: [],
+          promotions: [],
           eventArtists: [],
           eventTags: [],
         }));
@@ -315,13 +327,22 @@ test("nearby candidate query uses to-one venue relation filter with `is` and doe
   const db = {
     user: { findUnique: async () => ({ locationLat: 51.5, locationLng: -2.6, locationRadiusKm: 25, locationLabel: "Bristol" }) },
     follow: { findMany: async () => [] },
+    favorite: { groupBy: async () => [] },
     savedSearch: { findMany: async () => [] },
+    collectionFollow: { findMany: async () => [] },
+    collectionItem: { findMany: async () => [], groupBy: async () => [] },
     engagementEvent: { findMany: async () => [] },
     event: {
       findMany: async (args: any) => {
-        if (args.where?.OR && args.select?.id && args.select?.venue) {
+        if (
+          args.where?.OR &&
+          args.select?.id &&
+          args.select?.lat &&
+          args.select?.venue?.select?.lat &&
+          args.where.OR.some((clause: any) => clause?.lat?.gte != null || clause?.lat?.lte != null)
+        ) {
           nearbyQueryChecked = true;
-          assert.ok(args.where.OR[1]?.venue?.is);
+          assert.ok(args.where.OR.some((clause: any) => Boolean(clause?.venue?.is)));
           return [];
         }
         if (args.where?.id?.in) return [];

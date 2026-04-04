@@ -15,7 +15,7 @@ test("admin ingest list page is review-only; trigger lives on runs page", () => 
     "utf8",
   );
   assert.match(runsPageSource, /IngestTriggerClient/);
-  assert.match(runsPageSource, /Trigger a manual extraction run/);
+  assert.match(runsPageSource, /Trigger runs, view run history, logs, and pipeline health\./);
 });
 
 test("admin ingest run detail includes candidate moderation actions", () => {

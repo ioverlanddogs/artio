@@ -47,7 +47,7 @@ test("GET /api/calendar-events scope=all does not require auth and requests rang
   assert.deepEqual(body.items.map((item: { id: string }) => item.id), ["b", "a"]);
   assert.equal(body.items[0].description, null);
   assert.deepEqual(capturedArgs.orderBy, [{ startAt: "asc" }, { id: "asc" }]);
-  assert.equal(capturedArgs.where.isPublished, true);
+  assert.deepEqual(capturedArgs.where.OR, [{ status: "PUBLISHED" }, { isPublished: true }]);
 });
 
 test("GET /api/calendar-events scope=saved requires auth and returns only saved IDs", async () => {
