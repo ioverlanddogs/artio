@@ -20,7 +20,7 @@ const campaignUpdateSchema = z.object({
   campaignType: z.enum(CAMPAIGN_TYPES).optional(),
   audienceType: z.enum(CAMPAIGN_AUDIENCES).optional(),
   audienceFilter: z.record(z.string(), z.unknown()).optional().nullable(),
-  scheduledFor: z.string().datetime().optional().nullable(),
+  scheduledFor: z.iso.datetime().optional().nullable(),
   status: z.enum(CAMPAIGN_STATUSES).optional(),
 });
 

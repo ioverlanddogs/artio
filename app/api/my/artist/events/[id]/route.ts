@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-const paramsSchema = z.object({ id: z.string().uuid() });
+const paramsSchema = z.object({ id: z.guid() });
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

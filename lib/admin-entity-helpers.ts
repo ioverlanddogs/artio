@@ -47,7 +47,7 @@ function buildStatusCounts(rows: Array<{ status: string; _count: { _all: number 
   return counts;
 }
 
-const entityIdSchema = z.object({ id: z.string().uuid() });
+const entityIdSchema = z.object({ id: z.guid() });
 
 const venuePatchSchema = z.object({
   name: z.string().trim().min(1).optional(),
@@ -67,14 +67,14 @@ const venuePatchSchema = z.object({
   status: z.enum(["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "CHANGES_REQUESTED", "ARCHIVED"]).optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   openingHours: openingHoursSchema.optional(),
-  featuredAssetId: z.string().uuid().nullable().optional(),
+  featuredAssetId: z.guid().nullable().optional(),
 }).strict();
 
 const artistPatchSchema = z.object({
   name: z.string().trim().min(1).optional(),
   websiteUrl: z.string().trim().url().nullable().optional(),
   bio: z.string().trim().max(5000).nullable().optional(),
-  featuredAssetId: z.string().uuid().nullable().optional(),
+  featuredAssetId: z.guid().nullable().optional(),
   isPublished: z.boolean().optional(),
   twitterUrl: z.string().trim().nullable().optional(),
   linkedinUrl: z.string().trim().nullable().optional(),
@@ -95,7 +95,7 @@ const artworkPatchSchema = z.object({
   dimensions: z.string().trim().max(200).nullable().optional(),
   priceAmount: z.coerce.number().int().min(0).nullable().optional(),
   currency: z.string().trim().length(3).nullable().optional(),
-  artistId: z.string().uuid().nullish().transform((value) => value ?? undefined),
+  artistId: z.guid().nullish().transform((value) => value ?? undefined),
 }).strict();
 
 const importPreviewBodySchema = z.object({
@@ -240,10 +240,10 @@ function getCreateData(entity: EntityName, mapped: Record<string, unknown>) {
     return z.object({
       title: z.string().min(1),
       slug: z.string().min(1),
-      startAt: z.string().datetime({ offset: true }),
+      startAt: z.iso.datetime({ offset: true }),
       timezone: z.string().default("UTC"),
-      endAt: z.string().datetime({ offset: true }).nullable().optional(),
-      venueId: z.string().uuid().nullable().optional(),
+      endAt: z.iso.datetime({ offset: true }).nullable().optional(),
+      venueId: z.guid().nullable().optional(),
       ticketUrl: z.string().url().nullable().optional(),
       isPublished: z.boolean().optional(),
     }).safeParse(mapped);
@@ -254,7 +254,7 @@ function getCreateData(entity: EntityName, mapped: Record<string, unknown>) {
     slug: z.string().min(1),
     websiteUrl: z.string().url().nullable().optional(),
     bio: z.string().nullable().optional(),
-    featuredAssetId: z.string().uuid().nullable().optional(),
+    featuredAssetId: z.guid().nullable().optional(),
     isPublished: z.boolean().optional(),
   }).safeParse(mapped);
 }

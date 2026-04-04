@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 export const runtime = "nodejs";
 
 const tagCategorySchema = z.enum(["medium", "genre", "movement", "mood"]);
-const idSchema = z.object({ id: z.string().uuid() });
+const idSchema = z.object({ id: z.guid() });
 const patchSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),

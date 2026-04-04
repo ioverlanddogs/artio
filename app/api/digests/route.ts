@@ -9,7 +9,7 @@ import { listDigestsForUser } from "@/lib/digests";
 export const runtime = "nodejs";
 
 const querySchema = z.object({
-  cursor: z.string().uuid().optional(),
+  cursor: z.guid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 

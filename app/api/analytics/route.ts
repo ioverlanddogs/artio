@@ -25,9 +25,9 @@ const FORBIDDEN_PROP_KEYS = [
 const analyticsSchema = z.object({
   name: z.string().min(1).max(80),
   props: z.record(z.string(), z.union([z.string().max(120), z.number(), z.boolean()])).optional(),
-  ts: z.string().datetime(),
+  ts: z.iso.datetime(),
   path: z.string().max(250),
-  sid: z.string().uuid().optional(),
+  sid: z.guid().optional(),
   referrer: z.string().max(250).optional(),
 }).strict();
 

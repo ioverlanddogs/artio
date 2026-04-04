@@ -14,7 +14,7 @@ const roleUpdateBodySchema = z.object({
 });
 
 const roleUpdateParamsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 const trustedPublisherUpdateBodySchema = z.object({

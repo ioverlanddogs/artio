@@ -8,8 +8,8 @@ import { parseBody, zodDetails } from "@/lib/validators";
 import { resolveApiImageField } from "@/lib/assets/image-contract";
 import { markArtworkApprovalAttempt, markArtworkApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
 
-const paramsSchema = z.object({ id: z.string().uuid() });
-const bodySchema = z.object({ existingArtworkId: z.string().uuid() });
+const paramsSchema = z.object({ id: z.guid() });
+const bodySchema = z.object({ existingArtworkId: z.guid() });
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 

@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   title: z.string().trim().min(2).max(120),
-  venueId: z.string().uuid().optional(),
+  venueId: z.guid().optional(),
 });
 
 export async function POST(req: NextRequest) {

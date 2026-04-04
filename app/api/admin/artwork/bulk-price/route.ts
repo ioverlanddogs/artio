@@ -11,7 +11,7 @@ const bulkPriceSchema = z.object({
   items: z
     .array(
       z.object({
-        id: z.string().uuid(),
+        id: z.guid(),
         priceAmount: z.number().int().min(0).max(100_000_00),
         currency: z.string().length(3).toUpperCase(),
       }),

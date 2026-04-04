@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
-  eventId: z.string().uuid(),
+  eventId: z.guid(),
   role: z.unknown().optional(),
   message: z.string().trim().max(500).optional(),
 });

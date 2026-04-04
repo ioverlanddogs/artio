@@ -13,12 +13,12 @@ const daysLimitParamsSchema = z.object({
 const adminSubmissionsParamsSchema = z.object({
   status: z.enum(["IN_REVIEW", "APPROVED", "REJECTED"]).default("IN_REVIEW"),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: z.string().uuid().optional(),
+  cursor: z.guid().optional(),
 });
 
 const followCountsParamsSchema = z.object({
   targetType: z.enum(["ARTIST", "VENUE"]).default("ARTIST"),
-  targetId: z.string().uuid(),
+  targetId: z.guid(),
 });
 
 const eventFiltersParamsSchema = z.object({

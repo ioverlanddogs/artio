@@ -131,7 +131,7 @@ const patchSchema = z
       data.ingestConfidenceHighMin <= data.ingestConfidenceMediumMin
     ) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["ingestConfidenceHighMin"],
         message:
           "ingestConfidenceHighMin must be greater than ingestConfidenceMediumMin",

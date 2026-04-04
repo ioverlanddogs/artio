@@ -10,8 +10,8 @@ import { createVenueStubFromCandidate } from "@/lib/ingest/create-venue-stub-fro
 export const runtime = "nodejs";
 
 const paramsSchema = z.object({
-  jobId: z.string().uuid(),
-  candidateId: z.string().uuid(),
+  jobId: z.guid(),
+  candidateId: z.guid(),
 });
 
 export async function POST(

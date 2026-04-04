@@ -9,7 +9,7 @@ import { getGoalProgress } from "@/lib/discovery/goal-service";
 export const runtime = "nodejs";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
 });
 
 const patchSchema = z.object({
