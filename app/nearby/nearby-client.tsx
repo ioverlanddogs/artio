@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LocationPreferencesForm } from "@/components/location/location-preferences-form";
-import { NearbyMap } from "@/components/nearby/nearby-map";
 import { ErrorCard } from "@/components/ui/error-card";
 import { resolveNearbyView, type NearbyEventItem, type NearbyVenueItem, type NearbyView } from "@/lib/nearby-map";
 import { SaveSearchButton } from "@/components/saved-searches/save-search-button";
@@ -17,6 +17,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { parseNearbyFilters } from "@/lib/nearby-filters";
 import { fetchNearbyEvents, fetchNearbyVenues, normalizeNearbyNumber } from "@/lib/nearby-client-fetch";
 import { VenueCard } from "@/components/venues/venue-card";
+
+const NearbyMap = dynamic(
+  () => import("@/components/nearby/nearby-map").then((mod) => mod.NearbyMap),
+  { ssr: false }
+);
 
 const VIEW_STORAGE_KEY = "nearby:view";
 
