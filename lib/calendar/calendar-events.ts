@@ -6,6 +6,7 @@ import { guardUser } from "@/lib/auth-guard";
 import { paramsToObject, zodDetails } from "@/lib/validators";
 import { z } from "zod";
 import { resolveEntityPrimaryImage } from "@/lib/public-images";
+import { publishedEventWhere } from "@/lib/publish-status";
 
 const calendarEventsQuerySchema = z.object({
   scope: z.enum(["all", "saved", "following"]).default("all"),
@@ -94,7 +95,7 @@ export async function handleCalendarEventsGet(req: Request, deps: CalendarEventD
   const { scope, from, to, tags, q } = parsed.data;
   const fromDate = new Date(from);
   const toDate = new Date(to);
-  const baseWhere: Prisma.EventWhereInput = { isPublished: true, ...rangePredicate(fromDate, toDate) };
+  const baseWhere: Prisma.EventWhereInput = { ...publishedEventWhere(), ...rangePredicate(fromDate, toDate) };
 
   if (tags) {
     const tagList = tags.split(",").map((tag) => tag.trim()).filter(Boolean);

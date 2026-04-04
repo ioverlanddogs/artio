@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api";
 import { requireAuth, isAuthError } from "@/lib/auth";
 import { FOLLOWING_FEED_ORDER_BY, buildFollowingFeedCursorFilter, getFollowingFeedWithDeps } from "@/lib/following-feed";
 import { followingFeedQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
+import { publishedEventWhere } from "@/lib/publish-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
           const startedAt = performance.now();
           const events = await db.event.findMany({
             where: {
-              isPublished: true,
+              ...publishedEventWhere(),
               startAt: { gte: from, lte: to },
               AND: [
                 {
