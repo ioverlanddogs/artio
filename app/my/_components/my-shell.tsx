@@ -20,8 +20,8 @@ export async function MyShell({ children }: { children: ReactNode }) {
         orderBy: { createdAt: "asc" },
       }),
       db.artist.findUnique({ where: { userId: user.id }, select: { id: true } }),
-      db.artworkOrder.count({ where: { buyerUserId: user.id, status: "CONFIRMED" } }),
-      db.favorite.count({ where: { userId: user.id, targetType: "ARTWORK" } }),
+      db.artworkOrder.count({ where: { buyerUserId: user.id, status: "CONFIRMED" } }).catch(() => 0),
+      db.favorite.count({ where: { userId: user.id, targetType: "ARTWORK" } }).catch(() => 0),
     ]);
     venues = memberships.map((m) => ({ id: m.venueId, name: m.venue.name, role: m.role }));
     hasArtistProfile = Boolean(artist);
