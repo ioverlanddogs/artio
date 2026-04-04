@@ -52,8 +52,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [showArchived, setShowArchived] = useState(false);
-  const [onlyArchived, setOnlyArchived] = useState(false);
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "include" | "only">("active");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failedPermanently, setFailedPermanently] = useState(false);
@@ -77,8 +76,11 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
     try {
       const params = new URLSearchParams({ page: String(page) });
       if (query.trim()) params.set("query", query.trim());
-      if (showArchived) params.set("showArchived", "1");
-      if (onlyArchived) params.set("onlyArchived", "1");
+      if (archiveFilter === "include") params.set("showArchived", "1");
+      if (archiveFilter === "only") {
+        params.set("showArchived", "1");
+        params.set("onlyArchived", "1");
+      }
       const res = await fetch(`/api/admin/artwork?${params.toString()}`);
       if (res.status === 401 || res.status === 403) {
         setFailedPermanently(true);
@@ -96,7 +98,7 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
     } finally {
       setBusy(false);
     }
-  }, [failedPermanently, onlyArchived, page, query, showArchived]);
+  }, [archiveFilter, failedPermanently, page, query]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 250);
@@ -162,16 +164,28 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
               <select className="rounded border px-2 py-1 text-sm" value={bulkCurrency} onChange={(event) => setBulkCurrency(event.target.value as (typeof CURRENCIES)[number])}>
                 {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
               </select>
-              <input
-                type="number"
-                min={0}
-                max={100000}
-                step={1}
-                value={bulkPrice}
-                onChange={(event) => setBulkPrice(event.target.value)}
-                className="w-52 rounded border px-2 py-1 text-sm"
-                placeholder="Price (e.g. 1200)"
-              />
+              <div className="space-y-1">
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100000"
+                    step="1"
+                    placeholder="e.g. 2500"
+                    value={bulkPrice}
+                    onChange={(e) => setBulkPrice(e.target.value)}
+                    className="w-32 rounded border px-2 py-1 pr-14 text-sm"
+                  />
+                  <span className="pointer-events-none absolute right-2 text-xs text-muted-foreground">
+                    pence
+                  </span>
+                </div>
+                {parsedBulkPrice != null && parsedBulkPrice >= 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    = {new Intl.NumberFormat("en-GB", { style: "currency", currency: bulkCurrency }).format(parsedBulkPrice / 100)}
+                  </p>
+                ) : null}
+              </div>
               <Button type="button" size="sm" onClick={() => void applyBulkPrice()} disabled={!canApplyBulk}>
                 {bulkBusy ? "Applying..." : "Apply to selected"}
               </Button>
@@ -206,30 +220,18 @@ export default function AdminArtworkListClient({ pricedCount: initialPricedCount
           className="rounded border px-2 py-1 text-sm"
           placeholder="Search artwork"
         />
-        <label className="flex items-center gap-1 text-sm">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => {
-              setPage(1);
-              setShowArchived(event.target.checked);
-              if (!event.target.checked) setOnlyArchived(false);
-            }}
-          />
-          Show archived
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input
-            type="checkbox"
-            checked={onlyArchived}
-            onChange={(event) => {
-              setPage(1);
-              setOnlyArchived(event.target.checked);
-              if (event.target.checked) setShowArchived(true);
-            }}
-          />
-          Archived only
-        </label>
+        <select
+          value={archiveFilter}
+          onChange={(e) => {
+            setPage(1);
+            setArchiveFilter(e.target.value as "active" | "include" | "only");
+          }}
+          className="rounded border px-2 py-1 text-sm"
+        >
+          <option value="active">Active only</option>
+          <option value="include">Include archived</option>
+          <option value="only">Archived only</option>
+        </select>
       </div>
 
       {error ? <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</p> : null}
