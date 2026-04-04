@@ -51,6 +51,28 @@ const SERVICE_LABELS: Record<string, {
     { label: "Google Indexing", tab: "seo" },
 };
 
+const CONFIG_LINKS: Record<string, string> = {
+  googlePseConfigured: "/admin/settings?tab=ingest-ai",
+  braveConfigured: "/admin/settings?tab=ingest-ai",
+  openAiConfigured: "/admin/settings?tab=ingest-ai",
+  geminiConfigured: "/admin/settings?tab=ingest-ai",
+  anthropicConfigured: "/admin/settings?tab=ingest-ai",
+  resendConfigured: "/admin/settings?tab=email",
+  stripeConfigured: "/admin/settings?tab=payments",
+  googleIndexingConfigured: "/admin/settings?tab=seo",
+};
+
+const SERVICE_CONFIG_KEYS: Record<string, keyof ConnectivityPanelProps["initial"]> = {
+  googlePse: "googlePseConfigured",
+  brave: "braveConfigured",
+  openai: "openAiConfigured",
+  gemini: "geminiConfigured",
+  claude: "anthropicConfigured",
+  resend: "resendConfigured",
+  stripe: "stripeConfigured",
+  googleIndexing: "googleIndexingConfigured",
+};
+
 function StatusDot({
   status,
 }: { status: ServiceStatus }) {
@@ -199,6 +221,8 @@ function ConnectivityPanel(props: ConnectivityPanelProps) {
             const svc = services[key] ?? {
               status: "unconfigured" as ServiceStatus,
             };
+            const configKey = SERVICE_CONFIG_KEYS[key];
+            const configured = props.initial[configKey];
             return (
               <div key={key} className="flex items-center gap-2 py-1">
                 <StatusDot status={svc.status} />
@@ -210,9 +234,19 @@ function ConnectivityPanel(props: ConnectivityPanelProps) {
                     {label}
                   </Link>
                   {svc.status === "unconfigured" ? (
-                    <p className="text-[10px] text-muted-foreground">
-                      Not configured
-                    </p>
+                    <div className="flex items-center">
+                      <p className="text-[10px] text-muted-foreground">
+                        Not configured
+                      </p>
+                      {!configured ? (
+                        <Link
+                          href={CONFIG_LINKS[configKey]}
+                          className="ml-2 text-xs text-muted-foreground underline hover:text-foreground"
+                        >
+                          Configure →
+                        </Link>
+                      ) : null}
+                    </div>
                   ) : svc.status === "unchecked" ? (
                     <p className="text-[10px] text-muted-foreground">
                       Not tested

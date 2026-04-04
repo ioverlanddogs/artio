@@ -7,16 +7,17 @@ import { ADMIN_SECTIONS } from "./_components/admin-nav-sections";
 
 async function getSidebarCounts() {
   try {
-    const [submissions, ingest, venueClaims, readyArtists, readyArtworks] = await Promise.all([
+    const [submissions, ingest, venueClaims, readyArtists, readyArtworks, accessRequests] = await Promise.all([
       db.submission.count({ where: { status: "IN_REVIEW" } }),
       db.ingestExtractedEvent.count({ where: { status: "PENDING", duplicateOfId: null } }),
       db.venueClaimRequest.count({ where: { status: "PENDING_VERIFICATION" } }),
       db.artist.count({ where: { status: "IN_REVIEW", isAiDiscovered: true, deletedAt: null } }),
       db.artwork.count({ where: { status: "IN_REVIEW", deletedAt: null, ingestCandidate: { isNot: null } } }),
+      db.accessRequest.count({ where: { status: "PENDING" } }),
     ]);
-    return { submissions, ingest, venueClaims, readyToPublish: readyArtists + readyArtworks };
+    return { submissions, ingest, venueClaims, readyToPublish: readyArtists + readyArtworks, accessRequests };
   } catch {
-    return { submissions: null, ingest: null, venueClaims: null, readyToPublish: null };
+    return { submissions: null, ingest: null, venueClaims: null, readyToPublish: null, accessRequests: null };
   }
 }
 
@@ -58,6 +59,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               "/admin/ingest": sidebarCounts.ingest,
               "/admin/venue-claims": sidebarCounts.venueClaims,
               "/admin/ingest/ready-to-publish": sidebarCounts.readyToPublish,
+              "/admin/access-requests": sidebarCounts.accessRequests,
             }}
           />
         </aside>

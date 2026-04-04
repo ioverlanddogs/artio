@@ -10,6 +10,15 @@ type AccessRequestDeps = {
   appDb: typeof db;
 };
 
+// AccessRequestedRole is the public-facing vocabulary shown in the request UI.
+// It maps onto the internal platform Role enum as follows:
+//   VIEWER    -> USER   (read-only access)
+//   MODERATOR -> EDITOR (can review and publish content)
+//   OPERATOR  -> EDITOR (same platform permissions as MODERATOR for now)
+//   ADMIN     -> ADMIN  (full platform access — requires manual override flag)
+//
+// If the platform Role enum is expanded in future, update this mapping
+// and the corresponding tests in test/access-requests-route.test.ts.
 const requestedRoleToSystemRole: Record<"viewer" | "moderator" | "operator" | "admin", Role> = {
   viewer: "USER",
   moderator: "EDITOR",

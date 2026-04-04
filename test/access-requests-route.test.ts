@@ -105,6 +105,33 @@ test("user creates request and cannot create duplicate pending request", async (
   assert.equal(second.status, 409);
 });
 
+
+test("returns an error when a pending request already exists for the user", async () => {
+  const { deps } = createDeps({
+    users: [{ id: "u1", email: "u1@example.com", role: "USER" }],
+    requests: [],
+  });
+
+  const firstReq = new NextRequest("http://localhost/api/access/request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ requestedRole: "moderator" }),
+  });
+  const first = await handleCreateAccessRequest(firstReq, { id: "u1", email: "u1@example.com", role: "USER" }, deps);
+  assert.equal(first.status, 200);
+
+  const secondReq = new NextRequest("http://localhost/api/access/request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ requestedRole: "operator" }),
+  });
+  const second = await handleCreateAccessRequest(secondReq, { id: "u1", email: "u1@example.com", role: "USER" }, deps);
+  assert.equal(second.status, 409);
+
+  const body = await second.json();
+  assert.match(body.error?.message ?? "", /pending .*request/i);
+});
+
 test("user sees latest request status", async () => {
   const { deps } = createDeps({
     users: [{ id: "u1", email: "u1@example.com", role: "USER" }],
