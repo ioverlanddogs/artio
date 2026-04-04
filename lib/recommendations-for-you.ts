@@ -1,6 +1,7 @@
 import { Prisma, type SavedSearchType } from "@prisma/client";
 import { resolveImageUrl } from "@/lib/assets";
 import { getBoundingBox, isWithinRadiusKm } from "@/lib/geo";
+import { publishedEventWhere } from "@/lib/publish-status";
 import { runSavedSearchEvents } from "@/lib/saved-searches";
 import { DEFAULT_FEED_SCORE_WEIGHTS, interactionDecay, scoreEvent } from "@/domains/feed/scoreEvent";
 
@@ -270,7 +271,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   if (cached.length) {
     const ids = cached.map((c) => c.eventId);
     const cachedEvents = await db.event.findMany({
-      where: { id: { in: ids }, isPublished: true, startAt: { gte: now, lte: to } },
+      where: { id: { in: ids }, ...publishedEventWhere(), startAt: { gte: now, lte: to } },
       select: {
         id: true, title: true, slug: true, startAt: true,
         venue: { select: { name: true, slug: true, city: true } },
@@ -351,7 +352,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   if (followedVenueIds.size || followedArtistIds.size) {
     const items = await db.event.findMany({
       where: {
-        isPublished: true,
+        ...publishedEventWhere(),
         startAt: { gte: now, lte: to },
         ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
         OR: [
@@ -395,7 +396,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     const box = getBoundingBox(user.locationLat, user.locationLng, user.locationRadiusKm);
     const nearby = await db.event.findMany({
       where: {
-        isPublished: true,
+        ...publishedEventWhere(),
         startAt: { gte: now, lte: to },
         ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
         OR: [
@@ -489,7 +490,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     if (affinityVenueIds.size || affinityArtistIds.size || affinityTagIds.size) {
       const affinity = await db.event.findMany({
         where: {
-          isPublished: true,
+          ...publishedEventWhere(),
           startAt: { gte: now, lte: to },
           ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
           OR: [
@@ -510,7 +511,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   let events: CandidateEvent[] = [];
   try {
     events = (await db.event.findMany({
-      where: { id: { in: trimmed }, isPublished: true, startAt: { gte: now, lte: to } },
+      where: { id: { in: trimmed }, ...publishedEventWhere(), startAt: { gte: now, lte: to } },
       select: {
         id: true,
         title: true,
