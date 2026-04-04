@@ -3,6 +3,7 @@ import { getSiteSettings } from "@/lib/site-settings/get-site-settings";
 import { getStripeClient } from "@/lib/stripe";
 import { handleStripeWebhook } from "@/lib/stripe-webhook-handler";
 import { enqueueNotification } from "@/lib/notifications";
+import { upsertVenueSubscriptionFromStripe } from "@/domains/monetisation/venue-subscription";
 
 export const runtime = "nodejs";
 
@@ -80,5 +81,6 @@ export async function POST(req: Request) {
       }
     },
     enqueueNotification: (params) => enqueueNotification(params as never),
+    upsertVenueSubscriptionFromStripe: (params) => upsertVenueSubscriptionFromStripe(db, params),
   });
 }

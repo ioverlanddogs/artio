@@ -10,6 +10,7 @@ import { setOnboardingFlagForSession } from "@/lib/onboarding";
 import { followCountCacheTag } from "@/lib/follow-counts";
 import { logError } from "@/lib/logging";
 import { publishedVenueWhere } from "@/lib/publish-status";
+import { trackFollowInteraction } from "@/domains/follow/toggleFollow";
 
 export const runtime = "nodejs";
 
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
 
     if (!result.ok) return apiError(404, "not_found", "Follow target not found");
     revalidateTag(followCountCacheTag(parsed.data.targetType, parsed.data.targetId));
+    await trackFollowInteraction(db, { userId: user.id, targetType: parsed.data.targetType, targetId: parsed.data.targetId });
     try {
       await setOnboardingFlagForSession(user, "hasFollowedSomething", true, { path: "/api/follows" });
     } catch (onboardingError) {
@@ -106,6 +108,7 @@ export async function DELETE(req: NextRequest) {
     );
 
     revalidateTag(followCountCacheTag(parsed.data.targetType, parsed.data.targetId));
+    await trackFollowInteraction(db, { userId: user.id, targetType: parsed.data.targetType, targetId: parsed.data.targetId });
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (isRateLimitError(error)) return rateLimitErrorResponse(error);

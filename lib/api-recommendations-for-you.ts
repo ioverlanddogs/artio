@@ -3,12 +3,12 @@ import { db } from "@/lib/db";
 import { apiError } from "@/lib/api";
 import { isAuthError, requireUser } from "@/lib/auth";
 import { forYouRecommendationsQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
-import { getForYouRecommendations } from "@/lib/recommendations-for-you";
+import { getForYouFeed } from "@/domains/feed/getForYouFeed";
 import { getSessionCookiePresence, logAuthDebug } from "@/lib/auth-debug";
 
 export async function handleForYouGet(req: { nextUrl: URL }, deps: {
   requireAuthFn?: typeof requireUser;
-  getForYouRecommendationsFn?: typeof getForYouRecommendations;
+  getForYouRecommendationsFn?: typeof getForYouFeed;
 } = {}) {
   const cookieHeader = (req as { headers?: Headers }).headers?.get("cookie") ?? null;
 
@@ -25,7 +25,7 @@ export async function handleForYouGet(req: { nextUrl: URL }, deps: {
     const parsed = forYouRecommendationsQuerySchema.safeParse(paramsToObject(req.nextUrl.searchParams));
     if (!parsed.success) return apiError(400, "invalid_request", "Invalid query parameters", zodDetails(parsed.error));
 
-    const result = await (deps.getForYouRecommendationsFn ?? getForYouRecommendations)(db, {
+    const result = await (deps.getForYouRecommendationsFn ?? getForYouFeed)(db, {
       userId: user.id,
       days: parsed.data.days,
       limit: parsed.data.limit,

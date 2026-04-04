@@ -5,6 +5,7 @@ import { apiError } from "@/lib/api";
 import { guardUser } from "@/lib/auth-guard";
 import { favoriteBodySchema, parseBody, zodDetails } from "@/lib/validators";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
+import { trackUserInteraction } from "@/domains/recommendation/interaction";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,13 @@ export async function POST(req: NextRequest) {
       update: {},
       create: { userId: user.id, targetType: parsed.data.targetType, targetId: parsed.data.targetId },
     });
+    await trackUserInteraction(db, {
+      userId: user.id,
+      type: "SAVE",
+      entityType: parsed.data.targetType,
+      entityId: parsed.data.targetId,
+    });
+
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
     if (isRateLimitError(error)) return rateLimitErrorResponse(error);

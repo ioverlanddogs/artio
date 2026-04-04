@@ -17,6 +17,12 @@ type Deps = {
   findArtworkOrderBySessionId: (sessionId: string) => Promise<{ id: string; artworkId: string; status: ArtworkOrderStatus } | null>;
   confirmArtworkOrder: (orderId: string, artworkId: string, paymentIntentId: string | null) => Promise<void>;
   enqueueNotification: (params: { type: string; toEmail: string; payload: Record<string, unknown>; dedupeKey: string }) => Promise<unknown>;
+  upsertVenueSubscriptionFromStripe: (params: {
+    stripeCustomerId: string;
+    stripeSubscriptionId: string;
+    status: "ACTIVE" | "INACTIVE" | "PAST_DUE";
+    currentPeriodEnd: Date | null;
+  }) => Promise<void>;
 };
 
 export async function handleStripeWebhook(req: Request, deps: Deps) {
@@ -113,6 +119,28 @@ export async function handleStripeWebhook(req: Request, deps: Deps) {
             : null,
         );
       }
+    }
+  }
+
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    const object = event.data.object as unknown as {
+      id?: string;
+      customer?: string;
+      status?: string;
+      current_period_end?: number;
+    };
+    if (object.id && object.customer) {
+      const mappedStatus = object.status === "active"
+        ? "ACTIVE"
+        : object.status === "past_due"
+          ? "PAST_DUE"
+          : "INACTIVE";
+      await deps.upsertVenueSubscriptionFromStripe({
+        stripeCustomerId: object.customer,
+        stripeSubscriptionId: object.id,
+        status: mappedStatus,
+        currentPeriodEnd: object.current_period_end ? new Date(object.current_period_end * 1000) : null,
+      });
     }
   }
 

@@ -376,6 +376,30 @@ enum VenueIngestFrequency {
   MANUAL
 }
 
+enum UserInteractionType {
+  VIEW
+  SAVE
+  FOLLOW
+}
+
+enum UserInteractionEntityType {
+  EVENT
+  ARTIST
+  VENUE
+  ARTWORK
+}
+
+enum VenueSubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+}
+
+enum UserNotificationType {
+  FOLLOWED_ARTIST_NEW_EVENT
+  FOLLOWED_VENUE_NEW_EVENT
+}
+
 model User {
   id                   String                @id @default(uuid()) @db.Uuid
   email                String                @unique
@@ -431,6 +455,8 @@ model User {
   registrations       Registration[]
   artworkOrders      ArtworkOrder[]
   notificationPrefs  UserNotificationPrefs?
+  interactions      UserInteraction[]
+  userNotifications UserNotification[]
 
   @@index([locationLat, locationLng])
 }
@@ -633,6 +659,8 @@ model Venue {
   homepageImageCandidates VenueHomepageImageCandidate[]
   enrichmentLogs     VenueEnrichmentLog[]
   stripeAccount      StripeAccount?
+  subscription      VenueSubscription?
+  promotions        EventPromotion[]
   enrichmentRunItems EnrichmentRunItem[]      @relation("EnrichmentRunItemVenue")
   completenessScore     Int       @default(0)
   completenessFlags     String[]  @default([])
@@ -952,6 +980,7 @@ model Event {
   artistDiscoveryLinks IngestExtractedArtistEvent[]
   extractedArtworks  IngestExtractedArtwork[] @relation("IngestExtractedArtworkSourceEvent")
   enrichmentRunItems EnrichmentRunItem[]      @relation("EnrichmentRunItemEvent")
+  promotions        EventPromotion[]
 
   @@index([startAt])
   @@index([isPublished])
@@ -2163,6 +2192,65 @@ model Follow {
   @@index([userId, createdAt])
   @@index([targetType, targetId])
   @@index([targetType, targetId, createdAt])
+}
+
+model UserInteraction {
+  id         String                    @id @default(uuid()) @db.Uuid
+  userId     String                    @db.Uuid
+  type       UserInteractionType
+  entityType UserInteractionEntityType
+  entityId   String
+  createdAt  DateTime                  @default(now())
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([entityType, entityId, createdAt])
+}
+
+model VenueSubscription {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  venueId              String                  @unique @db.Uuid
+  stripeCustomerId     String                  @unique
+  stripeSubscriptionId String?                 @unique
+  status               VenueSubscriptionStatus @default(INACTIVE)
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  venue                Venue                   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+model EventPromotion {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  venueId   String   @db.Uuid
+  startsAt  DateTime
+  endsAt    DateTime
+  priority  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, startsAt, endsAt])
+  @@index([eventId])
+  @@index([priority])
+}
+
+model UserNotification {
+  id        String               @id @default(uuid()) @db.Uuid
+  userId    String               @db.Uuid
+  type      UserNotificationType
+  entityId  String               @db.Uuid
+  read      Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, entityId])
+  @@index([userId, read, createdAt])
 }
 
 model AdminAuditLog {
