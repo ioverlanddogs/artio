@@ -41,25 +41,25 @@ export const artistListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(48),
 });
 export const slugParamSchema = z.object({ slug: slugSchema });
-export const idParamSchema = z.object({ id: z.string().uuid() });
-export const venueIdParamSchema = z.object({ id: z.string().uuid() });
-export const artistIdParamSchema = z.object({ id: z.string().uuid() });
-export const artworkIdParamSchema = z.object({ id: z.string().uuid() });
+export const idParamSchema = z.object({ id: z.guid() });
+export const venueIdParamSchema = z.object({ id: z.guid() });
+export const artistIdParamSchema = z.object({ id: z.guid() });
+export const artworkIdParamSchema = z.object({ id: z.guid() });
 export const artworkRouteKeyParamSchema = z.object({ key: z.string().trim().min(1).max(120) });
-export const eventIdParamSchema = z.object({ eventId: z.string().uuid() });
-export const venueEventSubmitParamSchema = z.object({ venueId: z.string().uuid(), eventId: z.string().uuid() });
-export const memberIdParamSchema = z.object({ memberId: z.string().uuid() });
-export const inviteIdParamSchema = z.object({ inviteId: z.string().uuid() });
+export const eventIdParamSchema = z.object({ eventId: z.guid() });
+export const venueEventSubmitParamSchema = z.object({ venueId: z.guid(), eventId: z.guid() });
+export const memberIdParamSchema = z.object({ memberId: z.guid() });
+export const inviteIdParamSchema = z.object({ inviteId: z.guid() });
 export const tokenParamSchema = z.object({ token: z.string().trim().min(16).max(255) });
 
-export const imageIdParamSchema = z.object({ imageId: z.string().uuid() });
-export const associationIdParamSchema = z.object({ associationId: z.string().uuid() });
-export const associationModerationParamsSchema = z.object({ id: z.string().uuid(), associationId: z.string().uuid() });
+export const imageIdParamSchema = z.object({ imageId: z.guid() });
+export const associationIdParamSchema = z.object({ associationId: z.guid() });
+export const associationModerationParamsSchema = z.object({ id: z.guid(), associationId: z.guid() });
 
 export const artistVenueAssociationRoleSchema = z.unknown().transform((value) => normalizeAssociationRole(value));
 
 export const artistVenueRequestBodySchema = z.object({
-  venueId: z.string().uuid(),
+  venueId: z.guid(),
   role: artistVenueAssociationRoleSchema.optional(),
   message: z.string().trim().max(500).optional(),
 });
@@ -92,7 +92,7 @@ export const adminBrandingLogoCommitSchema = z.object({
 export const artistImageCreateSchema = z.object({
   url: httpUrlSchema,
   alt: z.string().trim().max(300).optional().nullable(),
-  assetId: z.string().uuid().optional().nullable(),
+  assetId: z.guid().optional().nullable(),
 });
 
 export const artistImageUpdateSchema = z.object({
@@ -100,20 +100,20 @@ export const artistImageUpdateSchema = z.object({
 });
 
 export const artistImageReorderSchema = z.object({
-  orderedIds: z.array(z.string().uuid()).min(1).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
+  orderedIds: z.array(z.guid()).min(1).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
 });
 
 export const artistCoverPatchSchema = z.object({
-  imageId: z.string().uuid().nullable(),
+  imageId: z.guid().nullable(),
 });
 
 const artworkSortSchema = z.enum(["RECENT", "OLDEST", "YEAR_DESC", "YEAR_ASC", "PRICE_ASC", "PRICE_DESC", "VIEWS_30D_DESC"]);
 
 export const artworkListQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
-  artistId: z.string().uuid().optional(),
-  venueId: z.string().uuid().optional(),
-  eventId: z.string().uuid().optional(),
+  artistId: z.guid().optional(),
+  venueId: z.guid().optional(),
+  eventId: z.guid().optional(),
   medium: z.union([z.string(), z.array(z.string())]).optional(),
   mediumCsv: z.string().optional(),
   year: z.coerce.number().int().min(1000).max(3000).optional(),
@@ -137,10 +137,10 @@ export const artworkListQuerySchema = z.object({
   return { ...data, mediums, yearFrom, yearTo, includeViews: data.includeViews ?? false };
 }).superRefine((data, ctx) => {
   if (data.yearFrom != null && data.yearTo != null && data.yearFrom > data.yearTo) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["yearFrom"], message: "yearFrom must be <= yearTo" });
+    ctx.addIssue({ code: "custom", path: ["yearFrom"], message: "yearFrom must be <= yearTo" });
   }
   if (data.priceMin != null && data.priceMax != null && data.priceMin > data.priceMax) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["priceMin"], message: "priceMin must be <= priceMax" });
+    ctx.addIssue({ code: "custom", path: ["priceMin"], message: "priceMin must be <= priceMax" });
   }
 });
 
@@ -166,12 +166,12 @@ export const artworkPublishPatchSchema = z.object({
 });
 
 export const artworkRelationsPutSchema = z.object({
-  venueIds: z.array(z.string().uuid()).optional(),
-  eventIds: z.array(z.string().uuid()).optional(),
+  venueIds: z.array(z.guid()).optional(),
+  eventIds: z.array(z.guid()).optional(),
 });
 
 export const artworkImageCreateSchema = z.object({
-  assetId: z.string().uuid(),
+  assetId: z.guid(),
   alt: z.string().trim().max(300).optional().nullable(),
 });
 
@@ -180,11 +180,11 @@ export const artworkImageUpdateSchema = z.object({
 });
 
 export const artworkImageReorderSchema = z.object({
-  imageIds: z.array(z.string().uuid()).min(1).refine((value) => new Set(value).size === value.length, "imageIds must be unique"),
+  imageIds: z.array(z.guid()).min(1).refine((value) => new Set(value).size === value.length, "imageIds must be unique"),
 });
 
 export const artworkCoverPatchSchema = z.object({
-  imageId: z.string().uuid().nullable(),
+  imageId: z.guid().nullable(),
 });
 
 export const myArtistPatchSchema = z.object({
@@ -198,7 +198,7 @@ export const myArtistPatchSchema = z.object({
   youtubeUrl: httpUrlSchema.optional().nullable(),
   mediums: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   avatarImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
 });
 
 export const myArtistCreateSchema = z.object({
@@ -207,7 +207,7 @@ export const myArtistCreateSchema = z.object({
 });
 
 export const artistFeaturedArtworksReplaceSchema = z.object({
-  artworkIds: z.array(z.string().uuid()).max(6),
+  artworkIds: z.array(z.guid()).max(6),
 });
 
 export const curatedCollectionCreateSchema = z.object({
@@ -218,7 +218,7 @@ export const curatedCollectionCreateSchema = z.object({
 });
 
 
-const optionalIsoDateSchema = z.union([z.string().datetime({ offset: true }), z.string().datetime(), z.null()]).optional();
+const optionalIsoDateSchema = z.union([z.iso.datetime({ offset: true }), z.iso.datetime({ local: true }), z.null()]).optional();
 
 export const curatedCollectionPatchSchema = z.object({
   slug: slugSchema.optional(),
@@ -232,17 +232,17 @@ export const curatedCollectionPatchSchema = z.object({
   showOnArtwork: z.boolean().optional(),
 }).superRefine((value, ctx) => {
   if (Object.keys(value).length === 0) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "At least one field must be provided" });
+    ctx.addIssue({ code: "custom", message: "At least one field must be provided" });
   }
   if (value.publishStartsAt && value.publishEndsAt) {
     if (new Date(value.publishStartsAt).getTime() >= new Date(value.publishEndsAt).getTime()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publishStartsAt"], message: "publishStartsAt must be before publishEndsAt" });
+      ctx.addIssue({ code: "custom", path: ["publishStartsAt"], message: "publishStartsAt must be before publishEndsAt" });
     }
   }
 });
 
 export const curatedCollectionItemsReplaceSchema = z.object({
-  artworkIds: z.array(z.string().uuid()).max(50),
+  artworkIds: z.array(z.guid()).max(50),
 });
 
 export const collectionPageQuerySchema = z.object({
@@ -252,13 +252,13 @@ export const collectionPageQuerySchema = z.object({
 });
 
 export const venueImageCreateSchema = z.object({
-  assetId: z.string().uuid().optional().nullable(),
+  assetId: z.guid().optional().nullable(),
   url: httpUrlSchema.optional().nullable(),
   key: z.string().trim().min(1).max(400).optional(),
   alt: z.string().trim().max(300).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (!data.assetId && !data.url) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Either assetId or url is required" });
+    ctx.addIssue({ code: "custom", path: ["url"], message: "Either assetId or url is required" });
   }
 });
 
@@ -267,23 +267,23 @@ export const venueImageUpdateSchema = z.object({
 });
 
 export const venueImageReorderSchema = z.object({
-  orderedIds: z.array(z.string().uuid()).min(1).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
+  orderedIds: z.array(z.guid()).min(1).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
 });
 
 export const venueCoverPatchSchema = z.object({
-  imageId: z.string().uuid().nullable().optional(),
-  venueImageId: z.string().uuid().nullable().optional(),
+  imageId: z.guid().nullable().optional(),
+  venueImageId: z.guid().nullable().optional(),
 }).superRefine((data, ctx) => {
   const candidateId = data.imageId ?? data.venueImageId;
   if (data.imageId === null || data.venueImageId === null) return;
   if (!candidateId) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["imageId"], message: "imageId is required" });
+    ctx.addIssue({ code: "custom", path: ["imageId"], message: "imageId is required" });
   }
 });
 
 
 export const adminEntityImageCreateSchema = z.object({
-  assetId: z.string().uuid().optional().nullable(),
+  assetId: z.guid().optional().nullable(),
   url: httpUrlSchema.optional().nullable(),
   alt: z.string().trim().max(300).optional().nullable(),
   makePrimary: z.boolean().optional(),
@@ -297,12 +297,12 @@ export const adminEntityImageCreateSchema = z.object({
   message: "Provide only one of makePrimary or setPrimary",
 }).superRefine((data, ctx) => {
   if (!data.assetId && !data.url) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Either assetId or url is required" });
+    ctx.addIssue({ code: "custom", path: ["url"], message: "Either assetId or url is required" });
   }
 });
 
 export const adminEntityImagePatchSchema = z.object({
-  assetId: z.string().uuid().optional().nullable(),
+  assetId: z.guid().optional().nullable(),
   url: httpsUrlSchema.optional(),
   alt: z.string().trim().max(300).optional().nullable(),
   contentType: z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
@@ -316,17 +316,17 @@ export const adminEntityImagePatchSchema = z.object({
 });
 
 export const adminEntityImageReorderSchema = z.object({
-  order: z.array(z.string().uuid()).min(1).refine((value) => new Set(value).size === value.length, "order must be unique"),
+  order: z.array(z.guid()).min(1).refine((value) => new Set(value).size === value.length, "order must be unique"),
 });
 
 export const favoriteBodySchema = z.object({
   targetType: z.enum(["EVENT", "VENUE", "ARTIST", "ARTWORK"]),
-  targetId: z.string().uuid(),
+  targetId: z.guid(),
 });
 
 export const followBodySchema = z.object({
   targetType: z.enum(["ARTIST", "VENUE", "USER"]),
-  targetId: z.string().uuid(),
+  targetId: z.guid(),
 });
 
 export const followManageBulkDeleteSchema = z.object({
@@ -346,7 +346,7 @@ export const savedSearchRenameSchema = z.object({
 });
 
 export const notificationsReadBatchSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(100),
+  ids: z.array(z.guid()).min(1).max(100),
 });
 
 export const notificationsListQuerySchema = z.object({
@@ -356,7 +356,7 @@ export const notificationsListQuerySchema = z.object({
 });
 
 export const notificationsReadSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(100).optional(),
+  ids: z.array(z.guid()).min(1).max(100).optional(),
   all: z.boolean().optional(),
 }).refine((data) => Boolean(data.all) || Boolean(data.ids?.length), {
   message: "Provide ids or all=true",
@@ -378,14 +378,14 @@ export const locationPreferenceSchema = z.object({
   const hasLat = data.lat != null;
   const hasLng = data.lng != null;
   if (hasLat !== hasLng) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [hasLat ? "lng" : "lat"], message: "lat and lng must be provided together" });
+    ctx.addIssue({ code: "custom", path: [hasLat ? "lng" : "lat"], message: "lat and lng must be provided together" });
   }
 });
 
 
 
 export const engagementMetaSchema = z.object({
-  digestRunId: z.string().uuid().optional(),
+  digestRunId: z.guid().optional(),
   position: z.number().int().min(0).max(500).optional(),
   query: z.string().trim().min(1).max(120).optional(),
   feedback: z.enum(["up", "down"]).optional(),
@@ -400,7 +400,7 @@ export const engagementBodySchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.meta?.feedback && data.action !== "CLICK") {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["meta", "feedback"],
       message: "feedback is only valid when action is CLICK",
     });
@@ -455,7 +455,7 @@ export const nearbyEventsQuerySchema = z.object({
   const hasDays = data.days != null;
   const hasRange = data.from != null || data.to != null;
   if (hasDays && hasRange) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["days"], message: "Provide either days or from/to, not both" });
+    ctx.addIssue({ code: "custom", path: ["days"], message: "Provide either days or from/to, not both" });
   }
 });
 
@@ -483,7 +483,7 @@ export const adminArtistCreateSchema = z.object({
   mediums: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   avatarImageUrl: httpUrlSchema.optional().nullable(),
   featuredImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   isPublished: z.boolean().optional(),
 });
 
@@ -496,7 +496,7 @@ export const adminArtistPatchSchema = z.object({
   mediums: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   avatarImageUrl: httpUrlSchema.optional().nullable(),
   featuredImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   isPublished: z.boolean().optional(),
 });
 
@@ -517,7 +517,7 @@ export const adminVenueCreateSchema = z.object({
   instagramUrl: httpUrlSchema.optional().nullable(),
   contactEmail: z.email().optional().nullable(),
   featuredImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   isPublished: z.boolean().optional(),
 });
 
@@ -538,7 +538,7 @@ export const adminVenuePatchSchema = z.object({
   instagramUrl: httpUrlSchema.optional().nullable(),
   contactEmail: z.email().optional().nullable(),
   featuredImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   isPublished: z.boolean().optional(),
 });
 
@@ -559,7 +559,7 @@ export const myVenuePatchSchema = z.object({
   instagramUrl: httpUrlSchema.optional().nullable(),
   openingHours: openingHoursSchema.optional(),
   featuredImageUrl: httpUrlSchema.optional().nullable(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   submitForApproval: z.boolean().optional(),
   note: z.string().trim().max(2000).optional().nullable(),
 });
@@ -585,13 +585,13 @@ export const myVenueCreateSchema = z.object({
 }));
 
 const eventImageSchema = z.object({
-  assetId: z.string().uuid().optional().nullable(),
+  assetId: z.guid().optional().nullable(),
   url: httpUrlSchema.optional().nullable(),
   alt: z.string().optional().nullable(),
   sortOrder: z.number().int().min(0).default(0),
 }).superRefine((data, ctx) => {
   if (!data.assetId && !data.url) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Either assetId or url is required" });
+    ctx.addIssue({ code: "custom", path: ["url"], message: "Either assetId or url is required" });
   }
 });
 
@@ -602,7 +602,7 @@ const adminEventShape = {
   timezone: z.string().trim().min(1),
   startAt: isoDatetimeSchema,
   endAt: isoDatetimeSchema.optional().nullable(),
-  venueId: z.string().uuid().optional().nullable(),
+  venueId: z.guid().optional().nullable(),
   tagSlugs: z.array(slugSchema).optional(),
   artistSlugs: z.array(slugSchema).optional(),
   images: z.array(eventImageSchema).optional(),
@@ -611,7 +611,7 @@ const adminEventShape = {
 
 export const adminEventCreateSchema = z.object(adminEventShape).superRefine((data, ctx) => {
   if (data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be >= startAt" });
   }
 });
 
@@ -622,14 +622,14 @@ export const adminEventPatchSchema = z.object({
   timezone: z.string().trim().min(1).optional(),
   startAt: isoDatetimeSchema.optional(),
   endAt: isoDatetimeSchema.optional().nullable(),
-  venueId: z.string().uuid().optional().nullable(),
+  venueId: z.guid().optional().nullable(),
   tagSlugs: z.array(slugSchema).optional(),
   artistSlugs: z.array(slugSchema).optional(),
   images: z.array(eventImageSchema).optional(),
   isPublished: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.startAt && data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be >= startAt" });
   }
 });
 
@@ -641,13 +641,13 @@ const myEventShape = {
   startAt: isoDatetimeSchema,
   endAt: isoDatetimeSchema.optional().nullable(),
   images: z.array(eventImageSchema).optional(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   note: z.string().trim().max(2000).optional().nullable(),
 };
 
 export const myEventCreateSchema = z.object(myEventShape).superRefine((data, ctx) => {
   if (data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be >= startAt" });
   }
 });
 
@@ -658,18 +658,18 @@ export const myEventPatchSchema = z.object({
   timezone: z.string().trim().min(1).optional(),
   startAt: isoDatetimeSchema.optional(),
   endAt: isoDatetimeSchema.optional().nullable(),
-  venueId: z.string().uuid().optional().nullable(),
+  venueId: z.guid().optional().nullable(),
   images: z.array(eventImageSchema).optional(),
-  featuredAssetId: z.string().uuid().optional().nullable(),
+  featuredAssetId: z.guid().optional().nullable(),
   eventType: z.enum(EVENT_TYPE_OPTIONS).optional().nullable(),
   ticketingMode: z.enum(["EXTERNAL", "RSVP", "PAID"]).optional(),
   capacity: z.number().int().positive().optional().nullable(),
   rsvpClosesAt: isoDatetimeSchema.optional().nullable(),
-  seriesId: z.string().uuid().optional().nullable(),
+  seriesId: z.guid().optional().nullable(),
   note: z.string().trim().max(2000).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.startAt && data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be >= startAt" });
   }
 });
 
@@ -677,13 +677,13 @@ export const CreateEventSchema = z.object({
   title: z.string().trim().min(2).max(120),
   startAt: isoDatetimeSchema,
   endAt: isoDatetimeSchema.optional(),
-  venueId: z.string().uuid().optional(),
+  venueId: z.guid().optional(),
   ticketUrl: httpUrlSchema.optional(),
   timezone: z.string().trim().min(1).max(80).optional(),
   eventType: z.enum(EVENT_TYPE_OPTIONS).optional(),
 }).superRefine((data, ctx) => {
   if (data.endAt && new Date(data.endAt) < new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be >= startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be >= startAt" });
   }
 });
 
@@ -698,7 +698,7 @@ export const eventRevisionPatchSchema = z.object({
   images: z.array(eventImageSchema).optional(),
 }).superRefine((data, ctx) => {
   if (data.startAt && data.endAt && new Date(data.endAt) <= new Date(data.startAt)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endAt"], message: "endAt must be > startAt" });
+    ctx.addIssue({ code: "custom", path: ["endAt"], message: "endAt must be > startAt" });
   }
 });
 
@@ -817,6 +817,6 @@ export function paramsToObject(searchParams: URLSearchParams) {
 
 
 export const curatedCollectionHomeOrderSchema = z.object({
-  orderedIds: z.array(z.string().uuid()).max(100).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
+  orderedIds: z.array(z.guid()).max(100).refine((value) => new Set(value).size === value.length, "orderedIds must be unique"),
   resetOthers: z.boolean().optional(),
 });
