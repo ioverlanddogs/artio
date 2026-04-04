@@ -13,8 +13,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 export default async function MyDashboardPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await getSessionUser();
-  if (!user) return redirectToLogin("/my");
-  if (!user) return null;
+  if (!user) redirectToLogin("/my");
 
   const params = await searchParams;
   const rawVenueId = params.venueId;
