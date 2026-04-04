@@ -93,6 +93,8 @@ async function run() {
       city: "London",
       country: "GB",
       addressLine1: "1 Modern Street",
+      lat: 51.5074,
+      lng: -0.1278,
     },
     {
       slug: "riverfront-arts",
@@ -100,6 +102,8 @@ async function run() {
       city: "Manchester",
       country: "GB",
       addressLine1: "2 Riverfront Road",
+      lat: 53.4808,
+      lng: -2.2426,
     },
   ];
 
@@ -141,6 +145,8 @@ async function run() {
         city: venue.city,
         country: venue.country,
         addressLine1: venue.addressLine1,
+        lat: venue.lat,
+        lng: venue.lng,
         isPublished: true,
         status: "PUBLISHED",
       },
@@ -157,6 +163,53 @@ async function run() {
       create: { ...artist, isPublished: true, status: "PUBLISHED" },
     });
     artistBySlug.set(artist.slug, { id: result.id });
+  }
+
+  if (adminEmail) {
+    const adminUser = await db.user.findUnique({
+      where: { email: adminEmail.toLowerCase() },
+      select: { id: true },
+    });
+
+    if (adminUser) {
+      for (const [, venue] of venueBySlug) {
+        await db.follow.upsert({
+          where: {
+            userId_targetType_targetId: {
+              userId: adminUser.id,
+              targetType: "VENUE",
+              targetId: venue.id,
+            },
+          },
+          update: {},
+          create: {
+            userId: adminUser.id,
+            targetType: "VENUE",
+            targetId: venue.id,
+          },
+        });
+        summary.linked += 1;
+      }
+
+      for (const [, artist] of artistBySlug) {
+        await db.follow.upsert({
+          where: {
+            userId_targetType_targetId: {
+              userId: adminUser.id,
+              targetType: "ARTIST",
+              targetId: artist.id,
+            },
+          },
+          update: {},
+          create: {
+            userId: adminUser.id,
+            targetType: "ARTIST",
+            targetId: artist.id,
+          },
+        });
+        summary.linked += 1;
+      }
+    }
   }
 
   for (const artwork of artworks) {
