@@ -30,34 +30,38 @@ const schema = z.object({
 });
 
 export async function handlePostPromoValidate(req: NextRequest, slug: string, deps: Deps) {
-  const event = await deps.findPublishedEventBySlug(slug);
-  if (!event) return apiError(404, "not_found", "Event not found");
-  if (event.ticketingMode !== "PAID") return apiError(400, "invalid_request", "Paid checkout is not enabled for this event");
+  try {
+    const event = await deps.findPublishedEventBySlug(slug);
+    if (!event) return apiError(404, "not_found", "Event not found");
+    if (event.ticketingMode !== "PAID") return apiError(400, "invalid_request", "Paid checkout is not enabled for this event");
 
-  const parsedBody = schema.safeParse(await parseBody(req));
-  if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedBody.error));
+    const parsedBody = schema.safeParse(await parseBody(req));
+    if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedBody.error));
 
-  const tier = await deps.findTicketTierById(parsedBody.data.tierId);
-  if (!tier || tier.eventId !== event.id) return apiError(404, "not_found", "Ticket tier not found");
+    const tier = await deps.findTicketTierById(parsedBody.data.tierId);
+    if (!tier || tier.eventId !== event.id) return apiError(404, "not_found", "Ticket tier not found");
 
-  const code = normalizePromoCode(parsedBody.data.promoCode);
-  const promoCode = await deps.findPromoCodeByEventIdAndCode(event.id, code);
-  if (!promoCode) return apiError(400, "promo_code_invalid", "Promo code is invalid");
+    const code = normalizePromoCode(parsedBody.data.promoCode);
+    const promoCode = await deps.findPromoCodeByEventIdAndCode(event.id, code);
+    if (!promoCode) return apiError(400, "promo_code_invalid", "Promo code is invalid");
 
-  const validationError = promoCodeValidationError(promoCode, deps.now());
-  if (validationError === "promo_code_invalid") return apiError(400, "promo_code_invalid", "Promo code is invalid");
-  if (validationError === "promo_code_expired") return apiError(400, "promo_code_expired", "Promo code has expired");
-  if (validationError === "promo_code_exhausted") return apiError(400, "promo_code_exhausted", "Promo code has reached its usage limit");
+    const validationError = promoCodeValidationError(promoCode, deps.now());
+    if (validationError === "promo_code_invalid") return apiError(400, "promo_code_invalid", "Promo code is invalid");
+    if (validationError === "promo_code_expired") return apiError(400, "promo_code_expired", "Promo code has expired");
+    if (validationError === "promo_code_exhausted") return apiError(400, "promo_code_exhausted", "Promo code has reached its usage limit");
 
-  const totalAmount = tier.priceAmount * parsedBody.data.quantity;
-  const discountAmount = calculateDiscountAmount(totalAmount, promoCode);
-  const finalAmount = totalAmount - discountAmount;
+    const totalAmount = tier.priceAmount * parsedBody.data.quantity;
+    const discountAmount = calculateDiscountAmount(totalAmount, promoCode);
+    const finalAmount = totalAmount - discountAmount;
 
-  return NextResponse.json({
-    valid: true,
-    discountType: promoCode.discountType,
-    value: promoCode.value,
-    discountAmount,
-    finalAmount,
-  });
+    return NextResponse.json({
+      valid: true,
+      discountType: promoCode.discountType,
+      value: promoCode.value,
+      discountAmount,
+      finalAmount,
+    });
+  } catch {
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
 }

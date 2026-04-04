@@ -14,15 +14,19 @@ async function handleTick(req: NextRequest) {
     method: req.method,
   });
   if (authFailure) return authFailure;
+  try {
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const result = await runSchedulerTick({
+      db,
+      appBaseUrl,
+      cronSecret: process.env.CRON_SECRET!,
+    });
 
-  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const result = await runSchedulerTick({
-    db,
-    appBaseUrl,
-    cronSecret: process.env.CRON_SECRET!,
-  });
-
-  return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    console.error("cron_tick_failed", error);
+    return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
+  }
 }
 
 export async function GET(req: NextRequest) {

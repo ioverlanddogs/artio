@@ -115,64 +115,68 @@ export async function handleDeleteRegistrationByConfirmationCode(
   confirmationCode: string,
   deps: Deps,
 ) {
-  const parsedBody = bodySchema.safeParse(await parseBody(req));
-  if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload");
+  try {
+    const parsedBody = bodySchema.safeParse(await parseBody(req));
+    if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload");
 
-  const registration = await deps.findRegistrationByConfirmationCode(confirmationCode);
-  if (!registration) return apiError(404, "not_found", "Registration not found");
+    const registration = await deps.findRegistrationByConfirmationCode(confirmationCode);
+    if (!registration) return apiError(404, "not_found", "Registration not found");
 
-  const user = await deps.getSessionUser();
-  const providedEmail = parsedBody.data.email;
+    const user = await deps.getSessionUser();
+    const providedEmail = parsedBody.data.email;
 
-  if (!user && !providedEmail) {
-    return apiError(400, "invalid_request", "email is required for guest cancellation");
-  }
+    if (!user && !providedEmail) {
+      return apiError(400, "invalid_request", "email is required for guest cancellation");
+    }
 
-  const isSelfCancellation = Boolean(user && registration.userId && registration.userId === user.id);
-  const isGuestEmailMatch = Boolean(providedEmail && emailEquals(providedEmail, registration.guestEmail));
-  const isVenueMember = user && registration.event.venueId
-    ? await deps.hasVenueMembership(registration.event.venueId, user.id)
-    : false;
+    const isSelfCancellation = Boolean(user && registration.userId && registration.userId === user.id);
+    const isGuestEmailMatch = Boolean(providedEmail && emailEquals(providedEmail, registration.guestEmail));
+    const isVenueMember = user && registration.event.venueId
+      ? await deps.hasVenueMembership(registration.event.venueId, user.id)
+      : false;
 
-  if (!isSelfCancellation && !isGuestEmailMatch && !isVenueMember) {
-    return apiError(403, "forbidden", "Not allowed to cancel this registration");
-  }
+    if (!isSelfCancellation && !isGuestEmailMatch && !isVenueMember) {
+      return apiError(403, "forbidden", "Not allowed to cancel this registration");
+    }
 
-  if (registration.status === "CANCELLED") {
-    return apiError(400, "invalid_request", "Registration already cancelled");
-  }
+    if (registration.status === "CANCELLED") {
+      return apiError(400, "invalid_request", "Registration already cancelled");
+    }
 
-  const { cancelled, promoted } = await deps.prisma.$transaction((tx) => cancelRegistrationTransaction(tx, { registrationId: registration.id }));
+    const { cancelled, promoted } = await deps.prisma.$transaction((tx) => cancelRegistrationTransaction(tx, { registrationId: registration.id }));
 
-  await deps.enqueueNotificationOutbox({
-    type: "REGISTRATION_CANCELLED",
-    toEmail: cancelled.guestEmail,
-    dedupeKey: `registration-cancelled-${cancelled.id}`,
-    payload: {
-      type: "REGISTRATION_CANCELLED",
-      eventTitle: registration.event.title,
-      eventSlug: registration.event.slug,
-      confirmationCode: cancelled.confirmationCode,
-      reason: parsedBody.data.reason,
-    },
-  });
-
-  if (promoted) {
-    // Task 3.3: keep promotion notification wiring from the 1.6 fixup so promoted attendees receive confirmation emails.
     await deps.enqueueNotificationOutbox({
-      type: "REGISTRATION_CONFIRMED",
-      toEmail: promoted.guestEmail,
-      dedupeKey: `registration-confirmed-${promoted.id}`,
+      type: "REGISTRATION_CANCELLED",
+      toEmail: cancelled.guestEmail,
+      dedupeKey: `registration-cancelled-${cancelled.id}`,
       payload: {
-        type: "REGISTRATION_CONFIRMED",
+        type: "REGISTRATION_CANCELLED",
         eventTitle: registration.event.title,
         eventSlug: registration.event.slug,
-        confirmationCode: promoted.confirmationCode,
+        confirmationCode: cancelled.confirmationCode,
+        reason: parsedBody.data.reason,
       },
     });
-  }
 
-  return NextResponse.json({ ok: true, status: "CANCELLED" }, { headers: NO_STORE_HEADERS });
+    if (promoted) {
+      // Task 3.3: keep promotion notification wiring from the 1.6 fixup so promoted attendees receive confirmation emails.
+      await deps.enqueueNotificationOutbox({
+        type: "REGISTRATION_CONFIRMED",
+        toEmail: promoted.guestEmail,
+        dedupeKey: `registration-confirmed-${promoted.id}`,
+        payload: {
+          type: "REGISTRATION_CONFIRMED",
+          eventTitle: registration.event.title,
+          eventSlug: registration.event.slug,
+          confirmationCode: promoted.confirmationCode,
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true, status: "CANCELLED" }, { headers: NO_STORE_HEADERS });
+  } catch {
+    return apiError(500, "internal_error", "Unexpected server error");
+  }
 }
 
 export type { CancelledOrPromotedRegistration };

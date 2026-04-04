@@ -36,92 +36,94 @@ export async function GET(req: NextRequest) {
     method: req.method,
   });
   if (authFailure) return authFailure;
+  try {
+    const searchParams = new URL(req.url).searchParams;
+    const limit = parseLimit(searchParams.get("limit"));
+    const dryRun = shouldDryRun(searchParams.get("dryRun"));
 
-  const searchParams = new URL(req.url).searchParams;
-  const limit = parseLimit(searchParams.get("limit"));
-  const dryRun = shouldDryRun(searchParams.get("dryRun"));
+    const venues = await db.venue.findMany({
+      where: {
+        OR: [{ lat: null }, { lng: null }],
+        AND: [
+          {
+            OR: [{ postcode: { not: null } }, { city: { not: null } }, { addressLine1: { not: null } }],
+          },
+        ],
+      },
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        postcode: true,
+        country: true,
+        lat: true,
+        lng: true,
+      },
+    });
 
-  const venues = await db.venue.findMany({
-    where: {
-      OR: [{ lat: null }, { lng: null }],
-      AND: [
-        {
-          OR: [{ postcode: { not: null } }, { city: { not: null } }, { addressLine1: { not: null } }],
-        },
-      ],
-    },
-    orderBy: { updatedAt: "asc" },
-    take: limit,
-    select: {
-      id: true,
-      name: true,
-      addressLine1: true,
-      addressLine2: true,
-      city: true,
-      postcode: true,
-      country: true,
-      lat: true,
-      lng: true,
-    },
-  });
+    let processed = 0;
+    let updated = 0;
+    let wouldUpdate = 0;
+    let noMatch = 0;
+    let failed = 0;
+    let skipped = 0;
+    const samples: Sample[] = [];
 
-  let processed = 0;
-  let updated = 0;
-  let wouldUpdate = 0;
-  let noMatch = 0;
-  let failed = 0;
-  let skipped = 0;
-  const samples: Sample[] = [];
+    for (const venue of venues) {
+      processed += 1;
+      const query = [venue.name, venue.addressLine1, venue.addressLine2, venue.city, venue.postcode, venue.country]
+        .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+        .join(", ");
 
-  for (const venue of venues) {
-    processed += 1;
-    const query = [venue.name, venue.addressLine1, venue.addressLine2, venue.city, venue.postcode, venue.country]
-      .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
-      .join(", ");
-
-    if (!query) {
-      skipped += 1;
-      continue;
-    }
-
-    try {
-      const result = await geocodeBest(query);
-
-      if (!result) {
-        noMatch += 1;
-        if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "noMatch" });
+      if (!query) {
+        skipped += 1;
         continue;
       }
 
-      if (dryRun) {
-        wouldUpdate += 1;
-        if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "wouldUpdate", result });
-        continue;
-      }
+      try {
+        const result = await geocodeBest(query);
 
-      await db.venue.update({ where: { id: venue.id }, data: { lat: result.lat, lng: result.lng } });
-      updated += 1;
-      if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "updated", result });
-    } catch (error) {
-      if (isNotConfiguredError(error)) {
-        return NextResponse.json({ error: "not_configured" }, { status: 501 });
+        if (!result) {
+          noMatch += 1;
+          if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "noMatch" });
+          continue;
+        }
+
+        if (dryRun) {
+          wouldUpdate += 1;
+          if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "wouldUpdate", result });
+          continue;
+        }
+
+        await db.venue.update({ where: { id: venue.id }, data: { lat: result.lat, lng: result.lng } });
+        updated += 1;
+        if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "updated", result });
+      } catch (error) {
+        if (isNotConfiguredError(error)) {
+          return NextResponse.json({ error: "not_configured" }, { status: 501 });
+        }
+        failed += 1;
+        console.warn(`cron_geocode_venues_failed venueId=${venue.id} city=${venue.city ?? ""} postcode=${venue.postcode ?? ""}`);
+        if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "failed" });
       }
-      failed += 1;
-      console.warn(`cron_geocode_venues_failed venueId=${venue.id} city=${venue.city ?? ""} postcode=${venue.postcode ?? ""}`);
-      if (samples.length < 5) samples.push({ venueId: venue.id, query, outcome: "failed" });
     }
+
+    return NextResponse.json({
+      ok: true,
+      processed,
+      updated,
+      wouldUpdate,
+      noMatch,
+      failed,
+      skipped,
+      samples,
+    });
+  } catch (error) {
+    console.error("cron_geocode_venues_unexpected_error", error);
+    return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
   }
-
-  console.log(`cron_geocode_venues_summary processed=${processed} updated=${updated} wouldUpdate=${wouldUpdate} noMatch=${noMatch} failed=${failed} skipped=${skipped}`);
-
-  return NextResponse.json({
-    ok: true,
-    processed,
-    updated,
-    wouldUpdate,
-    noMatch,
-    failed,
-    skipped,
-    samples,
-  });
 }
