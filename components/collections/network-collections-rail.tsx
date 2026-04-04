@@ -13,18 +13,31 @@ export async function NetworkCollectionsRail({ title = "From people you follow" 
   });
   if (!followedUsers.length) return null;
 
-  const collections = await db.collection.findMany({
-    where: { userId: { in: followedUsers.map((row) => row.targetId) }, isPublic: true },
-    orderBy: { updatedAt: "desc" },
-    take: 8,
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      user: { select: { username: true, displayName: true, isCurator: true } },
-      _count: { select: { items: true } },
-    },
-  });
+  let collections: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    user: { username: string; displayName: string | null; isCurator: boolean };
+    _count: { items: number };
+  }> = [];
+  try {
+    collections = await db.collection.findMany({
+      where: { userId: { in: followedUsers.map((row) => row.targetId) }, isPublic: true },
+      orderBy: { updatedAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        user: { select: { username: true, displayName: true, isCurator: true } },
+        _count: { select: { items: true } },
+      },
+    });
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "P2021" || code === "P2010") return null;
+    throw err;
+  }
   if (!collections.length) return null;
 
   return (

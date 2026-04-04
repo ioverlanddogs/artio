@@ -46,12 +46,17 @@ export async function POST(req: NextRequest) {
       update: {},
       create: { userId: user.id, targetType: parsed.data.targetType, targetId: parsed.data.targetId },
     });
-    await trackUserInteraction(db, {
-      userId: user.id,
-      type: "SAVE",
-      entityType: parsed.data.targetType,
-      entityId: parsed.data.targetId,
-    });
+    try {
+      await trackUserInteraction(db, {
+        userId: user.id,
+        type: "SAVE",
+        entityType: parsed.data.targetType,
+        entityId: parsed.data.targetId,
+      });
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code !== "P2021" && code !== "P2010") throw err;
+    }
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
