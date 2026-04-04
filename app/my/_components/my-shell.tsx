@@ -10,18 +10,22 @@ export async function MyShell({ children }: { children: ReactNode }) {
   let venues: Array<{ id: string; name: string; role: "OWNER" | "EDITOR" }> = [];
   let hasArtistProfile = false;
   let unreadInquiryCount = 0;
+  let hasCollection = false;
 
   if (user) {
-    const [memberships, artist] = await Promise.all([
+    const [memberships, artist, orderCount, favoriteCount] = await Promise.all([
       db.venueMembership.findMany({
         where: { userId: user.id, role: { in: ["OWNER", "EDITOR"] }, venue: { deletedAt: null } },
         select: { venueId: true, role: true, venue: { select: { name: true } } },
         orderBy: { createdAt: "asc" },
       }),
       db.artist.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      db.artworkOrder.count({ where: { buyerUserId: user.id, status: "CONFIRMED" } }),
+      db.favorite.count({ where: { userId: user.id, targetType: "ARTWORK" } }),
     ]);
     venues = memberships.map((m) => ({ id: m.venueId, name: m.venue.name, role: m.role }));
     hasArtistProfile = Boolean(artist);
+    hasCollection = orderCount > 0 || favoriteCount > 0;
 
     if (artist) {
       unreadInquiryCount = await db.artworkInquiry.count({
@@ -36,7 +40,7 @@ export async function MyShell({ children }: { children: ReactNode }) {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <MyHeaderBar venues={venues} hasArtistProfile={hasArtistProfile} />
-      <MySubNav unreadInquiryCount={unreadInquiryCount} />
+      <MySubNav unreadInquiryCount={unreadInquiryCount} hasArtistProfile={hasArtistProfile} hasCollection={hasCollection} />
       <div>{children}</div>
     </div>
   );
