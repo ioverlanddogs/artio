@@ -22,7 +22,7 @@ export const ADMIN_SECTIONS: AdminNavSection[] = [
       { href: "/admin/artists", label: "Artists" },
       { href: "/admin/artist-event-associations", label: "Artist associations" },
       { href: "/admin/artwork", label: "Artwork" },
-      { href: "/admin/artwork-inquiries", label: "Enquiries" },
+      { href: "/admin/artwork-inquiries", label: "Artwork inquiries" },
       { href: "/admin/tags", label: "Tags" },
     ],
   },

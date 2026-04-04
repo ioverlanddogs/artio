@@ -129,7 +129,7 @@ export default function IngestShellClient({ stats, pipelineFlags, children }: Pr
 
   return (
     <main className="space-y-4">
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-11">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         <StatCard
           label="Pending"
           value={stats.total}

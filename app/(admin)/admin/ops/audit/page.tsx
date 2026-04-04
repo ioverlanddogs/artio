@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
+import { formatDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,11 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="border-t">
-                  <td className="px-3 py-2">{item.createdAt.toISOString()}</td>
+                  <td className="px-3 py-2">
+                    <time dateTime={item.createdAt.toISOString()}>
+                      {formatDate(item.createdAt)}
+                    </time>
+                  </td>
                   <td className="px-3 py-2">{item.actorEmail}</td>
                   <td className="px-3 py-2">{item.action}</td>
                   <td className="px-3 py-2">{item.targetType}</td>

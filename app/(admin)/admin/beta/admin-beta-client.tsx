@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/format-date";
 
 type RequestItem = { id: string; email: string; note: string | null; createdAt: string };
 type FeedbackItem = { id: string; email: string | null; pagePath: string | null; message: string; createdAt: string };
@@ -36,10 +38,10 @@ export function AdminBetaClient({ initialRequests, feedback }: { initialRequests
               <tr key={item.id} className="border-t align-top">
                 <td className="p-2">{item.email}</td>
                 <td className="p-2">{item.note || "—"}</td>
-                <td className="p-2">{new Date(item.createdAt).toISOString()}</td>
+                <td className="p-2">{formatDate(item.createdAt)}</td>
                 <td className="space-x-2 p-2">
-                  <button className="rounded border px-2 py-1" type="button" onClick={() => patchStatus(item.id, "APPROVED")}>Approve</button>
-                  <button className="rounded border px-2 py-1" type="button" onClick={() => patchStatus(item.id, "DENIED")}>Deny</button>
+                  <Button size="sm" variant="outline" onClick={() => void patchStatus(item.id, "APPROVED")}>Approve</Button>
+                  <Button size="sm" variant="destructive" onClick={() => void patchStatus(item.id, "DENIED")}>Deny</Button>
                 </td>
               </tr>
             ))}
@@ -64,7 +66,7 @@ export function AdminBetaClient({ initialRequests, feedback }: { initialRequests
                 <td className="p-2">{item.email || "anonymous"}</td>
                 <td className="p-2">{item.pagePath || "—"}</td>
                 <td className="p-2">{item.message.slice(0, 180)}</td>
-                <td className="p-2">{new Date(item.createdAt).toISOString()}</td>
+                <td className="p-2">{formatDate(item.createdAt)}</td>
               </tr>
             ))}
           </tbody>
