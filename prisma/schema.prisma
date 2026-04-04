@@ -320,6 +320,19 @@ enum BetaAccessRequestStatus {
   DENIED
 }
 
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AccessRequestedRole {
+  VIEWER
+  MODERATOR
+  OPERATOR
+  ADMIN
+}
+
 enum StripeAccountStatus {
   PENDING
   ACTIVE
@@ -403,6 +416,8 @@ model User {
   digestRadiusKm       Int?
   digestMaxEvents      Int                   @default(10)
   betaAccessRequests   BetaAccessRequest[]
+  accessRequests       AccessRequest[]          @relation("AccessRequestRequester")
+  reviewedAccessRequests AccessRequest[]        @relation("AccessRequestReviewer")
   betaFeedbackEntries  BetaFeedback[]
   adminInvitesCreated  AdminInvite[]         @relation("AdminInviteCreatedBy")
   importMappingPresets ImportMappingPreset[]
@@ -456,6 +471,24 @@ model BetaAccessRequest {
   userId    String?                 @db.Uuid
   user      User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([status, createdAt])
+}
+
+model AccessRequest {
+  id              String              @id @default(uuid()) @db.Uuid
+  userId          String              @db.Uuid
+  requestedRole   AccessRequestedRole
+  status          AccessRequestStatus @default(PENDING)
+  reason          String?
+  rejectionReason String?
+  reviewedAt      DateTime?
+  reviewedById    String?             @db.Uuid
+  reviewedBy      User?               @relation("AccessRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  user            User                @relation("AccessRequestRequester", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([userId, status])
   @@index([status, createdAt])
 }
 

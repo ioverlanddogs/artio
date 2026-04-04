@@ -109,58 +109,9 @@ export async function handleAdminPatchRequestStatus(
   if (!parsedBody.success) return apiError(400, "invalid_request", "Invalid payload", zodDetails(parsedBody.error));
 
   const status = parsedBody.data.status as BetaAccessRequestStatus;
-  await db.$transaction(async (tx) => {
-    const request = await tx.betaAccessRequest.update({
-      where: { id: parsedId.data.id },
-      data: { status },
-      select: { id: true, email: true, userId: true },
-    });
-
-    if (status !== "APPROVED") return;
-
-    const targetUser = request.userId
-      ? await tx.user.findUnique({ where: { id: request.userId }, select: { id: true, role: true, email: true } })
-      : await tx.user.findFirst({ where: { email: { equals: normalizeEmail(request.email), mode: "insensitive" } }, select: { id: true, role: true, email: true } });
-
-    if (!targetUser) {
-      console.info("publisher_access_approved_without_user", { requestId: request.id, email: request.email });
-      return;
-    }
-
-    if (targetUser.role !== "USER") return;
-
-    const updatedUser = await tx.user.update({
-      where: { id: targetUser.id },
-      data: { role: "EDITOR" },
-      select: { id: true, role: true },
-    });
-
-    await tx.adminAuditLog.create({
-      data: {
-        actorEmail: actorUser?.email ?? "unknown",
-        action: "ROLE_GRANT_PUBLISHER",
-        targetType: "user",
-        targetId: updatedUser.id,
-        metadata: {
-          actorUserId: actorUser?.id ?? null,
-          targetUserId: updatedUser.id,
-          fromRole: targetUser.role,
-          toRole: updatedUser.role,
-          requestId: request.id,
-        },
-      },
-    });
-
-    await tx.notification.create({
-      data: {
-        userId: updatedUser.id,
-        type: "INVITE_CREATED",
-        title: "Publisher access approved",
-        body: "Your publisher access request was approved.",
-        href: "/my",
-        dedupeKey: `publisher-access-approved:${request.id}:${updatedUser.id}`,
-      },
-    });
+  await db.betaAccessRequest.update({
+    where: { id: parsedId.data.id },
+    data: { status },
   });
 
   return noStoreJson({ ok: true });

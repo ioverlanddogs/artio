@@ -739,6 +739,15 @@ export const betaRequestStatusPatchSchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "DENIED"]),
 });
 
+export const accessRequestCreateSchema = z.object({
+  requestedRole: z.enum(["viewer", "moderator", "operator", "admin"]),
+  reason: z.string().trim().max(1000).optional(),
+});
+
+export const accessRequestRejectionSchema = z.object({
+  rejectionReason: z.string().trim().max(1000).optional(),
+});
+
 export const submissionDecisionSchema = z.object({
   action: z.enum(["approve", "reject"]),
   decisionReason: z.string().trim().max(2000).optional().nullable(),
