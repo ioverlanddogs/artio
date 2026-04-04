@@ -10,6 +10,7 @@ const adminUsersQuerySchema = z.object({
 
 const roleUpdateBodySchema = z.object({
   role: z.enum(["USER", "EDITOR", "ADMIN"]),
+  manualOverride: z.boolean().optional(),
 });
 
 const roleUpdateParamsSchema = z.object({
@@ -26,6 +27,8 @@ type AdminUsersDeps = {
   requireAdminUser: () => Promise<AdminActor>;
   appDb: typeof db;
 };
+
+const roleWeight: Record<Role, number> = { USER: 0, EDITOR: 1, ADMIN: 2 };
 
 function getRequestDetails(req: NextRequest) {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -109,6 +112,15 @@ export async function handleAdminUserRoleUpdate(req: NextRequest, params: { id: 
       return NextResponse.json({ success: true, user: targetUser });
     }
 
+    const isElevation = roleWeight[parsedBody.data.role] > roleWeight[targetUser.role];
+    if (isElevation && parsedBody.data.manualOverride !== true) {
+      return apiError(
+        409,
+        "use_access_request_flow",
+        "Direct role elevation is disabled. Use the access request approval flow or pass manualOverride=true for break-glass changes.",
+      );
+    }
+
     const { ip, userAgent } = getRequestDetails(req);
 
     const updatedUser = await deps.appDb.$transaction(async (tx) => {
@@ -138,7 +150,7 @@ export async function handleAdminUserRoleUpdate(req: NextRequest, params: { id: 
       await tx.adminAuditLog.create({
         data: {
           actorEmail: actor.email,
-          action: "USER_ROLE_CHANGED",
+          action: isElevation ? "USER_ROLE_CHANGED_MANUAL_OVERRIDE" : "USER_ROLE_CHANGED",
           targetType: "user",
           targetId: user.id,
           metadata,

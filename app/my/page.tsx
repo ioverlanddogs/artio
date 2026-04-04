@@ -41,7 +41,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
             { label: "Set up artist profile", href: "/my/artist", variant: "secondary" },
           ]}
         />
-        {!hasVenueAccess ? <RequestPublisherAccessCard email={user.email} /> : null}
+        {!hasVenueAccess ? <RequestPublisherAccessCard currentRole={user.role} /> : null}
       </main>
     );
   }
@@ -53,7 +53,7 @@ export default async function MyDashboardPage({ searchParams }: { searchParams: 
       {!hasVenueAccess ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Want to publish venues and events?</h2>
-          <RequestPublisherAccessCard email={user.email} />
+          <RequestPublisherAccessCard currentRole={user.role} />
         </section>
       ) : null}
     </main>

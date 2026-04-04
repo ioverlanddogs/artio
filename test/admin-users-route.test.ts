@@ -106,7 +106,7 @@ test("GET /api/admin/users returns 403 for non-admin", async () => {
   assert.equal(res.status, 403);
 });
 
-test("PATCH /api/admin/users/[id]/role lets admin update another user's role", async () => {
+test("PATCH /api/admin/users/[id]/role lets admin demote without manual override", async () => {
   const { appDb } = buildDeps([
     { id: "11111111-1111-4111-8111-111111111111", email: "admin@example.com", name: "Admin", role: "ADMIN" },
     { id: "22222222-2222-4222-8222-222222222222", email: "editor@example.com", name: "Editor", role: "EDITOR" },
@@ -126,6 +126,26 @@ test("PATCH /api/admin/users/[id]/role lets admin update another user's role", a
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.user.role, "USER");
+});
+
+test("PATCH /api/admin/users/[id]/role blocks elevation without manual override", async () => {
+  const { appDb } = buildDeps([
+    { id: "11111111-1111-4111-8111-111111111111", email: "admin@example.com", name: "Admin", role: "ADMIN" },
+    { id: "22222222-2222-4222-8222-222222222222", email: "user@example.com", name: "User", role: "USER" },
+  ]);
+
+  const req = new NextRequest("http://localhost/api/admin/users/22222222-2222-4222-8222-222222222222/role", {
+    method: "PATCH",
+    body: JSON.stringify({ role: "EDITOR" }),
+    headers: { "content-type": "application/json" },
+  });
+
+  const res = await handleAdminUserRoleUpdate(req, { id: "22222222-2222-4222-8222-222222222222" }, {
+    requireAdminUser: async () => ({ id: "11111111-1111-4111-8111-111111111111", email: "admin@example.com", role: "ADMIN" }),
+    appDb: appDb as never,
+  });
+
+  assert.equal(res.status, 409);
 });
 
 test("PATCH /api/admin/users/[id]/role prevents demoting the last admin", async () => {
@@ -155,7 +175,7 @@ test("PATCH /api/admin/users/[id]/role writes an audit log entry on success", as
 
   const req = new NextRequest("http://localhost/api/admin/users/22222222-2222-4222-8222-222222222222/role", {
     method: "PATCH",
-    body: JSON.stringify({ role: "EDITOR" }),
+    body: JSON.stringify({ role: "EDITOR", manualOverride: true }),
     headers: { "content-type": "application/json", "user-agent": "node-test" },
   });
 
@@ -166,7 +186,7 @@ test("PATCH /api/admin/users/[id]/role writes an audit log entry on success", as
 
   assert.equal(res.status, 200);
   assert.equal(auditEntries.length, 1);
-  assert.equal(auditEntries[0].action, "USER_ROLE_CHANGED");
+  assert.equal(auditEntries[0].action, "USER_ROLE_CHANGED_MANUAL_OVERRIDE");
 });
 
 
