@@ -6,7 +6,7 @@ import { resolveAssetDisplay } from "@/lib/assets/resolve-asset-display";
 import { toApiImageField } from "@/lib/assets/image-contract";
 import { distanceKm, getBoundingBox, isWithinRadiusKm } from "@/lib/geo";
 import { nearbyVenuesQuerySchema, paramsToObject, zodDetails } from "@/lib/validators";
-import { publishedVenueWhere } from "@/lib/publish-status";
+import { publishedEventWhere, publishedVenueWhere } from "@/lib/publish-status";
 import { RATE_LIMITS, enforceRateLimit, isRateLimitError, principalRateLimitKey, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       ? {
         events: {
           some: {
-            isPublished: true,
+            ...publishedEventWhere(),
             startAt: {
               gte: windowStart,
               ...(windowEnd ? { lte: windowEnd } : {}),
