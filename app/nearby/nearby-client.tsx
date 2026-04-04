@@ -157,7 +157,7 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
   }, [mapFullscreen]);
 
 
-  const enableLocation = async () => {
+  const enableLocation = useCallback(async () => {
     track("location_enable_clicked", { page: "nearby" });
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       track("location_enable_result", { result: "error" });
@@ -197,7 +197,12 @@ export function NearbyClient({ initialLocation, isAuthenticated, initialView }: 
       }
       setIsLocating(false);
     }, { timeout: 10000, maximumAge: 300000, enableHighAccuracy: false });
-  };
+  }, [form.locationLabel, form.radiusKm, isAuthenticated, loadNearby]);
+
+  useEffect(() => {
+    if (!canSearch) void enableLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mapItems = useMemo(() => [
     ...eventItems.map((item) => ({ ...item, kind: "event" as const })),
