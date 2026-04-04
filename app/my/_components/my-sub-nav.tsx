@@ -10,26 +10,30 @@ const primaryTabs = [
   ["Events", "/my/events"],
 ] as const;
 
-const secondaryTabs = [
-  ["Artwork", "/my/artwork"],
-  ["Collection", "/my/collection"],
-  ["Artist Profile", "/my/artist"],
-  ["CV & history", "/my/artist/cv"],
-  ["Inquiries", "/my/artist/inquiries"],
-  ["Team", "/my/team"],
-  ["Analytics", "/my/analytics"],
-  ["Settings", "/my/settings"],
-] as const;
-
 type MySubNavProps = {
   unreadInquiryCount?: number;
+  hasArtistProfile?: boolean;
+  hasCollection?: boolean;
 };
 
-export function MySubNav({ unreadInquiryCount = 0 }: MySubNavProps) {
+export function MySubNav({ unreadInquiryCount = 0, hasArtistProfile = false, hasCollection = false }: MySubNavProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const venueId = searchParams.get("venueId");
   const suffix = venueId ? `?venueId=${encodeURIComponent(venueId)}` : "";
+
+  const secondaryTabs: Array<readonly [string, string]> = [
+    ["Artwork", "/my/artwork"],
+    ...(hasCollection ? [["Collection", "/my/collection"] as const] : []),
+    ["Artist Profile", "/my/artist"],
+    ...(hasArtistProfile ? [
+      ["CV & history", "/my/artist/cv"] as const,
+      ["Inquiries", "/my/artist/inquiries"] as const,
+    ] : []),
+    ["Team", "/my/team"],
+    ["Analytics", "/my/analytics"],
+    ["Settings", "/my/settings"],
+  ];
 
   const renderTab = ([label, href]: readonly [string, string], tone: "primary" | "secondary") => {
     const active = href === "/my"

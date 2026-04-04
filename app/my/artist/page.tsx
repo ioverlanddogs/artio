@@ -78,21 +78,7 @@ export default async function MyArtistPage() {
   }
 
   const latestSubmission = artist.targetSubmissions[0] ?? null;
-  const [publishedVenues, publishedEvents, artworkCount] = await Promise.all([
-    db.venue.findMany({
-      where: { isPublished: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, slug: true },
-      take: 20, // Limited to avoid large payloads — ArtistVenuesPanel should move to search/autocomplete for scale
-    }),
-    db.event.findMany({
-      where: { isPublished: true },
-      orderBy: { startAt: "asc" },
-      select: { id: true, title: true, slug: true, startAt: true },
-      take: 50,
-    }),
-    countAllArtworksByArtist(artist.id),
-  ]);
+  const artworkCount = await countAllArtworksByArtist(artist.id);
 
   const stripeAccount = await db.artistStripeAccount.findUnique({
     where: { artistId: artist.id },
@@ -205,8 +191,8 @@ export default async function MyArtistPage() {
             initialImages={artist.images}
             initialCover={coverUrl}
           />
-          <ArtistVenuesPanel initialVenues={publishedVenues} />
-          <ArtistEventsPanel initialEvents={publishedEvents} />
+          <ArtistVenuesPanel />
+          <ArtistEventsPanel />
           <ArtworkManagementGrid artistId={artist.id} />
         </div>
 
