@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { handleTrackPageView } from "@/lib/page-view-route";
+import { trackUserInteraction } from "@/domains/recommendation/interaction";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,14 @@ export async function POST(req: NextRequest) {
           userId: input.userId,
         },
       });
+      if (input.userId) {
+        await trackUserInteraction(db, {
+          userId: input.userId,
+          type: "VIEW",
+          entityType: input.entityType,
+          entityId: input.entityId,
+        });
+      }
     },
     incrementDaily: async (input) => {
       await db.$executeRaw(

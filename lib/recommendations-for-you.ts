@@ -24,7 +24,15 @@ type CandidateEvent = {
   lat: number | null;
   lng: number | null;
   venueId: string | null;
-  venue: { name: string; slug: string; city: string | null; lat: number | null; lng: number | null } | null;
+  venue: {
+    name: string;
+    slug: string;
+    city: string | null;
+    lat: number | null;
+    lng: number | null;
+    subscription: { status: "ACTIVE" | "INACTIVE" | "PAST_DUE" } | null;
+  } | null;
+  promotions: Array<{ priority: number }>;
   images: Array<{ url: string; asset: { url: string } | null }>;
   eventArtists: Array<{ artistId: string }>;
   eventTags: Array<{ tagId: string; tag: { slug: string; category: string } }>;
@@ -117,6 +125,17 @@ export function scoreForYouEvents(args: {
     if (args.nearbyMatches.has(event.id)) {
       score += 6;
       reasons.push(`Near ${args.locationLabel || "your area"} (within ${args.radiusKm ?? 25} km)`);
+    }
+
+    if (event.venue?.subscription?.status === "ACTIVE") {
+      score += 3;
+      reasons.push("From a Venue Pro subscriber");
+    }
+    const activePromotions = event.promotions ?? [];
+    if (activePromotions.length) {
+      const maxPriority = Math.max(...activePromotions.map((promotion) => promotion.priority));
+      score += Math.max(2, Math.min(8, maxPriority * 2));
+      reasons.push("Promoted by venue");
     }
 
     if (event.venueId && args.affinityVenueIds.has(event.venueId)) {
@@ -366,7 +385,11 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
       lat: true,
       lng: true,
       venueId: true,
-      venue: { select: { name: true, slug: true, city: true, lat: true, lng: true } },
+      venue: { select: { name: true, slug: true, city: true, lat: true, lng: true, subscription: { select: { status: true } } } },
+      promotions: {
+        where: { startsAt: { lte: now }, endsAt: { gte: now } },
+        select: { priority: true },
+      },
       images: { take: 1, orderBy: { sortOrder: "asc" }, select: { url: true, asset: { select: { url: true } } } },
       eventArtists: { select: { artistId: true } },
       eventTags: { select: { tagId: true, tag: { select: { slug: true, category: true } } } },
