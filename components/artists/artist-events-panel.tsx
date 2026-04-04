@@ -17,8 +17,9 @@ type Assoc = {
 
 export function ArtistEventsPanel() {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<EventOption[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<EventOption[]>([]);
   const [searching, setSearching] = useState(false);
   const [role, setRole] = useState(DEFAULT_ASSOCIATION_ROLE);
   const [message, setMessage] = useState("");
@@ -26,31 +27,23 @@ export function ArtistEventsPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
       return;
     }
-
-    const timeout = window.setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/search/quick?q=${encodeURIComponent(trimmed)}`, { cache: "no-store" });
-        if (!res.ok) {
-          setResults([]);
-          return;
-        }
-        const payload = await res.json().catch(() => ({ events: [] }));
-        const events = Array.isArray(payload.events) ? payload.events : [];
-        setResults(events.slice(0, 10).map((event: EventOption) => ({ id: event.id, title: event.title, slug: event.slug, startAt: event.startAt })));
+        const res = await fetch(`/api/search/quick?q=${encodeURIComponent(searchQuery)}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => ({}));
+        setSearchResults(Array.isArray(body.events) ? body.events : []);
       } finally {
         setSearching(false);
       }
     }, 350);
-
-    return () => window.clearTimeout(timeout);
-  }, [query]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   async function loadAssociations() {
     setLoading(true);
@@ -71,11 +64,16 @@ export function ArtistEventsPanel() {
     void loadAssociations();
   }, []);
 
-  async function handleRequest(eventId: string) {
+  async function handleRequest() {
+    if (!selectedEventId) {
+      enqueueToast({ title: "Select an event first", variant: "error" });
+      return;
+    }
+
     const res = await fetch("/api/my/artist/events", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ eventId, role, message: message || undefined }),
+      body: JSON.stringify({ eventId: selectedEventId, role, message: message || undefined }),
     });
     if (res.status === 401) {
       window.location.href = buildLoginRedirectUrl("/my/artist");
@@ -89,8 +87,9 @@ export function ArtistEventsPanel() {
     enqueueToast({ title: "Association requested", variant: "success" });
     setMessage("");
     setRole(DEFAULT_ASSOCIATION_ROLE);
-    setQuery("");
-    setResults([]);
+    setSelectedEventId("");
+    setSearchQuery("");
+    setSearchResults([]);
     await loadAssociations();
     router.refresh();
   }
@@ -109,39 +108,57 @@ export function ArtistEventsPanel() {
     await loadAssociations();
   }
 
+  const selectedEvent = searchResults.find((event) => event.id === selectedEventId);
+
   return (
     <section className="space-y-3 rounded border p-4">
       <h2 className="text-lg font-semibold">Events</h2>
       <div className="space-y-2">
-        <input
-          type="text"
-          className="w-full rounded border p-2 text-sm"
-          placeholder="Search for an event by title…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
-        {results.length > 0 && query.trim().length >= 2 && (
-          <ul className="divide-y rounded border text-sm">
-            {results.map((event) => (
-              <li key={event.id} className="flex items-center justify-between p-2">
-                <span>{event.title}</span>
-                <button
-                  type="button"
-                  className="rounded border px-2 py-1 text-xs"
-                  onClick={() => void handleRequest(event.id)}
-                >
-                  Request association
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="space-y-2">
+          <input
+            type="text"
+            className="w-full rounded border p-2 text-sm"
+            placeholder="Search for an event by title…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searching && <p className="text-xs text-muted-foreground">Searching…</p>}
+          {searchResults.length > 0 && (
+            <ul className="divide-y rounded border text-sm">
+              {searchResults.map((event) => (
+                <li key={event.id} className="flex items-center justify-between p-2">
+                  <div>
+                    <span>{event.title}</span>
+                    {event.startAt ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {new Date(event.startAt).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded border px-2 py-1 text-xs"
+                    onClick={() => setSelectedEventId(event.id)}
+                  >
+                    Select
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <select className="w-full rounded border px-2 py-1" value={role} onChange={(e) => setRole(normalizeAssociationRole(e.target.value))}>
           {ASSOCIATION_ROLES.map((roleKey) => <option key={roleKey} value={roleKey}>{roleLabel(roleKey)}</option>)}
         </select>
         <textarea className="w-full rounded border px-2 py-1" rows={3} placeholder="Optional note" value={message} onChange={(e) => setMessage(e.target.value)} />
+        {selectedEventId && selectedEvent ? (
+          <p className="text-xs text-muted-foreground">
+            Selected: {selectedEvent.title}
+          </p>
+        ) : null}
         <div className="flex gap-2">
+          <button className="rounded border px-3 py-1" onClick={() => void handleRequest()}>Request association</button>
           <button className="rounded border px-3 py-1" onClick={loadAssociations}>Refresh list</button>
         </div>
       </div>
@@ -162,7 +179,7 @@ export function ArtistEventsPanel() {
                       <div className="text-xs text-muted-foreground">{item.event.venueName ?? "Unknown venue"}</div>
                       <div className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{roleLabel(normalizedRole)}</div>
                       {item.message ? <div className="text-muted-foreground">{item.message}</div> : null}
-                      {item.status === "PENDING" ? <button className="mt-1 rounded border px-2 py-1" onClick={() => cancelAssociation(item.id)}>Cancel</button> : null}
+                      {item.status === "PENDING" ? <button className="mt-1 rounded border px-2 py-1" onClick={() => void cancelAssociation(item.id)}>Cancel</button> : null}
                     </li>
                   );
                 })}
