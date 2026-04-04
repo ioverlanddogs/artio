@@ -40,108 +40,128 @@ export async function handleStripeWebhook(req: Request, deps: Deps) {
     return apiError(400, "invalid_signature", "Stripe signature verification failed");
   }
 
-  if (event.type === "account.updated") {
-    const accountId = event.data.object.id;
-    if (accountId) {
-      const isDeleted = event.data.object.deleted === true;
-      const chargesEnabled = event.data.object.charges_enabled === true;
-      const payoutsEnabled = event.data.object.payouts_enabled === true;
-      const status = isDeleted ? "DEAUTHORIZED" : chargesEnabled ? "ACTIVE" : "RESTRICTED";
+  switch (event.type) {
+    case "account.updated": {
+      try {
+        const accountId = event.data.object.id;
+        if (accountId) {
+          const isDeleted = event.data.object.deleted === true;
+          const chargesEnabled = event.data.object.charges_enabled === true;
+          const payoutsEnabled = event.data.object.payouts_enabled === true;
+          const status = isDeleted ? "DEAUTHORIZED" : chargesEnabled ? "ACTIVE" : "RESTRICTED";
 
-      const account = await deps.findStripeAccountByStripeAccountId(accountId);
-      if (account) {
-        await deps.updateStripeAccount(account.id, {
-          chargesEnabled,
-          payoutsEnabled,
-          status,
-        });
+          const account = await deps.findStripeAccountByStripeAccountId(accountId);
+          if (account) {
+            await deps.updateStripeAccount(account.id, {
+              chargesEnabled,
+              payoutsEnabled,
+              status,
+            });
+          }
+
+          const artistAccount = await deps.findArtistStripeAccountByStripeAccountId(accountId);
+          if (artistAccount) {
+            await deps.updateArtistStripeAccount(artistAccount.id, {
+              chargesEnabled,
+              payoutsEnabled,
+              status,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("stripe_webhook_account_updated_failed", error);
       }
+      break;
+    }
+    case "account.application.deauthorized": {
+      try {
+        const accountId = event.data.object.id;
+        if (accountId) {
+          const account = await deps.findStripeAccountByStripeAccountId(accountId);
+          if (account) {
+            await deps.updateStripeAccount(account.id, { status: "DEAUTHORIZED" });
+          }
 
-      const artistAccount = await deps.findArtistStripeAccountByStripeAccountId(accountId);
-      if (artistAccount) {
-        await deps.updateArtistStripeAccount(artistAccount.id, {
-          chargesEnabled,
-          payoutsEnabled,
-          status,
-        });
+          const artistAccount = await deps.findArtistStripeAccountByStripeAccountId(accountId);
+          if (artistAccount) {
+            await deps.updateArtistStripeAccount(artistAccount.id, { status: "DEAUTHORIZED" });
+          }
+        }
+      } catch (error) {
+        console.error("stripe_webhook_deauthorized_failed", error);
       }
+      break;
     }
-  }
+    case "checkout.session.completed": {
+      try {
+        const paymentIntentId = event.data.object.payment_intent;
+        const metadata = event.data.object.metadata as { registrationId?: string; artworkOrderId?: string } | undefined;
+        const metadataRegistrationId = metadata?.registrationId;
 
-  if (event.type === "account.application.deauthorized") {
-    const accountId = event.data.object.id;
-    if (accountId) {
-      const account = await deps.findStripeAccountByStripeAccountId(accountId);
-      if (account) {
-        await deps.updateStripeAccount(account.id, { status: "DEAUTHORIZED" });
+        const registration = paymentIntentId
+          ? await deps.findRegistrationByPaymentIntentId(paymentIntentId)
+          : metadataRegistrationId
+            ? await deps.findRegistrationById(metadataRegistrationId)
+            : null;
+
+        if (registration && registration.status === "PENDING") {
+          await deps.updateRegistrationStatus(registration.id, "CONFIRMED");
+          await deps.enqueueNotification({
+            type: "REGISTRATION_CONFIRMED",
+            toEmail: registration.guestEmail,
+            payload: { registrationId: registration.id },
+            dedupeKey: `registration-confirmed:${registration.id}`,
+          });
+        }
+
+        const artworkOrderId = metadata?.artworkOrderId;
+        if (artworkOrderId && event.data.object.id) {
+          const artworkOrder = await deps.findArtworkOrderBySessionId(event.data.object.id);
+          if (artworkOrder && artworkOrder.status === "PENDING") {
+            await deps.confirmArtworkOrder(
+              artworkOrder.id,
+              artworkOrder.artworkId,
+              typeof event.data.object.payment_intent === "string"
+                ? event.data.object.payment_intent
+                : null,
+            );
+          }
+        }
+      } catch (error) {
+        console.error("stripe_webhook_checkout_completed_failed", error);
       }
-
-      const artistAccount = await deps.findArtistStripeAccountByStripeAccountId(accountId);
-      if (artistAccount) {
-        await deps.updateArtistStripeAccount(artistAccount.id, { status: "DEAUTHORIZED" });
+      break;
+    }
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted": {
+      try {
+        const object = event.data.object as unknown as {
+          id?: string;
+          customer?: string;
+          status?: string;
+          current_period_end?: number;
+        };
+        if (object.id && object.customer) {
+          const mappedStatus = object.status === "active"
+            ? "ACTIVE"
+            : object.status === "past_due"
+              ? "PAST_DUE"
+              : "INACTIVE";
+          await deps.upsertVenueSubscriptionFromStripe({
+            stripeCustomerId: object.customer,
+            stripeSubscriptionId: object.id,
+            status: mappedStatus,
+            currentPeriodEnd: object.current_period_end ? new Date(object.current_period_end * 1000) : null,
+          });
+        }
+      } catch (error) {
+        console.error("stripe_webhook_subscription_sync_failed", error);
       }
+      break;
     }
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const paymentIntentId = event.data.object.payment_intent;
-    const metadata = event.data.object.metadata as { registrationId?: string; artworkOrderId?: string } | undefined;
-    const metadataRegistrationId = metadata?.registrationId;
-
-    const registration = paymentIntentId
-      ? await deps.findRegistrationByPaymentIntentId(paymentIntentId)
-      : metadataRegistrationId
-        ? await deps.findRegistrationById(metadataRegistrationId)
-        : null;
-
-    if (registration && registration.status === "PENDING") {
-      await deps.updateRegistrationStatus(registration.id, "CONFIRMED");
-      // NOTE: checkout-confirm.ts also enqueues this notification with the same dedupeKey.
-      // The outbox upsert is idempotent — whichever path fires first wins.
-      // Both paths now use the real guestEmail (see findRegistrationBy* deps above).
-      await deps.enqueueNotification({
-        type: "REGISTRATION_CONFIRMED",
-        toEmail: registration.guestEmail,
-        payload: { registrationId: registration.id },
-        dedupeKey: `registration-confirmed:${registration.id}`,
-      });
-    }
-
-    const artworkOrderId = metadata?.artworkOrderId;
-    if (artworkOrderId && event.data.object.id) {
-      const artworkOrder = await deps.findArtworkOrderBySessionId(event.data.object.id);
-      if (artworkOrder && artworkOrder.status === "PENDING") {
-        await deps.confirmArtworkOrder(
-          artworkOrder.id,
-          artworkOrder.artworkId,
-          typeof event.data.object.payment_intent === "string"
-            ? event.data.object.payment_intent
-            : null,
-        );
-      }
-    }
-  }
-
-  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-    const object = event.data.object as unknown as {
-      id?: string;
-      customer?: string;
-      status?: string;
-      current_period_end?: number;
-    };
-    if (object.id && object.customer) {
-      const mappedStatus = object.status === "active"
-        ? "ACTIVE"
-        : object.status === "past_due"
-          ? "PAST_DUE"
-          : "INACTIVE";
-      await deps.upsertVenueSubscriptionFromStripe({
-        stripeCustomerId: object.customer,
-        stripeSubscriptionId: object.id,
-        status: mappedStatus,
-        currentPeriodEnd: object.current_period_end ? new Date(object.current_period_end * 1000) : null,
-      });
-    }
+    default:
+      console.warn(`stripe_webhook_unhandled_event_type:${event.type}`);
   }
 
   return NextResponse.json({ received: true });
