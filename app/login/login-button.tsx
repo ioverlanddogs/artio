@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { signIn } from "next-auth/react";
@@ -10,7 +10,43 @@ export function LoginButton({ callbackUrl = "/account", testAuthEnabled = false 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleAvailable, setIsGoogleAvailable] = useState(true);
+  const [googleError, setGoogleError] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkGoogleProvider() {
+      try {
+        const res = await fetch("/api/auth/providers", { cache: "no-store" });
+        if (!res.ok) throw new Error("Unable to load auth providers");
+        const providers = (await res.json()) as Record<string, unknown>;
+        if (!isMounted) return;
+
+        if (!providers?.google) {
+          setIsGoogleAvailable(false);
+          setGoogleError("Google sign-in is temporarily unavailable. Please contact support.");
+          return;
+        }
+
+        setIsGoogleAvailable(true);
+        setGoogleError(null);
+      } catch {
+        if (!isMounted) return;
+        setIsGoogleAvailable(false);
+        setGoogleError("Unable to initialize Google sign-in right now. Please try again later.");
+      }
+    }
+
+    if (!testAuthEnabled) {
+      void checkGoogleProvider();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [testAuthEnabled]);
 
   async function handleTestLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,6 +64,35 @@ export function LoginButton({ callbackUrl = "/account", testAuthEnabled = false 
       router.refresh();
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleError(null);
+
+    if (!isGoogleAvailable) {
+      setGoogleError("Google sign-in is not configured. Please contact support.");
+      return;
+    }
+
+    try {
+      const result = await signIn("google", { callbackUrl, redirect: false });
+
+      if (!result) {
+        setGoogleError("Google sign-in failed to start. Please try again.");
+        return;
+      }
+
+      if (result.error) {
+        setGoogleError("Google sign-in is unavailable right now. Please try again later.");
+        return;
+      }
+
+      if (result.url) {
+        window.location.href = result.url;
+      }
+    } catch {
+      setGoogleError("Unable to start Google sign-in right now. Please try again.");
     }
   }
 
@@ -76,8 +141,11 @@ export function LoginButton({ callbackUrl = "/account", testAuthEnabled = false 
   }
 
   return (
-    <Button type="button" onClick={() => signIn("google", { callbackUrl })}>
-      Continue with Google
-    </Button>
+    <div className="space-y-2">
+      <Button type="button" onClick={handleGoogleSignIn} disabled={!isGoogleAvailable}>
+        Continue with Google
+      </Button>
+      {googleError ? <p className="text-sm text-red-600">{googleError}</p> : null}
+    </div>
   );
 }

@@ -70,6 +70,15 @@ SEED_ENABLED=true pnpm db:seed
 
 If missing in production-like environments, auth boot will fail fast with a clear error.
 
+## Google OAuth environment variables (Vercel)
+
+To use Google sign-in with NextAuth in production, set these in **Vercel → Settings → Environment Variables**:
+
+- `AUTH_SECRET` (generate with `openssl rand -base64 32`)
+- `AUTH_GOOGLE_ID` (Google Cloud Console → APIs & Services → Credentials)
+- `AUTH_GOOGLE_SECRET` (Google Cloud Console → APIs & Services → Credentials)
+- `NEXTAUTH_URL` (your production Vercel URL, for example `https://yourapp.vercel.app`)
+
 ## Deployment
 
 - Push to GitHub
