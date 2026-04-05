@@ -37,6 +37,7 @@ const emptySignals: OnboardingSignals = {
   savedEventsCount: 0,
   savedSearchesCount: 0,
   hasLocation: false,
+  radiusKm: 25,
 };
 
 export function RecommendedFollows({ page, source, isAuthenticated }: { page: string; source: string; isAuthenticated: boolean }) {

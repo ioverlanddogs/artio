@@ -23,7 +23,7 @@ export function OnboardingGate({ page, isAuthenticated }: { page: string; isAuth
   const [hydrated, setHydrated] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [signals, setSignals] = useState<OnboardingSignals>({ followsCount: 0, followedArtistSlugs: [], followedVenueSlugs: [], followedArtistNames: [], followedVenueNames: [], savedSearchesCount: 0, savedEventsCount: 0, hasLocation: false });
+  const [signals, setSignals] = useState<OnboardingSignals>({ followsCount: 0, followedArtistSlugs: [], followedVenueSlugs: [], followedArtistNames: [], followedVenueNames: [], savedSearchesCount: 0, savedEventsCount: 0, hasLocation: false, radiusKm: 25 });
   const [showCompletion, setShowCompletion] = useState(false);
   const [compact, setCompact] = useState(false);
 

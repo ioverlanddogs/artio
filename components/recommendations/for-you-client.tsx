@@ -45,6 +45,7 @@ const emptySignals: OnboardingSignals = {
   savedEventsCount: 0,
   savedSearchesCount: 0,
   hasLocation: false,
+  radiusKm: 25,
 };
 
 const debugEnabled = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_PERSONALIZATION_DEBUG === "true";
@@ -292,7 +293,11 @@ export function ForYouClient() {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const payload = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const payload = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          radiusKm: signals.radiusKm,
+        };
 
         try {
           const response = await fetch("/api/me/location", {
@@ -305,7 +310,7 @@ export function ForYouClient() {
             throw new Error("location_update_failed");
           }
 
-          setSignals((current) => ({ ...current, hasLocation: true }));
+          setSignals((current) => ({ ...current, hasLocation: true, radiusKm: payload.radiusKm }));
           setLocationPromptError(null);
         } catch {
           setLocationPromptError("Could not detect location. Set it manually.");
@@ -318,7 +323,7 @@ export function ForYouClient() {
         setLocationPromptError("Could not detect location. Set it manually.");
       },
     );
-  }, []);
+  }, [signals.radiusKm]);
 
   const shouldShowLocationPrompt = areSignalsLoaded && !signals.hasLocation && !locationPromptDismissed;
 

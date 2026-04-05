@@ -39,6 +39,7 @@ const emptySignals: OnboardingSignals = {
   savedEventsCount: 0,
   savedSearchesCount: 0,
   hasLocation: false,
+  radiusKm: 25,
 };
 
 const debugEnabled = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_PERSONALIZATION_DEBUG === "true";
