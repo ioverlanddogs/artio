@@ -29,6 +29,7 @@ type ForYouResponse = {
       slug: string;
       startAt: string;
       venue: { name: string; slug: string; city: string | null } | null;
+      primaryImageUrl?: string | null;
       savedByCount?: number;
       inCollectionsCount?: number;
     };
@@ -55,10 +56,77 @@ export async function fetchForYouRecommendations({
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }): Promise<{ kind: "unauthorized" | "error" } | { kind: "success"; data: ForYouResponse }> {
+  const normalizeItem = (item: unknown, fallbackIndex: number) => {
+    const source = (item ?? {}) as Record<string, unknown>;
+    const rawEvent = (source.event ?? source) as Record<string, unknown>;
+    const rawVenue = (rawEvent.venue ?? source.venue ?? null) as Record<string, unknown> | null;
+    const id = String(rawEvent.id ?? source.id ?? `event-${fallbackIndex}`);
+    const rawTitle = String(rawEvent.title ?? source.title ?? rawEvent.name ?? source.name ?? "").trim();
+    const title = rawTitle.length > 0 ? rawTitle : "Untitled event";
+    const slug = String(rawEvent.slug ?? source.slug ?? id);
+    const startAt = String(rawEvent.startAt ?? source.startAt ?? new Date().toISOString());
+    const primaryImageUrl = typeof rawEvent.primaryImageUrl === "string"
+      ? rawEvent.primaryImageUrl
+      : typeof source.primaryImageUrl === "string"
+        ? source.primaryImageUrl
+        : typeof rawEvent.image_url === "string"
+          ? rawEvent.image_url
+          : null;
+    const venue = rawVenue
+      ? {
+          name: String(rawVenue.name ?? "Unknown venue"),
+          slug: String(rawVenue.slug ?? ""),
+          city: typeof rawVenue.city === "string" ? rawVenue.city : null,
+        }
+      : null;
+
+    return {
+      score: typeof source.score === "number" ? source.score : 0,
+      reasons: Array.isArray(source.reasons) ? source.reasons.filter((reason): reason is string => typeof reason === "string") : [],
+      reason: typeof source.reason === "string" ? source.reason : "Recommended for you",
+      reasonCategory: source.reasonCategory === "network" || source.reasonCategory === "nearby" ? source.reasonCategory : "trending",
+      event: {
+        id,
+        title,
+        slug,
+        startAt,
+        venue,
+        primaryImageUrl,
+        savedByCount: typeof rawEvent.savedByCount === "number" ? rawEvent.savedByCount : undefined,
+        inCollectionsCount: typeof rawEvent.inCollectionsCount === "number" ? rawEvent.inCollectionsCount : undefined,
+      },
+    } satisfies ForYouResponse["items"][number];
+  };
+
+  const normalizeResponse = (payload: unknown): ForYouResponse => {
+    const raw = (payload ?? {}) as Record<string, unknown>;
+    const wrappedData = (raw.data ?? raw.result ?? raw) as Record<string, unknown>;
+    const rawItems = Array.isArray(wrappedData.items) ? wrappedData.items : [];
+    return {
+      windowDays: typeof wrappedData.windowDays === "number" ? wrappedData.windowDays : 7,
+      items: rawItems.map((item, index) => normalizeItem(item, index)),
+    };
+  };
+
+  const fetchTrendingFallback = async (): Promise<ForYouResponse | null> => {
+    const fallbackResponse = await fetchImpl("/api/recommendations/events?limit=20", { cache: "no-store", signal });
+    if (!fallbackResponse.ok) return null;
+    const fallbackRaw = (await fallbackResponse.json()) as { items?: unknown[] };
+    const fallbackItems = (fallbackRaw.items ?? []).map((item, index) => normalizeItem(item, index));
+    return { windowDays: 7, items: fallbackItems };
+  };
+
   const response = await fetchImpl("/api/recommendations/for-you?days=7&limit=20", { cache: "no-store", signal });
   if (response.status === 401) return { kind: "unauthorized" };
   if (!response.ok) return { kind: "error" };
-  const data = (await response.json()) as ForYouResponse;
+  const raw = await response.json();
+  const data = normalizeResponse(raw);
+  if (!data.items.length) {
+    const fallback = await fetchTrendingFallback();
+    if (fallback && fallback.items.length) {
+      return { kind: "success", data: fallback };
+    }
+  }
   return { kind: "success", data };
 }
 
@@ -73,7 +141,7 @@ export function shouldAttemptForYouFetch({
 }
 
 export function ForYouClient() {
-  const [data, setData] = useState<ForYouResponse>({ windowDays: 7, items: [] });
+  const [data, setData] = useState<ForYouResponse | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAuthFallback, setShowAuthFallback] = useState(false);
@@ -89,6 +157,10 @@ export function ForYouClient() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
+    console.log("FOR YOU INPUT", {
+      preferences: getPreferenceSnapshot(),
+      location: { hasLocation: signals.hasLocation },
+    });
     const result = await fetchForYouRecommendations({ signal });
     if (signal?.aborted) return;
     if (result.kind === "unauthorized") {
@@ -152,8 +224,9 @@ export function ForYouClient() {
   }, []);
 
   const rankedItems = useMemo(() => {
-    const visible = data.items.filter((item) => !hiddenIds.includes(item.event.id));
-    const seed = data.items.length + new Date().getDate();
+    const items = data?.items ?? [];
+    const visible = items.filter((item) => !hiddenIds.includes(item.event.id));
+    const seed = items.length + new Date().getDate();
     const ranked = rankItems(
       visible.map((item) => {
         const feedback = feedbackByEventId[item.event.id];
@@ -185,7 +258,7 @@ export function ForYouClient() {
     );
 
     return ranked;
-  }, [data.items, feedbackByEventId, hiddenIds, signals]);
+  }, [data?.items, feedbackByEventId, hiddenIds, signals]);
 
   const groupedItems = useMemo(() => {
     const buckets: Record<"network" | "trending" | "nearby", typeof rankedItems> = { network: [], trending: [], nearby: [] };
@@ -284,7 +357,7 @@ export function ForYouClient() {
   return (
     <section className="space-y-3" aria-busy={isLoading}>
       <p className="text-sm text-gray-700">
-        Personalized events in the next {data.windowDays} days based on your follows, saved searches, location, and recent clicks.
+        Personalized events in the next {data?.windowDays ?? 7} days based on your follows, saved searches, location, and recent clicks.
       </p>
       {error ? <ErrorCard message={error} onRetry={() => void load()} /> : null}
       {!isLoading && showAuthFallback ? (
@@ -365,8 +438,9 @@ export function ForYouClient() {
                   href={`/events/${item.event.slug}`}
                   title={item.event.title}
                   startAt={item.event.startAt}
-                  venueName={item.event.venue?.name}
+                  venueName={item.event.venue?.name ?? "Unknown venue"}
                   venueSlug={item.event.venue?.slug}
+                  image={{ url: item.event.primaryImageUrl ?? null }}
                   badges={item.reasons.slice(0, 2)}
                   secondaryText={debugEnabled ? `Score: ${ranked.score} • ${ranked.breakdown.map((entry) => `${entry.key}:${entry.value}`).join(", ")}` : `Score: ${ranked.score}`}
                   savedByCount={item.event.savedByCount}

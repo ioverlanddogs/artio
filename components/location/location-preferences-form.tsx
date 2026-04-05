@@ -66,12 +66,14 @@ export function LocationPreferencesForm({
   }
 
   async function saveLocation() {
-    const ok = await onSave({
+    const payload = {
       locationLabel: form.locationLabel || null,
       lat: form.lat === "" ? null : Number(form.lat),
       lng: form.lng === "" ? null : Number(form.lng),
       radiusKm: Number(form.radiusKm || "25"),
-    });
+    };
+    console.log("ONBOARDING PAYLOAD", payload);
+    const ok = await onSave(payload);
     setStatus(ok ? "Location saved." : "Unable to save location.");
     enqueueToast({ title: ok ? "Location saved" : "Unable to save location", variant: ok ? "success" : "error" });
     if (ok && afterSave) afterSave(form);
