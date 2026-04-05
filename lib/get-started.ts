@@ -2,6 +2,7 @@ export type GetStartedSignals = {
   hasFollowed: boolean;
   hasLocation: boolean;
   hasSavedSearch: boolean;
+  hasVisitedNearby?: boolean;
   hasVisitedFollowing?: boolean;
 };
 
@@ -56,7 +57,7 @@ export function computeGetStartedProgress(signals: GetStartedSignals): GetStarte
       key: "browseNearby",
       title: "Browse events near you",
       description: "See local events and recommendations based on your location.",
-      done: signals.hasLocation,
+      done: Boolean(signals.hasVisitedNearby),
       ctas: [
         { label: "Open nearby", href: "/nearby" },
       ],
