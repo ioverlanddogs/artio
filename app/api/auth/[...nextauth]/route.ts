@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 const handler = NextAuth(authOptions);
 
 function missingAuthConfigResponse() {
+  console.error("[auth] Auth is not configured. AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must be set.");
   return Response.json({ error: "Auth is not configured." }, { status: 500 });
 }
 
