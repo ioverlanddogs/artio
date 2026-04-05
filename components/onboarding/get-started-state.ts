@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { computeGetStartedProgress, type GetStartedProgress } from "@/lib/get-started";
 
 type OnboardingApiPayload = {
+  state?: {
+    hasVisitedFollowing?: boolean;
+    hasVisitedNearby?: boolean;
+  };
   checklist?: Array<{ flag: string; done: boolean }>;
 };
 
@@ -62,6 +66,8 @@ export function useGetStartedState() {
         hasFollowed: followed,
         hasLocation: hasLocation(location),
         hasSavedSearch: (savedSearches?.items?.length ?? 0) > 0,
+        hasVisitedNearby: Boolean(onboarding?.state?.hasVisitedNearby),
+        hasVisitedFollowing: Boolean(onboarding?.state?.hasVisitedFollowing),
       });
 
       setState({ loading: false, error: null, progress });

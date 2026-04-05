@@ -50,6 +50,7 @@ export async function runWeeklyDigests(headerSecret: string | null, dryRunRaw: s
         where: {
           isEnabled: true,
           frequency: "WEEKLY",
+          type: { not: "ARTWORK" },
           OR: [{ lastSentAt: null }, { lastSentAt: { lt: threshold } }],
           user: { digestEnabled: true },
         },
