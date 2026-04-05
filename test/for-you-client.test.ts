@@ -7,7 +7,7 @@ test("fetchForYouRecommendations attempts request regardless of auth client stat
   const result = await fetchForYouRecommendations({
     fetchImpl: async () => {
       called = true;
-      return Response.json({ windowDays: 7, items: [] });
+      return Response.json({ windowDays: 7, items: [{ score: 1, reasons: ["x"], event: { id: "1", title: "A", slug: "a", startAt: "2026-01-01T00:00:00.000Z", venue: null } }] });
     },
   });
 
@@ -16,15 +16,15 @@ test("fetchForYouRecommendations attempts request regardless of auth client stat
 });
 
 test("fetchForYouRecommendations calls endpoint", async () => {
-  let calledUrl: string | null = null;
+  const calledUrls: string[] = [];
   const result = await fetchForYouRecommendations({
     fetchImpl: async (input) => {
-      calledUrl = String(input);
-      return Response.json({ windowDays: 7, items: [] });
+      calledUrls.push(String(input));
+      return Response.json({ windowDays: 7, items: [{ score: 1, reasons: ["x"], event: { id: "1", title: "A", slug: "a", startAt: "2026-01-01T00:00:00.000Z", venue: null } }] });
     },
   });
 
-  assert.equal(calledUrl, "/api/recommendations/for-you?days=7&limit=20");
+  assert.equal(calledUrls[0], "/api/recommendations/for-you?days=7&limit=20");
   assert.equal(result.kind, "success");
 });
 
@@ -49,5 +49,20 @@ test("fetchForYouRecommendations returns success data for 200", async () => {
     fetchImpl: async () => Response.json(data),
   });
 
-  assert.deepEqual(result, { kind: "success", data });
+  assert.equal(result.kind, "success");
+  if (result.kind !== "success") return;
+  assert.equal(result.data.windowDays, 7);
+  assert.equal(result.data.items[0]?.event.title, "A");
+  assert.equal(result.data.items[0]?.reasonCategory, "trending");
+});
+
+test("fetchForYouRecommendations normalizes wrapped payload and title fallback", async () => {
+  const result = await fetchForYouRecommendations({
+    fetchImpl: async () => Response.json({ status: "ok", data: { windowDays: 30, items: [{ id: "1", name: "", startAt: "2026-01-01T00:00:00.000Z", venue: { name: "Club", slug: "club" } }] } }),
+  });
+  assert.equal(result.kind, "success");
+  if (result.kind !== "success") return;
+  assert.equal(result.data.windowDays, 30);
+  assert.equal(result.data.items[0]?.event.title, "Untitled event");
+  assert.equal(result.data.items[0]?.event.venue?.name, "Club");
 });
