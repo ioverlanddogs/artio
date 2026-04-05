@@ -159,6 +159,7 @@ enum SavedSearchType {
 }
 
 enum DigestFrequency {
+  DAILY
   WEEKLY
 }
 
@@ -2244,13 +2245,14 @@ model UserFeedCache {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid
   eventId   String   @db.Uuid
+  windowDays Int     @default(30)
   score     Float
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
-  @@index([userId, score, createdAt])
+  @@unique([userId, eventId, windowDays])
+  @@index([userId, windowDays, score, createdAt])
 }
 
 model CollectionItem {

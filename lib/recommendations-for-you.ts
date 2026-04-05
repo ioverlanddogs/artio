@@ -263,7 +263,7 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   const cacheFreshAfter = new Date(now.getTime() - 45 * 60 * 1000);
   const userFeedCache = (db as { userFeedCache?: { findMany: (...args: unknown[]) => Promise<Array<{ eventId: string }>> } }).userFeedCache;
   const cached = userFeedCache ? await userFeedCache.findMany({
-    where: { userId: args.userId, createdAt: { gte: cacheFreshAfter } },
+    where: { userId: args.userId, createdAt: { gte: cacheFreshAfter }, windowDays: args.days },
     orderBy: [{ score: "desc" }, { createdAt: "desc" }],
     take: args.limit,
     select: { eventId: true },
@@ -296,10 +296,15 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     return { windowDays: args.days, items, candidateCount: items.length };
   }
 
-  const [user, follows, searches, followedCollections] = await Promise.all([
+  const [user, follows, searches, ownFavorites, followedCollections] = await Promise.all([
     db.user.findUnique({ where: { id: args.userId }, select: { locationLat: true, locationLng: true, locationRadiusKm: true, locationLabel: true } }),
     db.follow.findMany({ where: { userId: args.userId }, select: { targetType: true, targetId: true } }),
-    db.savedSearch.findMany({ where: { userId: args.userId, isEnabled: true, frequency: "WEEKLY" }, orderBy: { updatedAt: "desc" }, take: 2, select: { id: true, name: true, type: true, paramsJson: true } }),
+    db.savedSearch.findMany({ where: { userId: args.userId, isEnabled: true }, orderBy: { updatedAt: "desc" }, take: 5, select: { id: true, name: true, type: true, paramsJson: true } }),
+    db.favorite.findMany({
+      where: { userId: args.userId, targetType: { in: ["VENUE", "ARTIST"] } },
+      select: { targetType: true, targetId: true },
+      take: 500,
+    }),
     db.collectionFollow.findMany({ where: { userId: args.userId }, select: { collectionId: true } }).catch((err: unknown) => {
       if (isMissingTableError(err)) return [];
       throw err;
@@ -307,8 +312,14 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   ]);
   const followedCollectionIds = followedCollections.map((item) => item.collectionId);
 
-  const followedVenueIds = new Set(follows.filter((f) => f.targetType === "VENUE").map((f) => f.targetId));
-  const followedArtistIds = new Set(follows.filter((f) => f.targetType === "ARTIST").map((f) => f.targetId));
+  const savedVenueIds = new Set([
+    ...follows.filter((f) => f.targetType === "VENUE").map((f) => f.targetId),
+    ...ownFavorites.filter((f) => f.targetType === "VENUE").map((f) => f.targetId),
+  ]);
+  const savedArtistIds = new Set([
+    ...follows.filter((f) => f.targetType === "ARTIST").map((f) => f.targetId),
+    ...ownFavorites.filter((f) => f.targetType === "ARTIST").map((f) => f.targetId),
+  ]);
   const followedUserIds = new Set(follows.filter((f) => f.targetType === "USER").map((f) => f.targetId));
   const hiddenEventIds = new Set((await db.engagementEvent.findMany({
     where: { userId: args.userId, action: "HIDE", targetType: "EVENT" },
@@ -349,15 +360,15 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     addIds(candidateIds, seenIds, Array.from(new Set([...sociallySavedEventIds, ...sociallyCollectedEventIds])), SOURCE_CAPS.follows + SOURCE_CAPS.social);
   }
 
-  if (followedVenueIds.size || followedArtistIds.size) {
+  if (savedVenueIds.size || savedArtistIds.size) {
     const items = await db.event.findMany({
       where: {
         ...publishedEventWhere(),
         startAt: { gte: now, lte: to },
         ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
         OR: [
-          followedVenueIds.size ? { venueId: { in: Array.from(followedVenueIds) } } : undefined,
-          followedArtistIds.size ? { eventArtists: { some: { artistId: { in: Array.from(followedArtistIds) } } } } : undefined,
+          savedVenueIds.size ? { venueId: { in: Array.from(savedVenueIds) } } : undefined,
+          savedArtistIds.size ? { eventArtists: { some: { artistId: { in: Array.from(savedArtistIds) } } } } : undefined,
         ].filter(Boolean) as Prisma.EventWhereInput[],
       },
       select: { id: true },
@@ -576,8 +587,8 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
   const scored = scoreForYouEvents({
     now,
     events: eventsWithFeedback,
-    followedVenueIds,
-    followedArtistIds,
+    followedVenueIds: savedVenueIds,
+    followedArtistIds: savedArtistIds,
     savedSearchMatches,
     nearbyMatches,
     affinityVenueIds,
@@ -632,9 +643,9 @@ export async function getForYouRecommendations(db: Prisma.TransactionClient | Pr
     },
   }));
   if (items.length) {
-    await (db as { userFeedCache?: { deleteMany: (...args: unknown[]) => Promise<unknown> } }).userFeedCache?.deleteMany({ where: { userId: args.userId } }).catch(() => undefined);
+    await (db as { userFeedCache?: { deleteMany: (...args: unknown[]) => Promise<unknown> } }).userFeedCache?.deleteMany({ where: { userId: args.userId, windowDays: args.days } }).catch(() => undefined);
     await (db as { userFeedCache?: { createMany: (...args: unknown[]) => Promise<unknown> } }).userFeedCache?.createMany({
-      data: topItems.map((item) => ({ userId: args.userId, eventId: item.event.id, score: item.score })),
+      data: topItems.map((item) => ({ userId: args.userId, eventId: item.event.id, score: item.score, windowDays: args.days })),
     }).catch(() => undefined);
   }
 
