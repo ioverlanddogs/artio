@@ -31,6 +31,7 @@ const emptySignals: OnboardingSignals = {
   savedSearchesCount: 0,
   savedEventsCount: 0,
   hasLocation: false,
+  radiusKm: 25,
 };
 
 function humanTypeLabel(type: SavedSearch["type"]) {

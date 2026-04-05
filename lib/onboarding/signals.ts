@@ -11,6 +11,7 @@ type OnboardingSignals = {
   savedSearchesCount: number;
   savedEventsCount: number;
   hasLocation: boolean;
+  radiusKm: number;
 };
 
 const FALLBACK_SIGNALS: OnboardingSignals = {
@@ -22,6 +23,7 @@ const FALLBACK_SIGNALS: OnboardingSignals = {
   savedSearchesCount: 0,
   savedEventsCount: 0,
   hasLocation: false,
+  radiusKm: 25,
 };
 
 let memoizedSignals: OnboardingSignals | null = null;
@@ -52,7 +54,7 @@ export async function getOnboardingSignals(force = false): Promise<OnboardingSig
       fetchJson<{ artists?: FollowItem[]; venues?: FollowItem[] }>("/api/follows/manage"),
       fetchJson<{ items?: unknown[] }>("/api/saved-searches"),
       fetchJson<{ items?: Array<{ targetType?: string }> }>("/api/favorites"),
-      fetchJson<{ locationLabel?: string | null; lat?: number | null; lng?: number | null }>("/api/me/location"),
+      fetchJson<{ locationLabel?: string | null; lat?: number | null; lng?: number | null; radiusKm?: number | null }>("/api/me/location"),
     ]);
 
     const artists = followsPayload?.artists ?? [];
@@ -67,6 +69,7 @@ export async function getOnboardingSignals(force = false): Promise<OnboardingSig
       savedSearchesCount: savedSearches?.items?.length ?? 0,
       savedEventsCount: (favorites?.items ?? []).filter((item) => item.targetType === "EVENT").length,
       hasLocation: Boolean(location?.locationLabel) || (typeof location?.lat === "number" && typeof location?.lng === "number"),
+      radiusKm: typeof location?.radiusKm === "number" ? location.radiusKm : 25,
     };
 
     memoizedSignals = next;
