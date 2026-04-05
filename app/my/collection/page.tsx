@@ -75,14 +75,20 @@ export default async function MyCollectionPage() {
           {orders.map((order) => {
             const imageUrl = order.artwork.images[0]?.asset.url;
             const artworkKey = order.artwork.slug ?? order.artwork.id;
+            const title = order.artwork.title?.trim() || "Untitled artwork";
+            const artistName = order.artwork.artist.name?.trim() || "Unknown artist";
 
             return (
               <Link key={order.id} href={`/artwork/${artworkKey}`} className="rounded border p-3 hover:bg-muted/40">
                 <div className="relative mb-3 h-44 overflow-hidden rounded bg-muted">
-                  {imageUrl ? <Image src={imageUrl} alt={order.artwork.title} fill className="object-cover" /> : null}
+                  {imageUrl ? (
+                    <Image src={imageUrl} alt={title} fill className="object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image available</div>
+                  )}
                 </div>
-                <p className="font-medium">{order.artwork.title}</p>
-                <p className="text-sm text-muted-foreground">{order.artwork.artist.name}</p>
+                <p className="font-medium">{title}</p>
+                <p className="text-sm text-muted-foreground">{artistName}</p>
                 <p className="text-sm">{formatPrice(order.amountPaid, order.currency)}</p>
                 <p className="text-xs text-muted-foreground">Purchased {new Date(order.confirmedAt ?? order.createdAt).toLocaleDateString()}</p>
               </Link>
@@ -98,15 +104,21 @@ export default async function MyCollectionPage() {
           {savedArtworks.map((artwork) => {
             const imageUrl = artwork.images[0]?.asset.url;
             const artworkKey = artwork.slug ?? artwork.id;
+            const title = artwork.title?.trim() || "Untitled artwork";
+            const artistName = artwork.artist.name?.trim() || "Unknown artist";
 
             return (
               <Link key={artwork.id} href={`/artwork/${artworkKey}`} className="relative rounded border p-3 hover:bg-muted/40">
                 {artwork.soldAt ? <span className="absolute right-3 top-3 rounded bg-foreground px-2 py-0.5 text-xs text-background">SOLD</span> : null}
                 <div className="relative mb-3 h-44 overflow-hidden rounded bg-muted">
-                  {imageUrl ? <Image src={imageUrl} alt={artwork.title} fill className="object-cover" /> : null}
+                  {imageUrl ? (
+                    <Image src={imageUrl} alt={title} fill className="object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">No image available</div>
+                  )}
                 </div>
-                <p className="font-medium">{artwork.title}</p>
-                <p className="text-sm text-muted-foreground">{artwork.artist.name}</p>
+                <p className="font-medium">{title}</p>
+                <p className="text-sm text-muted-foreground">{artistName}</p>
                 {artwork.priceAmount != null && artwork.currency ? <p className="text-sm">{formatPrice(artwork.priceAmount, artwork.currency)}</p> : null}
               </Link>
             );

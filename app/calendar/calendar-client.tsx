@@ -34,6 +34,7 @@ type CalendarItem = {
 };
 
 type EventsResponse = { items: CalendarItem[]; truncated?: boolean };
+type CalendarStatus = "loading" | "error" | "empty" | "ready";
 
 export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureItems }: { isAuthenticated: boolean; fixtureItems?: CalendarItem[]; fallbackFixtureItems?: CalendarItem[] }) {
   const calendarRef = useRef<FullCalendar | null>(null);
@@ -59,8 +60,8 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   }
 
   const [events, setEvents] = useState<CalendarItem[]>(fixtureItems ?? []);
-  const [isLoading, setIsLoading] = useState(!fixtureItems);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<CalendarStatus>(fixtureItems && fixtureItems.length > 0 ? "ready" : (fixtureItems ? "empty" : "loading"));
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarItem | null>(null);
@@ -91,7 +92,7 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   useEffect(() => {
     if (fixtureItems) {
       setEvents(fixtureItems);
-      setIsLoading(false);
+      setStatus(fixtureItems.length > 0 ? "ready" : "empty");
     }
   }, [fixtureItems]);
 
@@ -112,34 +113,49 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
   }, [pathname, router, stableSearchParams]);
 
   const fetchEvents = useCallback(async () => {
-    if (fixtureItems || !range) return;
-    setIsLoading(true);
+    if (fixtureItems) return;
+    setStatus("loading");
     setError(null);
+    const effectiveRange = range ?? (() => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+      return {
+        from: start.toISOString().slice(0, 10),
+        to: end.toISOString().slice(0, 10),
+      };
+    })();
     const params = new URLSearchParams();
     if (filters.query) params.set("q", filters.query);
     if (tagsKey) params.set("tags", tagsKey);
     params.set("scope", scope);
-    params.set("from", filters.from || range.from);
-    params.set("to", filters.to || range.to);
+    params.set("from", filters.from || effectiveRange.from);
+    params.set("to", filters.to || effectiveRange.to);
 
     try {
       const response = await fetch(`/api/calendar-events?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error("failed");
+      if (!response.ok) {
+        console.error("Calendar events fetch failed", { status: response.status });
+        throw new Error("failed");
+      }
       const data = (await response.json()) as EventsResponse;
-      setEvents(data.items ?? []);
+      const nextItems = Array.isArray(data.items) ? data.items : [];
+      setEvents(nextItems);
       setIsTruncated(Boolean(data.truncated));
+      setStatus(nextItems.length > 0 ? "ready" : "empty");
     } catch {
       if (fallbackFixtureItems?.length) {
         setEvents(fallbackFixtureItems);
         setIsTruncated(false);
         setError(null);
+        setStatus("ready");
       } else {
         setError("Unable to load calendar events right now.");
         setIsTruncated(false);
         setEvents([]);
+        setStatus("error");
       }
-    } finally {
-      setIsLoading(false);
     }
   }, [fallbackFixtureItems, filters.from, filters.query, fixtureItems, range, scope, tagsKey, filters.to]);
 
@@ -268,7 +284,7 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
         <EventFilterChips filters={{ query: filters.query, tags: activeTags, from: filters.from, to: filters.to }} onRemove={replaceSearch} onClearAll={() => replaceSearch({ query: null, tags: null, from: null, to: null })} />
       </div>
 
-      {error ? <ErrorCard message={error} onRetry={() => void fetchEvents()} /> : null}
+      {status === "error" ? <ErrorCard message={error ?? "Unable to load calendar events right now."} onRetry={() => void fetchEvents()} /> : null}
       {isTruncated ? (
         <InlineBanner>
           Showing the first 1,000 events.{" "}
@@ -280,7 +296,11 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
         </InlineBanner>
       ) : null}
       {viewMode === "agenda" ? (
-        events.length === 0 ? (
+        status === "loading" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => <EventCardSkeleton key={`agenda-skeleton-${index}`} />)}
+          </div>
+        ) : status === "empty" ? (
           scope === "saved" ? (
             <EmptyState title="No saved events in this range" description="Save events you're interested in and they'll appear here." actions={[{ label: "Browse Events", href: eventsHref }]} />
           ) : scope === "following" ? (
@@ -339,13 +359,13 @@ export function CalendarClient({ isAuthenticated, fixtureItems, fallbackFixtureI
               events={calendarEvents}
               eventClick={openEventPanel}
             />
-            {isLoading ? (
+            {status === "loading" ? (
               <div className="pointer-events-none absolute inset-2 z-10 space-y-2 rounded-md bg-background/70 p-2">
                 {Array.from({ length: 3 }).map((_, i) => <EventCardSkeleton key={`calendar-loading-${i}`} />)}
               </div>
             ) : null}
           </div>
-          {!isLoading && !error && events.length === 0 ? (
+          {status === "empty" ? (
             scope === "saved" ? (
               <EmptyState
                 title="No saved events in this range"
