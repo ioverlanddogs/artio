@@ -36,12 +36,17 @@ export default async function ForYouPage() {
     );
   }
 
-  const [followCount, savedSearchCount] = await Promise.all([
+  const [followCount, savedSearchCount, userLocation] = await Promise.all([
     db.follow.count({ where: { userId: user.id } }).catch(() => 0),
     db.savedSearch.count({ where: { userId: user.id } }),
+    db.user.findUnique({
+      where: { id: user.id },
+      select: { locationLat: true, locationLng: true },
+    }),
   ]);
 
-  const isFirstRun = followCount === 0 && savedSearchCount === 0;
+  const hasLocation = userLocation?.locationLat != null && userLocation?.locationLng != null;
+  const isFirstRun = followCount === 0 && savedSearchCount === 0 && !hasLocation;
 
   return (
     <main className="space-y-4 p-6">

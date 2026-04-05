@@ -157,10 +157,6 @@ export function ForYouClient() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
-    console.log("FOR YOU INPUT", {
-      preferences: getPreferenceSnapshot(),
-      location: { hasLocation: signals.hasLocation },
-    });
     const result = await fetchForYouRecommendations({ signal });
     if (signal?.aborted) return;
     if (result.kind === "unauthorized") {
@@ -299,19 +295,11 @@ export function ForYouClient() {
         const payload = { lat: position.coords.latitude, lng: position.coords.longitude };
 
         try {
-          let response = await fetch("/api/me/location", {
-            method: "POST",
+          const response = await fetch("/api/me/location", {
+            method: "PUT",
             headers: { "content-type": "application/json" },
             body: JSON.stringify(payload),
           });
-
-          if (!response.ok && response.status === 405) {
-            response = await fetch("/api/me/location", {
-              method: "PUT",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-          }
 
           if (!response.ok) {
             throw new Error("location_update_failed");

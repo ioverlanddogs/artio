@@ -64,3 +64,4 @@ export async function PUT(req: NextRequest) {
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }
+export const POST = PUT;

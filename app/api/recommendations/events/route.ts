@@ -93,7 +93,57 @@ export async function GET(req: NextRequest) {
     const { followedArtistIds, followedVenueIds, followedArtists, followedVenues, seedEvents } = await getRecommendationInputs(user.id, dayBucket);
 
     if (!followedArtistIds.length && !followedVenueIds.length) {
-      return NextResponse.json({ items: [], reason: null }, { headers: { "cache-control": "private, no-store" } });
+      const now = new Date();
+      const coldItems = await db.event.findMany({
+        where: {
+          isPublished: true,
+          startAt: { gte: now },
+          id: { notIn: exclude },
+        },
+        take: limit,
+        orderBy: { startAt: "asc" },
+        include: {
+          venue: { select: { id: true, name: true } },
+          images: {
+            take: 1,
+            orderBy: { sortOrder: "asc" },
+            include: {
+              asset: {
+                select: {
+                  url: true,
+                  originalUrl: true,
+                  processingStatus: true,
+                  processingError: true,
+                  variants: { select: { variantName: true, url: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      const coldMapped = coldItems.map((event) => {
+        const primaryDisplay = resolveAssetDisplay({
+          asset: event.images?.[0]?.asset ?? null,
+          requestedVariant: "card",
+          legacyUrl: event.images?.[0]?.url ?? null,
+        });
+        return {
+          id: event.id,
+          slug: event.slug,
+          title: event.title,
+          startAt: event.startAt.toISOString(),
+          endAt: event.endAt?.toISOString() ?? null,
+          venue: event.venue,
+          tags: [],
+          image: toApiImageField(primaryDisplay),
+          primaryImageUrl: primaryDisplay.url,
+          score: 0,
+        };
+      });
+      return NextResponse.json(
+        { items: coldMapped, reason: null },
+        { headers: { "cache-control": "private, no-store" } },
+      );
     }
 
     const now = new Date();

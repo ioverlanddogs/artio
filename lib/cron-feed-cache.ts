@@ -10,7 +10,7 @@ export async function runFeedCacheCron(secret: string | null, db: PrismaClient) 
   const users = await db.user.findMany({ select: { id: true }, take: 200, orderBy: { updatedAt: "desc" } });
   let rebuilt = 0;
   for (const user of users) {
-    await getForYouRecommendations(db, { userId: user.id, days: 30, limit: 60 });
+    await getForYouRecommendations(db, { userId: user.id, days: 7, limit: 20 });
     rebuilt += 1;
   }
 
