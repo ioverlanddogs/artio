@@ -154,6 +154,7 @@ test("PATCH persists all 16 new fields", async () => {
   let captured: Record<string, unknown> | null = null;
   const res = await handleAdminSettingsPatch(req, {
     requireAdminFn: async () => ({ id: "admin", email: "admin@example.com" }) as never,
+    getSiteSettingsFn: async () => baseSettings() as never,
     updateSiteSettingsFn: async (data) => {
       captured = data as Record<string, unknown>;
       return { ...baseSettings(), ...data } as never;
