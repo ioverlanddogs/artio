@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
     publishArtist: async () => undefined,
     setArtistDraft: async (artistId) => {
-      await db.artist.update({ where: { id: artistId }, data: { isPublished: false } });
+      await db.artist.update({ where: { id: artistId }, data: { isPublished: false, status: "CHANGES_REQUESTED" } });
     },
     publishEvent: async () => undefined,
     setEventDraft: async (eventId) => {
