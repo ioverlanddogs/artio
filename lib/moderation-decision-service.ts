@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { publishedStateAt } from "@/lib/publish-helpers";
 
@@ -147,25 +146,13 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
       },
     });
 
-    const href = submission.type === "ARTIST"
-      ? "/my/artist"
-      : submission.type === "VENUE"
-        ? `/my/venues/${submission.targetVenue?.id ?? submission.targetVenueId ?? submission.targetVenue?.slug ?? ""}`
-        : `/my/events/${submission.targetEvent?.slug ?? submission.targetEventId ?? ""}`;
-
-    await tx.notification.create({
-      data: {
-        userId: submission.submitterUserId,
-        type: isApprove ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
-        title: isApprove ? `${submission.type} approved` : `${submission.type} needs edits`,
-        body: isApprove ? "Your submission was approved and is now published." : decisionReason,
-        href,
-        dedupeKey: `moderation:${submission.id}:${isApprove ? "approved" : "rejected"}:${randomUUID()}`,
-        entityType: submission.type,
-        entityId: submission.targetArtistId ?? submission.targetVenueId ?? submission.targetEventId,
-      },
-    });
-
-    return { submission: updated, idempotent: false as const, submitterId: submission.submitter.id, submitterEmail: submission.submitter.email };
+    return {
+      submission: updated,
+      idempotent: false as const,
+      submitterId: submission.submitter.id,
+      submitterEmail: submission.submitter.email,
+      targetEventSlug: submission.targetEvent?.slug ?? null,
+      targetVenueSlug: submission.targetVenue?.slug ?? null,
+    };
   });
 }
