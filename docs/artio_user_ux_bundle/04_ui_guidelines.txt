@@ -1,0 +1,18 @@
+UI GUIDELINES
+
+- Visual-first cards
+- Large tap targets
+- Bottom navigation
+- Consistent card layout
+- Minimal text, strong hierarchy
+
+Event Card:
+[Image]
+[Title]
+[Date/Time]
+[Distance]
+
+Gallery Card:
+[Hero Image]
+[Title]
+[Artist]

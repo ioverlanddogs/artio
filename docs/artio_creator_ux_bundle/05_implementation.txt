@@ -1,0 +1,21 @@
+IMPLEMENTATION NOTES
+
+Frontend:
+- Form wizard component
+- Preview renderer
+
+Backend:
+- Content models (event, gallery)
+- Draft states
+
+Analytics:
+- Track views, saves
+
+Phase 1:
+- Basic publishing
+
+Phase 2:
+- Custom pages
+
+Phase 3:
+- Insights dashboard

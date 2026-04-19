@@ -1,0 +1,10 @@
+USER FLOWS
+
+FLOW 1: Discover Event
+Home → Scroll → Tap event → Save → Get reminder
+
+FLOW 2: Browse Gallery
+Home → Tap gallery → Swipe through works → Follow artist
+
+FLOW 3: Return Loop
+Notification → Open event → Attend → View gallery after

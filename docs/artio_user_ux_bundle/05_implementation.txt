@@ -1,0 +1,22 @@
+IMPLEMENTATION NOTES
+
+Frontend:
+- Component-based card system
+- Feed algorithm placeholder (rule-based first)
+
+Backend:
+- Recommendation tags
+- Save/Follow system
+
+Notifications:
+- Reminder scheduling
+- Push integration
+
+Phase 1:
+- Static feed + filters
+
+Phase 2:
+- Personalization
+
+Phase 3:
+- AI recommendations

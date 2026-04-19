@@ -1,0 +1,14 @@
+CREATOR UX STRATEGY
+
+Goal:
+Enable creators to publish easily and feel ownership.
+
+Key pillars:
+- Simple creation flow
+- Strong identity (profile space)
+- Feedback loop (analytics)
+
+KPIs:
+- Content published
+- Creator retention
+- Event creation rate

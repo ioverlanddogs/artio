@@ -1,0 +1,16 @@
+USER UX UPGRADE STRATEGY
+
+Goal:
+Improve discovery, engagement, and retention.
+
+Key pillars:
+- Personalized discovery feed
+- Event-centric interaction loops
+- Gallery storytelling instead of static browsing
+- Low-friction engagement (save, follow, notify)
+
+KPIs:
+- Time spent
+- Event saves
+- Repeat sessions
+- Follow rate
