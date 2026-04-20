@@ -1,0 +1,22 @@
+FEATURE PLAN
+
+1. Explore Feed
+- Personalized recommendations
+- Mixed content: events + galleries
+
+2. Smart Filters
+- Tonight / Nearby / Free / Trending
+
+3. Event UX Improvements
+- Sticky CTA (Save / Attend)
+- Add to calendar
+- Reminder notifications
+
+4. Gallery Mode
+- Curated viewing (not grid only)
+- Artist commentary layer
+
+5. Engagement Layer
+- Follow artists
+- Save events
+- Recommendation engine

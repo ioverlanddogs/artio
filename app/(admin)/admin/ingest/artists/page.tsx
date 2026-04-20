@@ -34,10 +34,14 @@ export default async function AdminIngestArtistsPage({
     select: {
       id: true,
       name: true,
+      normalizedName: true,
       bio: true,
       mediums: true,
+      collections: true,
       websiteUrl: true,
       instagramUrl: true,
+      twitterUrl: true,
+      avatarUrl: true,
       nationality: true,
       birthYear: true,
       sourceUrl: true,
@@ -95,6 +99,31 @@ export default async function AdminIngestArtistsPage({
     }),
   }));
 
+  const identityRows = await db.artistIdentity.findMany({
+    where: {
+      normalizedName: {
+        in: hydratedCandidates.map((candidate) => candidate.normalizedName),
+      },
+    },
+    select: {
+      normalizedName: true,
+      confidenceBand: true,
+      observations: {
+        select: { sourceDomain: true, confidenceScore: true, extractedAt: true },
+        orderBy: { confidenceScore: "desc" },
+      },
+    },
+  });
+
+  const identityByNormalizedName = new Map(
+    identityRows.map((row) => [row.normalizedName, row]),
+  );
+
+  const candidatesWithIdentity = hydratedCandidates.map((candidate) => ({
+    ...candidate,
+    identity: identityByNormalizedName.get(candidate.normalizedName) ?? null,
+  }));
+
   return (
     <>
       <AdminPageHeader
@@ -103,7 +132,7 @@ export default async function AdminIngestArtistsPage({
       />
       <BackfillArtistsTrigger />
       <ArtistsClient
-        candidates={hydratedCandidates}
+        candidates={candidatesWithIdentity}
         userRole={user?.role}
         initialApprovalFilter={query.approval}
         initialImageFilter={query.image}

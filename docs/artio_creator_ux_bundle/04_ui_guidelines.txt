@@ -1,0 +1,13 @@
+UI GUIDELINES
+
+- Clean dashboard
+- Stepper-based forms
+- Live preview panel
+- Clear publish button
+
+Avoid:
+- Overwhelming forms
+- Hidden actions
+
+Use:
+- Progressive disclosure

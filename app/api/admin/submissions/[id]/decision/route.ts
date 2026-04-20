@@ -29,6 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       key: `submissions:decision:user:${user.id}`,
       limit: RATE_LIMITS.submissions.limit,
       windowMs: RATE_LIMITS.submissions.windowMs,
+      fallbackToMemory: true,
     });
 
     const parsedId = idParamSchema.safeParse(await params);
@@ -54,8 +55,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return apiError(500, "internal_error", "Unexpected submission status after moderation decision");
     }
 
+    const isApproved = result.submission.status === "APPROVED";
     await enqueueNotification({
-      type: result.submission.status === "APPROVED" ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
+      type: isApproved ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
       toEmail: result.submitterEmail,
       dedupeKey: submissionDecisionDedupeKey(result.submission.id, result.submission.status),
       payload: {
@@ -64,13 +66,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         decisionReason: result.submission.decisionReason,
         decidedAt: result.submission.decidedAt?.toISOString() ?? null,
       },
-      inApp: buildInAppFromTemplate(result.submitterId, result.submission.status === "APPROVED" ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED", {
-        type: result.submission.status === "APPROVED" ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
-        submissionId: result.submission.id,
-        submissionType: result.submission.type,
-        targetVenueId: result.submission.targetVenueId,
-        decisionReason: result.submission.decisionReason,
-      }),
+      inApp: isApproved
+        ? buildInAppFromTemplate(result.submitterId, "SUBMISSION_APPROVED", {
+            type: "SUBMISSION_APPROVED",
+            submissionId: result.submission.id,
+            submissionType: result.submission.type,
+            targetEventSlug: result.targetEventSlug,
+            targetVenueSlug: result.targetVenueSlug,
+          })
+        : buildInAppFromTemplate(result.submitterId, "SUBMISSION_REJECTED", {
+            type: "SUBMISSION_REJECTED",
+            submissionId: result.submission.id,
+            submissionType: result.submission.type,
+            targetVenueId: result.submission.targetVenueId,
+            targetArtistId: result.submission.targetArtistId,
+            decisionReason: result.submission.decisionReason,
+          }),
     });
 
     return NextResponse.json(result.submission);
@@ -85,6 +96,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (error instanceof Error && error.message === "forbidden") {
       return apiError(403, "forbidden", "Editor role required");
     }
+    console.error("submissions_decision_unexpected_error", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

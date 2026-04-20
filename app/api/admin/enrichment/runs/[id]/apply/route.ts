@@ -160,6 +160,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
               venueWebsiteUrl: event.venue?.websiteUrl ?? null,
               candidateImageUrl: event.ingestExtractedCandidate?.imageUrl ?? null,
               requestId: `enrichment-apply-${item.id}`,
+              skipIngestGate: true,
             });
             if (!imageResult.attached) throw new Error(imageResult.warning ?? "image_import_failed");
           } else {
@@ -176,6 +177,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         });
         successItems += 1;
       } catch (error) {
+        console.error("enrichment_apply_item_failed", {
+          itemId: item.id,
+          entityType: item.entityType,
+          entityId: item.eventId ?? item.artistId ?? item.artworkId ?? item.venueId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         failedItems += 1;
         await enrichmentApplyRouteDeps.db.enrichmentRunItem.update({
           where: { id: item.id },
@@ -205,6 +212,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required");
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Forbidden");
+    console.error("admin_enrichment_runs_id_apply_unexpected_error", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

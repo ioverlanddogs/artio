@@ -29,9 +29,12 @@ test("approve_publish transitions status and returns publicUrl", async () => {
   let lastUpdate: Record<string, unknown> | null = null;
   const req = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "approve_publish" }) });
   const res = await handleEventModerationIntent(req, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord(),
     updateEvent: async (_id, data) => { lastUpdate = data; },
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   const body = await res.json();
   assert.equal(res.status, 200);
@@ -44,9 +47,12 @@ test("approve_publish returns 409 when event has no images", async () => {
   let updateCalled = false;
   const req = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "approve_publish" }) });
   const res = await handleEventModerationIntent(req, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord({ _count: { images: 0 } }),
     updateEvent: async () => { updateCalled = true; },
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
 
   const body = await res.json();
@@ -60,18 +66,24 @@ test("approve_publish returns 409 when event has no images", async () => {
 test("request_changes requires reason and sets CHANGES_REQUESTED", async () => {
   const badReq = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request_changes" }) });
   const badRes = await handleEventModerationIntent(badReq, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord({ slug: "x" }),
     updateEvent: async () => undefined,
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   assert.equal(badRes.status, 400);
 
   let status = "";
   const okReq = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "request_changes", reason: "Please fix date" }) });
   const okRes = await handleEventModerationIntent(okReq, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord({ slug: "x" }),
     updateEvent: async (_id, data) => { status = String(data.status); },
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   assert.equal(okRes.status, 200);
   assert.equal(status, "CHANGES_REQUESTED");
@@ -80,18 +92,24 @@ test("request_changes requires reason and sets CHANGES_REQUESTED", async () => {
 test("reject requires reason and sets REJECTED", async () => {
   const badReq = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reject" }) });
   const badRes = await handleEventModerationIntent(badReq, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord({ slug: "x" }),
     updateEvent: async () => undefined,
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   assert.equal(badRes.status, 400);
 
   let status = "";
   const okReq = new Request("http://localhost", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reject", reason: "Not suitable" }) });
   const okRes = await handleEventModerationIntent(okReq, params, {
-    requireAdminUser: async () => undefined,
+    requireAdminUser: async () => ({ email: "admin@example.com" }),
     findEvent: async () => makeEventRecord({ slug: "x" }),
     updateEvent: async (_id, data) => { status = String(data.status); },
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   assert.equal(okRes.status, 200);
   assert.equal(status, "REJECTED");
@@ -103,6 +121,9 @@ test("non-admin access denied", async () => {
     requireAdminUser: async () => { throw new Error("forbidden"); },
     findEvent: async () => makeEventRecord({ slug: "x" }),
     updateEvent: async () => undefined,
+    createAuditLog: async () => {},
+    findLatestSubmissionSubmitter: async () => null,
+    enqueueModerationNotification: async () => {},
   });
   assert.equal(res.status, 403);
 });

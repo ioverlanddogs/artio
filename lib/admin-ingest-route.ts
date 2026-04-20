@@ -14,6 +14,7 @@ import { getAdminIngestHealthData } from "@/lib/ingest/health-query";
 import { discoverArtist } from "@/lib/ingest/artist-discovery";
 import { extractArtworksForEvent } from "@/lib/ingest/artwork-extraction";
 import { autoTagEvent } from "@/lib/ingest/auto-tag-event";
+import { enqueueGalleryIngestionForVenue } from "@/lib/ingestion/bootstrap";
 
 type AdminActor = { id: string; email: string; role: "USER" | "EDITOR" | "ADMIN" };
 
@@ -161,6 +162,8 @@ export async function handleAdminIngestRun(req: NextRequest, params: { venueId?:
     }
 
     const result = await resolved.runExtraction({ venueId: venue.id, sourceUrl, model: parsedBody.data.model });
+
+    await enqueueGalleryIngestionForVenue(venue.id, sourceUrl).catch(() => undefined);
 
     await resolved.logAction({
       actorEmail: actor.email,
@@ -393,8 +396,13 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
         return {
           candidate: updated,
           createdEventId: updated.createdEventId as string,
+          eventTitle: candidate.title,
+          eventDescription: candidate.description ?? null,
+          autoTagSettings: null,
           unmatchedNames: [] as string[],
+          sparseArtistNames: [] as string[],
           artistSettings: null as {
+            braveSearchApiKey: string | undefined;
             googlePseApiKey: string | undefined;
             googlePseCx: string | undefined;
             artistLookupProvider: string | null | undefined;
@@ -410,6 +418,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
             openAiApiKey: string | null | undefined;
           } | null,
           sourceUrl: candidate.sourceUrl,
+          linkedArtistCount: 0,
           published: publishImmediately,
           imageContext: {
             runId: candidate.runId,
@@ -509,6 +518,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
       let unmatchedNames: string[] = [];
       let sparseArtistNames: string[] = [];
       let artistSettings: {
+        braveSearchApiKey: string | undefined;
         googlePseApiKey: string | undefined;
         googlePseCx: string | undefined;
         artistLookupProvider: string | null | undefined;
@@ -545,6 +555,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
           select: {
             artworkExtractionProvider: true,
             enrichMatchedArtists: true,
+            braveSearchApiKey: true,
             googlePseApiKey: true,
             googlePseCx: true,
             artistLookupProvider: true,
@@ -594,6 +605,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
 
         if (unmatchedNames.length > 0 || sparseArtistNames.length > 0) {
           artistSettings = {
+            braveSearchApiKey: settings?.braveSearchApiKey ?? process.env.BRAVE_SEARCH_API_KEY,
             googlePseApiKey: settings?.googlePseApiKey ?? process.env.GOOGLE_PSE_API_KEY,
             googlePseCx: settings?.googlePseCx ?? process.env.GOOGLE_PSE_CX,
             artistLookupProvider: settings?.artistLookupProvider,
@@ -634,7 +646,6 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
               locationText: effectiveLocationText,
             },
             submittedAt: new Date(),
-            isAiGenerated: true,
           },
           select: { id: true },
         });
@@ -696,6 +707,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
             db: resolved.appDb,
             artistName: name,
             eventId: approved.createdEventId,
+            eventTitle: approved.eventTitle,
             settings: approved.artistSettings!,
           }).catch((err) =>
             console.error("[artist-discovery] failed for", name, err),
@@ -715,6 +727,7 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
             db: resolved.appDb,
             artistName: name,
             eventId: approved.createdEventId,
+            eventTitle: approved.eventTitle,
             settings: approved.artistSettings!,
           }).catch((err) =>
             console.error("[artist-enrichment] failed for", name, err),
@@ -813,6 +826,11 @@ export async function handleAdminIngestApprove(req: NextRequest, params: { id?: 
   } catch (error) {
     if (error instanceof Error && error.message === "unauthorized") return apiError(401, "unauthorized", "Authentication required", undefined, requestId);
     if (error instanceof Error && error.message === "forbidden") return apiError(403, "forbidden", "Editor role required", undefined, requestId);
+    console.error("handleAdminIngestApprove_unexpected_error", {
+      requestId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return apiError(500, "internal_error", "Unexpected server error", undefined, requestId);
   }
 }

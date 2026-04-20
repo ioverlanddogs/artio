@@ -12,6 +12,9 @@ export function scoreArtistCandidate(candidate: {
   websiteUrl?: string | null;
   instagramUrl?: string | null;
   twitterUrl?: string | null;
+  avatarUrl?: string | null;
+  exhibitionUrls?: string[] | null;
+  collections?: string[] | null;
   mediums: string[];
   birthYear?: number | null;
   name: string;
@@ -50,6 +53,21 @@ export function scoreArtistCandidate(candidate: {
     reasons.push("has twitter url");
   }
 
+  if (candidate.avatarUrl?.trim()) {
+    score += 5;
+    reasons.push("avatar image present");
+  }
+
+  if (Array.isArray(candidate.exhibitionUrls) && candidate.exhibitionUrls.length > 0) {
+    score += 8;
+    reasons.push(`${candidate.exhibitionUrls.length} exhibition pages found`);
+  }
+
+  if (Array.isArray(candidate.collections) && candidate.collections.length > 0) {
+    score += 10;
+    reasons.push(`work held in ${candidate.collections.length} named collection(s)`);
+  }
+
   const hasKnownMedium = candidate.mediums.some((medium) => {
     const normalized = medium.trim().toLowerCase();
     return KNOWN_MEDIUMS.some((known) => normalized.includes(known));
@@ -70,7 +88,8 @@ export function scoreArtistCandidate(candidate: {
     reasons.push(`name looks like institution/venue (${candidate.searchQuery})`);
   }
 
-  const band = score >= 80 ? "HIGH" : score >= 50 ? "MEDIUM" : "LOW";
+  const clampedScore = Math.min(100, Math.max(0, score));
+  const band = clampedScore >= 70 ? "HIGH" : clampedScore >= 50 ? "MEDIUM" : "LOW";
 
-  return { score, band, reasons };
+  return { score: clampedScore, band, reasons };
 }

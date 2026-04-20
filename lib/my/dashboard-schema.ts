@@ -20,8 +20,8 @@ export const AttentionItemSchema = z.object({
   ctaLabel: z.string(),
   ctaHref: z.string().startsWith("/my"),
   venueId: z.string().optional(),
-  createdAtISO: z.iso.datetime().optional(),
-  updatedAtISO: z.iso.datetime().optional(),
+  createdAtISO: z.string().datetime().optional(),
+  updatedAtISO: z.string().datetime().optional(),
 }).refine((value) => Boolean(value.createdAtISO ?? value.updatedAtISO), {
   message: "Attention item requires at least one timestamp",
 });
@@ -31,7 +31,7 @@ export const ActivityItemSchema = z.object({
   id: z.string(),
   label: z.string(),
   href: z.string().startsWith("/my"),
-  occurredAtISO: z.iso.datetime(),
+  occurredAtISO: z.string().datetime(),
 });
 export type ActivityItem = z.infer<typeof ActivityItemSchema>;
 
@@ -40,7 +40,7 @@ export const VenueSummarySchema = z.object({
   name: z.string(),
   role: z.enum(["OWNER", "EDITOR"]),
   status: PublisherStatusSchema,
-  updatedAtISO: z.iso.datetime(),
+  updatedAtISO: z.string().datetime(),
   completeness: z.object({
     percent: z.number().int().min(0).max(100),
     missing: z.array(z.string()),
@@ -54,8 +54,8 @@ export const EventSummarySchema = z.object({
   venueId: z.string().nullable(),
   venueName: z.string().nullable(),
   status: PublisherStatusSchema,
-  startAtISO: z.iso.datetime(),
-  updatedAtISO: z.iso.datetime(),
+  startAtISO: z.string().datetime(),
+  updatedAtISO: z.string().datetime(),
 });
 export type EventSummary = z.infer<typeof EventSummarySchema>;
 
@@ -63,8 +63,8 @@ export const ArtworkSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
   status: z.enum(["Draft", "Published"]),
-  updatedAtISO: z.iso.datetime(),
-  imageUrl: z.string().url().nullable(),
+  updatedAtISO: z.string().datetime(),
+  imageUrl: z.string().nullable(),
 });
 export type ArtworkSummary = z.infer<typeof ArtworkSummarySchema>;
 
@@ -99,6 +99,9 @@ export const MyDashboardResponseSchema = z.object({
     upcomingEvents: z.array(EventSummarySchema),
     recentArtwork: z.array(ArtworkSummarySchema),
   }),
+  publisherNotice: z.object({
+    noticeId: z.string(),
+  }).nullable().optional(),
 });
 export type MyDashboardResponse = z.infer<typeof MyDashboardResponseSchema>;
 
@@ -109,7 +112,7 @@ export const MyTeamResponseSchema = z.object({
   members: z.array(z.object({
     id: z.string(),
     role: z.enum(["OWNER", "EDITOR"]),
-    createdAtISO: z.iso.datetime(),
+    createdAtISO: z.string().datetime(),
     user: z.object({ id: z.string(), email: z.string().email(), name: z.string().nullable() }),
   })),
   invites: z.array(z.object({
@@ -117,8 +120,8 @@ export const MyTeamResponseSchema = z.object({
     email: z.string().email(),
     role: z.enum(["OWNER", "EDITOR"]),
     status: z.enum(["PENDING", "ACCEPTED", "REVOKED", "EXPIRED"]),
-    createdAtISO: z.iso.datetime(),
-    expiresAtISO: z.iso.datetime(),
+    createdAtISO: z.string().datetime(),
+    expiresAtISO: z.string().datetime(),
   })),
 });
 export type MyTeamResponse = z.infer<typeof MyTeamResponseSchema>;

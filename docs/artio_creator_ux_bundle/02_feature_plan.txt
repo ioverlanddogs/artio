@@ -1,0 +1,19 @@
+FEATURE PLAN
+
+1. Creation Flow
+- Event or Gallery selection
+- Step-by-step input
+- Live preview
+
+2. Creator Page
+- Custom layout
+- Featured content
+- Events + galleries
+
+3. Publishing Tools
+- Draft / Scheduled / Live states
+
+4. Analytics
+- Views
+- Saves
+- Attendees

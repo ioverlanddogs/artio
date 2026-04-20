@@ -1,0 +1,10 @@
+CREATOR FLOWS
+
+FLOW 1: Create Event
+Dashboard → New Event → Add details → Preview → Publish
+
+FLOW 2: Upload Gallery
+Dashboard → New Gallery → Upload images → Add captions → Publish
+
+FLOW 3: Manage Space
+Profile → Rearrange sections → Highlight content

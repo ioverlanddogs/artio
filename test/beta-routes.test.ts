@@ -7,6 +7,7 @@ import { db } from "../lib/db.ts";
 const originalRequestUpsert = db.betaAccessRequest.upsert;
 const originalRequestUpdate = db.betaAccessRequest.update;
 const originalFeedbackCreate = db.betaFeedback.create;
+const originalTransaction = db.$transaction;
 
 test("POST /api/beta/request-access validates and upserts", async () => {
   let upsertedEmail = "";
@@ -53,20 +54,20 @@ test("POST /api/beta/feedback validates and stores", async () => {
 });
 
 test("PATCH /api/admin/beta/requests/[id] updates status", async () => {
-  const id = "11111111-1111-4111-8111-111111111111";
   let updatedStatus = "";
+
   db.betaAccessRequest.update = (async (input: { data: { status: string } }) => {
     updatedStatus = input.data.status;
-    return { id, email: "user@example.com", createdAt: new Date() };
+    return { id: "11111111-1111-4111-8111-111111111111", email: "user@example.com", userId: null };
   }) as typeof db.betaAccessRequest.update;
 
-  const req = new NextRequest(`http://localhost/api/admin/beta/requests/${id}`, {
+  const req = new NextRequest("http://localhost/api/admin/beta/requests/11111111-1111-4111-8111-111111111111", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ status: "APPROVED" }),
   });
 
-  const res = await handleAdminPatchRequestStatus(req, Promise.resolve({ id }));
+  const res = await handleAdminPatchRequestStatus(req, Promise.resolve({ id: "11111111-1111-4111-8111-111111111111" }));
   assert.equal(res.status, 200);
   assert.equal(updatedStatus, "APPROVED");
 });
@@ -75,4 +76,5 @@ test.after(() => {
   db.betaAccessRequest.upsert = originalRequestUpsert;
   db.betaAccessRequest.update = originalRequestUpdate;
   db.betaFeedback.create = originalFeedbackCreate;
+  db.$transaction = originalTransaction;
 });

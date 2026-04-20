@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { slugifyArtistName, ensureUniqueArtistSlugWithDeps } from "@/lib/artist-slug";
 import { resolveArtistCandidate } from "@/lib/ingest/artist-resolution";
+import { resolveIdentityToArtist } from "@/lib/ingest/artist-identity";
 import { importApprovedArtistImage } from "@/lib/ingest/import-approved-artist-image";
 import { logWarn } from "@/lib/logging";
 import { markArtistApprovalAttempt, markArtistApprovalFailure, normalizeApprovalError } from "@/lib/ingest/candidate-observability";
@@ -47,8 +48,11 @@ export async function autoApproveArtistCandidate(args: {
           data: {
             name: candidate.name,
             slug: slug ?? candidate.id,
-            bio: candidate.bio,
+            bio: candidate.bio ?? undefined,
             mediums: candidate.mediums,
+            collections: candidate.collections ?? [],
+            birthYear: candidate.birthYear ?? undefined,
+            nationality: candidate.nationality ?? undefined,
             websiteUrl: candidate.websiteUrl,
             instagramUrl: candidate.instagramUrl,
             twitterUrl: candidate.twitterUrl,
@@ -61,6 +65,33 @@ export async function autoApproveArtistCandidate(args: {
 
         artistId = createdArtist.id;
         createdNewArtist = true;
+      } else {
+        const existingArtist = await tx.artist.findUnique({
+          where: { id: artistId },
+          select: {
+            id: true,
+            bio: true,
+            birthYear: true,
+            nationality: true,
+            collections: true,
+          },
+        });
+
+        if (existingArtist) {
+          const nextCollections = (candidate.collections ?? [])
+            .filter((collection) => !existingArtist.collections.includes(collection));
+          if (!existingArtist.bio && candidate.bio) {
+            await tx.artist.update({
+              where: { id: existingArtist.id },
+              data: {
+                bio: candidate.bio,
+                collections: nextCollections.length > 0 ? { push: nextCollections } : undefined,
+                birthYear: existingArtist.birthYear ?? candidate.birthYear ?? undefined,
+                nationality: existingArtist.nationality ?? candidate.nationality ?? undefined,
+              },
+            });
+          }
+        }
       }
 
       for (const link of candidate.eventLinks) {
@@ -98,6 +129,27 @@ export async function autoApproveArtistCandidate(args: {
       requestId: `auto-approve-artist-${candidate.id}`,
       candidateId: candidate.id,
     }).catch((err) => logWarn({ message: "auto_approve_artist_image_failed", candidateId: candidate.id, err, approvalErrorCode: "image_import_failed" }));
+
+    // Import avatar image if available and artist has no featured asset yet
+    if (candidate.avatarUrl && newArtist.id) {
+      try {
+        const existingArtist = await args.db.artist.findUnique({
+          where: { id: newArtist.id },
+          select: { featuredAssetId: true },
+        });
+
+        if (!existingArtist?.featuredAssetId) {
+          const { importArtistAvatarImage } = await import("@/lib/ingest/import-artist-avatar-image");
+          await importArtistAvatarImage({
+            db: args.db,
+            artistId: newArtist.id,
+            imageUrl: candidate.avatarUrl,
+          });
+        }
+      } catch (err) {
+        logWarn({ message: "auto_approve_artist_avatar_import_failed", artistId: newArtist.id, err });
+      }
+    }
 
     // Retroactive artwork re-link
     try {
@@ -152,7 +204,36 @@ export async function autoApproveArtistCandidate(args: {
         where: { id: newArtist.id },
         data: { status: "PUBLISHED", isPublished: true },
       });
+      try {
+        const identity = await args.db.artistIdentity.findUnique({
+          where: { normalizedName: candidate.normalizedName },
+          select: { id: true, artistId: true },
+        });
+        if (identity && !identity.artistId) {
+          await resolveIdentityToArtist(args.db as PrismaClient, identity.id, newArtist.id);
+        }
+      } catch (err: unknown) {
+        logWarn({
+          message: "artist_identity_resolve_failed",
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       return { artistId: newArtist.id, published: true };
+    }
+
+    try {
+      const identity = await args.db.artistIdentity.findUnique({
+        where: { normalizedName: candidate.normalizedName },
+        select: { id: true, artistId: true },
+      });
+      if (identity && !identity.artistId) {
+        await resolveIdentityToArtist(args.db as PrismaClient, identity.id, newArtist.id);
+      }
+    } catch (err: unknown) {
+      logWarn({
+        message: "artist_identity_resolve_failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return { artistId: newArtist.id, published: false };

@@ -46,7 +46,16 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
   return dbClient.$transaction(async (tx) => {
     const submission = await tx.submission.findUnique({
       where: { id: input.submissionId },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        kind: true,
+        note: true,
+        submitterUserId: true,
+        targetArtistId: true,
+        targetVenueId: true,
+        targetEventId: true,
         submitter: { select: { id: true, email: true } },
         targetVenue: { select: { id: true, slug: true } },
         targetEvent: { select: { id: true, slug: true } },
@@ -71,10 +80,16 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
 
     if (isApprove) {
       if (submission.type === "ARTIST" && submission.targetArtistId) {
-        await tx.artist.update({ where: { id: submission.targetArtistId }, data: { ...publishedStateAt(decidedAt) } });
+        await tx.artist.update({
+          where: { id: submission.targetArtistId },
+          data: { isPublished: true, status: "PUBLISHED" },
+        });
       }
       if (submission.type === "VENUE" && submission.targetVenueId) {
-        await tx.venue.update({ where: { id: submission.targetVenueId }, data: { ...publishedStateAt(decidedAt) } });
+        await tx.venue.update({
+          where: { id: submission.targetVenueId },
+          data: { isPublished: true, status: "PUBLISHED" },
+        });
       }
       if (submission.type === "EVENT" && submission.targetEventId) {
         await tx.event.update({ where: { id: submission.targetEventId }, data: { ...publishedStateAt(decidedAt) } });
@@ -83,7 +98,7 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
         const artworkId = submission.note.replace("artworkId:", "").trim();
         await tx.artwork.update({
           where: { id: artworkId },
-          data: { ...publishedStateAt(decidedAt) },
+          data: { isPublished: true, status: "PUBLISHED" },
         });
       }
     }
@@ -104,6 +119,16 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
         decidedAt,
         decisionReason,
         rejectionReason: decisionReason,
+      },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        targetArtistId: true,
+        targetVenueId: true,
+        targetEventId: true,
+        decisionReason: true,
+        decidedAt: true,
       },
     });
 
@@ -141,6 +166,13 @@ export async function decideSubmission(input: DecideSubmissionInput, dbClient: D
       },
     });
 
-    return { submission: updated, idempotent: false as const, submitterId: submission.submitter.id, submitterEmail: submission.submitter.email };
+    return {
+      submission: updated,
+      idempotent: false as const,
+      submitterId: submission.submitter.id,
+      submitterEmail: submission.submitter.email,
+      targetEventSlug: submission.targetEvent?.slug ?? null,
+      targetVenueSlug: submission.targetVenue?.slug ?? null,
+    };
   });
 }

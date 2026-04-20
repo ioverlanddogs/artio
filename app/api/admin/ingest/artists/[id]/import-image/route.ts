@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { importApprovedArtistImage } from "@/lib/ingest/import-approved-artist-image";
 import { idParamSchema, zodDetails } from "@/lib/validators";
@@ -70,6 +70,10 @@ export async function POST(
     if (error instanceof Error && error.message === "forbidden") {
       return apiError(403, "forbidden", "Forbidden");
     }
+    console.error("admin_ingest_artists_id_import_image_unexpected_error", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return apiError(500, "internal_error", "Unexpected server error");
   }
 }

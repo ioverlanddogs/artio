@@ -12,9 +12,9 @@ import { extractJsonLdEvents } from "@/lib/ingest/jsonld-extract";
 import { extractionJsonSchema, parseExtractedEventsFromModel, type NormalizedExtractedEvent, type VenueSnapshot } from "@/lib/ingest/schemas";
 import { clusterCandidates, computeSimilarityKey, scoreSimilarity } from "@/lib/ingest/similarity";
 import { inferTimezoneFromLatLng } from "@/lib/timezone";
-import { detectPlatform, getPlatformPromptHint, isJsRenderedPlatform, type Platform } from "@/lib/ingest/detect-platform";
+import { detectPlatform, getPlatformPromptHint, isJsRenderedPlatform, detectVenueType, getVenueTypePromptHint, type Platform, type VenueType } from "@/lib/ingest/detect-platform";
 import { enrichVenueFromSnapshot } from "@/lib/ingest/enrich-venue-from-snapshot";
-import { getProvider, type ProviderName } from "@/lib/ingest/providers";
+import { getProvider, type ExtractionParams, type ProviderName } from "@/lib/ingest/providers";
 import { resolveRelativeHttpUrl } from "@/lib/ingest/url-utils";
 import { getVenueTrackRecordBonus } from "@/lib/ingest/venue-confidence-signal";
 import { logError, logWarn } from "@/lib/logging";
@@ -26,6 +26,12 @@ const DEFAULT_DUPLICATE_LOOKBACK_DAYS = 30;
 const DEFAULT_DURATION_MINUTES = 120;
 
 const CANDIDATE_CAP_STOP_REASON = "CANDIDATE_CAP_REACHED";
+const RETRYABLE_ERROR_CODES = new Set([
+  "RATE_LIMITED",
+  "TOKEN_LIMIT",
+  "OVERLOADED",
+  "PROVIDER_ERROR",
+]);
 
 const DEFAULT_SYSTEM_PROMPT_LINES = [
   "You are extracting structured data from a venue website. Your output must contain",
@@ -60,6 +66,7 @@ const DEFAULT_SYSTEM_PROMPT_LINES = [
 function buildExtractionSystemPrompt(params: {
   ingestSystemPrompt: string | null | undefined;
   platformHint: string | null;
+  venueTypeHint: string | null;
   venueContext?: { name: string; address: string | null };
 }): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -76,6 +83,7 @@ function buildExtractionSystemPrompt(params: {
     venueLine,
     `Today's date: ${today}`,
     params.platformHint,
+    params.venueTypeHint,
     "",
     ...staticPromptLines,
   ].filter(Boolean).join("\n");
@@ -116,6 +124,85 @@ function resolveProviderApiKey(
   }
 }
 
+export function resolveFallbackProviderName(primary: string): ProviderName | null {
+  if (primary === "claude") return "openai";
+  if (primary === "openai") return "claude";
+  if (primary === "gemini") return "openai";
+  return null;
+}
+
+function resolveFallbackApiKey(
+  providerName: ProviderName,
+  settings: { openAiApiKey?: string | null; geminiApiKey?: string | null; anthropicApiKey?: string | null } | null,
+  env: NodeJS.ProcessEnv,
+): string | null {
+  try {
+    return resolveProviderApiKey(providerName, settings, env);
+  } catch {
+    return null;
+  }
+}
+
+type FallbackExtractionResult = {
+  raw: unknown;
+  model: string;
+  usage: ExtractUsage;
+  usedFallback: boolean;
+  extractionProvider: string;
+};
+
+export async function extractWithFallback(params: {
+  primaryProvider: ReturnType<typeof getProvider>;
+  primaryApiKey: string;
+  fallbackProviderName: ProviderName | null;
+  fallbackApiKey: string | null;
+  extractParams: ExtractionParams;
+  getProviderFn?: typeof getProvider;
+}): Promise<FallbackExtractionResult> {
+  try {
+    const result = await params.primaryProvider.extract({
+      ...params.extractParams,
+      apiKey: params.primaryApiKey,
+    });
+    return {
+      raw: result.raw,
+      model: result.model,
+      usage: result.usage,
+      usedFallback: false,
+      extractionProvider: params.primaryProvider.name,
+    };
+  } catch (error) {
+    const isRetryable =
+      error instanceof IngestError && RETRYABLE_ERROR_CODES.has(error.code);
+
+    if (!isRetryable || !params.fallbackProviderName || !params.fallbackApiKey) {
+      throw error;
+    }
+
+    console.warn("extraction_primary_failed_using_fallback", {
+      primaryProvider: params.primaryProvider.name,
+      fallbackProvider: params.fallbackProviderName,
+      errorCode: error instanceof IngestError ? error.code : "unknown",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    const fallbackProvider = (params.getProviderFn ?? getProvider)(params.fallbackProviderName);
+    const result = await fallbackProvider.extract({
+      ...params.extractParams,
+      apiKey: params.fallbackApiKey,
+      model: "",
+    });
+
+    return {
+      raw: result.raw,
+      model: result.model,
+      usage: result.usage,
+      usedFallback: true,
+      extractionProvider: fallbackProvider.name,
+    };
+  }
+}
+
 type RunIngestParams = {
   venueId: string;
   sourceUrl: string; // prefer venue.eventsPageUrl ?? venue.websiteUrl
@@ -133,13 +220,28 @@ type IngestStore = {
   };
   ingestExtractedEvent: {
     findUnique: typeof db.ingestExtractedEvent.findUnique;
-    findMany: typeof db.ingestExtractedEvent.findMany;
+    findMany: typeof db.ingestExtractedEvent.findMany & ((args: {
+      where: {
+        venueId: string;
+        fingerprint: { in: string[] };
+      };
+      select: { fingerprint: true };
+      orderBy?: Record<string, unknown> | Record<string, unknown>[];
+      take?: number;
+    }) => Promise<Array<{ fingerprint: string }>>);
     create: typeof db.ingestExtractedEvent.create;
     update: typeof db.ingestExtractedEvent.update;
   };
   venue: {
     findUnique: typeof db.venue.findUnique;
-    update: typeof db.venue.update;
+    update: (args: {
+      where: { id: string };
+      data: Record<string, unknown> & {
+        eventsPageUrl?: string;
+        usesJsonLd?: boolean;
+        lastIngestedAt?: Date;
+      };
+    }) => Promise<unknown>;
   };
   siteSettings: {
     findUnique: typeof db.siteSettings.findUnique;
@@ -328,8 +430,16 @@ export async function runVenueIngestExtraction(
   const fetchImageWithGuardsImpl = deps.fetchImageWithGuards ?? fetchImageWithGuards;
   const uploadCandidateImageToBlobImpl = deps.uploadCandidateImageToBlob ?? uploadCandidateImageToBlob;
   const detectPlatformFn = deps.detectPlatformFn ?? detectPlatform;
+  const updateVenueNonBlocking = (data: { eventsPageUrl?: string; usesJsonLd?: boolean; lastIngestedAt?: Date }, warningMessage: string) => {
+    if (typeof store.venue?.update !== "function") return;
+    store.venue.update({
+      where: { id: params.venueId },
+      data,
+    }).catch((err) => logWarn({ message: warningMessage, venueId: params.venueId, err }));
+  };
   const startedAtMs = now();
   let detectedPlatform: Platform | null = null;
+  let detectedVenueType: VenueType | null = null;
 
   const run = await store.ingestRun.create({
     data: {
@@ -354,6 +464,7 @@ export async function runVenueIngestExtraction(
     });
 
     detectedPlatform = detectPlatformFn(fetched.html, fetched.finalUrl);
+    detectedVenueType = detectVenueType(fetched.html, fetched.finalUrl);
 
     if (isJsRenderedPlatform(detectedPlatform)) {
       const finishedAt = new Date(now());
@@ -389,16 +500,7 @@ export async function runVenueIngestExtraction(
 
     const detectedEventsPageUrl = detectEventsPageUrl(fetched.html, fetched.finalUrl);
     if (detectedEventsPageUrl && !venue?.eventsPageUrl) {
-      store.venue.update({
-        where: { id: params.venueId },
-        data: { eventsPageUrl: detectedEventsPageUrl },
-      }).catch((err) => {
-        logWarn({ message: "ingest_detect_events_page_url_update_failed",
-          venueId: params.venueId,
-          detectedEventsPageUrl,
-          err,
-        });
-      });
+      updateVenueNonBlocking({ eventsPageUrl: detectedEventsPageUrl }, "ingest_detect_events_page_url_update_failed");
     }
 
     const settings = await store.siteSettings.findUnique({
@@ -429,6 +531,7 @@ export async function runVenueIngestExtraction(
     let extractedUsage: ExtractUsage | undefined;
     let extractedVenueSnapshot: VenueSnapshot = {};
     let extractionProvider: string | null = null;
+    let extractionErrorDetail: string | undefined;
 
     if (jsonLdResult.attempted && jsonLdResult.events.length > 0) {
       extractionMethod = "json_ld";
@@ -439,6 +542,7 @@ export async function runVenueIngestExtraction(
         venueLat: venue?.lat ?? null,
         venueLng: venue?.lng ?? null,
       }));
+      updateVenueNonBlocking({ usesJsonLd: true, lastIngestedAt: new Date() }, "ingest_venue_jsonld_flag_update_failed");
     } else {
       if (!(settings?.ingestEnabled ?? (process.env.AI_INGEST_ENABLED === "1"))) {
         await markRunFailed(store, run.id, startedAtMs, "INGEST_DISABLED", "AI ingest is disabled");
@@ -446,6 +550,7 @@ export async function runVenueIngestExtraction(
       }
 
       const platformHint = getPlatformPromptHint(detectedPlatform);
+      const venueTypeHint = getVenueTypePromptHint(detectedVenueType ?? "unknown");
       const venueContext = venue
         ? {
             name: venue.name,
@@ -485,20 +590,31 @@ export async function runVenueIngestExtraction(
       } else {
         const provider = getProvider(settings?.eventExtractionProvider as ProviderName | null);
         const providerApiKey = resolveProviderApiKey(provider.name, settings, process.env);
+        const fallbackProviderName = resolveFallbackProviderName(provider.name);
+        const fallbackApiKey = fallbackProviderName
+          ? resolveFallbackApiKey(fallbackProviderName, settings, process.env)
+          : null;
         const systemPrompt = buildExtractionSystemPrompt({
           ingestSystemPrompt: settings?.ingestSystemPrompt,
           platformHint,
+          venueTypeHint,
           venueContext,
         });
 
-        const extracted = await provider.extract({
-          html: fetched.html,
-          sourceUrl: fetched.finalUrl,
-          systemPrompt,
-          jsonSchema: extractionJsonSchema,
-          model: params.model?.trim() || settings?.ingestModel?.trim() || "",
-          apiKey: providerApiKey,
-          maxOutputTokens: settings?.ingestMaxOutputTokens ?? undefined,
+        const extracted = await extractWithFallback({
+          primaryProvider: provider,
+          primaryApiKey: providerApiKey,
+          fallbackProviderName,
+          fallbackApiKey,
+          extractParams: {
+            html: fetched.html,
+            sourceUrl: fetched.finalUrl,
+            systemPrompt,
+            jsonSchema: extractionJsonSchema,
+            model: params.model?.trim() || settings?.ingestModel?.trim() || "",
+            apiKey: providerApiKey,
+            maxOutputTokens: settings?.ingestMaxOutputTokens ?? undefined,
+          },
         });
 
         if (!extracted.raw || typeof extracted.raw !== "object" || !Array.isArray((extracted.raw as { events?: unknown }).events)) {
@@ -518,6 +634,7 @@ export async function runVenueIngestExtraction(
         extractedModel = extracted.model;
         extractedUsage = extracted.usage;
         extractedVenueSnapshot = extractVenueSnapshot(rawObject);
+        extractionErrorDetail = extracted.usedFallback ? `fallback_provider_used:${extracted.extractionProvider}` : undefined;
       }
     }
     const totalCandidatesReturned = normalized.length;
@@ -531,26 +648,28 @@ export async function runVenueIngestExtraction(
 
     let dedupedCount = 0;
     const candidates: PendingCandidate[] = [];
-
-    for (const [index, event] of cappedCandidates.entries()) {
-      const fingerprint = fingerprintForCandidate({
+    const allFingerprints = cappedCandidates.map((event) =>
+      fingerprintForCandidate({
         venueId: params.venueId,
         title: event.title,
         startAt: event.startAt,
         locationText: event.locationText,
-      });
+      })
+    );
 
-      const existing = await store.ingestExtractedEvent.findUnique({
+    const existingFingerprints = new Set(
+      (await store.ingestExtractedEvent.findMany({
         where: {
-          venueId_fingerprint: {
-            venueId: params.venueId,
-            fingerprint,
-          },
+          venueId: params.venueId,
+          fingerprint: { in: allFingerprints },
         },
-        select: { id: true },
-      });
+        select: { fingerprint: true },
+      }) as Array<{ fingerprint: string }>).map((row) => row.fingerprint),
+    );
 
-      if (existing) {
+    for (const [index, event] of cappedCandidates.entries()) {
+      const fingerprint = allFingerprints[index]!;
+      if (existingFingerprints.has(fingerprint)) {
         dedupedCount += 1;
         continue;
       }
@@ -813,6 +932,10 @@ export async function runVenueIngestExtraction(
       createdDuplicateCount += 1;
     }
 
+    if (extractionMethod === "openai") {
+      updateVenueNonBlocking({ lastIngestedAt: new Date() }, "ingest_venue_last_ingested_update_failed");
+    }
+
     const finishedAt = new Date(now());
     await store.ingestRun.update({
       where: { id: run.id },
@@ -834,6 +957,7 @@ export async function runVenueIngestExtraction(
           ? (extractedVenueSnapshot as Prisma.JsonObject)
           : undefined,
         stopReason,
+        errorDetail: extractionErrorDetail,
       },
     });
 

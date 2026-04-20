@@ -249,6 +249,18 @@ enum IngestArtworkStatus {
   DUPLICATE
 }
 
+enum GalleryCrawlStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum GalleryExtractionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
 enum DiscoveryEntityType {
   VENUE
   ARTIST
@@ -423,6 +435,7 @@ model User {
   isTrustedPublisher   Boolean               @default(false)
   trustedPublisherSince DateTime?
   trustedPublisherById String?               @db.Uuid
+  sessionRevokedAt     DateTime?
   trustedPublisherBy   User?                  @relation("TrustedPublisherGrantedBy", fields: [trustedPublisherById], references: [id])
   grantedTrustedPublisherUsers User[]         @relation("TrustedPublisherGrantedBy")
   createdAt            DateTime              @default(now())
@@ -526,6 +539,7 @@ model AccessRequest {
   reason          String?
   rejectionReason String?
   reviewedAt      DateTime?
+  dismissedAt     DateTime?
   reviewedById    String?             @db.Uuid
   reviewedBy      User?               @relation("AccessRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   user            User                @relation("AccessRequestRequester", fields: [userId], references: [id], onDelete: Cascade)
@@ -633,6 +647,8 @@ model Venue {
   canonicalUrl       String?
   eventsPageUrl      String?                   @map("eventsPageUrl")
   ingestFrequency    VenueIngestFrequency      @default(WEEKLY)
+  usesJsonLd         Boolean                   @default(false)
+  lastIngestedAt     DateTime?                 @db.Timestamptz
   instagramUrl       String?
   facebookUrl        String?
   contactEmail       String?
@@ -669,6 +685,7 @@ model Venue {
   artistAssociations ArtistVenueAssociation[]
   artworkVenues      ArtworkVenue[]
   ingestRuns         IngestRun[]
+  gallerySources      GallerySource[]
   discoverySeeds     IngestDiscoveryCandidate[]
   ingestExtractedEvents IngestExtractedEvent[]
   claimRequests      VenueClaimRequest[]
@@ -845,6 +862,9 @@ model Artist {
   tiktokUrl         String?
   youtubeUrl        String?
   mediums           String[]                 @default([])
+  collections       String[]                 @default([])
+  birthYear         Int?
+  nationality       String?
   avatarImageUrl    String?
   featuredImageUrl  String?
   featuredAssetId   String?                  @db.Uuid
@@ -872,11 +892,14 @@ model Artist {
   artworks          Artwork[]
   featuredArtworks  ArtistFeaturedArtwork[]
   ingestCandidates  IngestExtractedArtist[]  @relation("IngestExtractedArtistCreated")
+  ingestExtractedArtworks IngestExtractedArtwork[] @relation("IngestExtractedArtworkMatchedArtist")
   stripeAccount     ArtistStripeAccount?
   enrichmentRunItems EnrichmentRunItem[]      @relation("EnrichmentRunItemArtist")
   completenessScore     Int       @default(0)
   completenessFlags     String[]  @default([])
   completenessUpdatedAt DateTime?
+  directoryEntities    DirectoryEntity[]
+  identity             ArtistIdentity?          @relation("ArtistIdentityResolved")
 
   @@index([isPublished])
   @@index([featuredAssetId])
@@ -1083,6 +1106,280 @@ model PromoCode {
   @@index([eventId])
 }
 
+model GallerySource {
+  id                  String              @id @default(uuid()) @db.Uuid
+  venueId              String              @db.Uuid
+  name                 String
+  baseUrl              String
+  eventsPageUrl        String?
+  platformType         String?
+  strategyType         String?             @default("dom")
+  isActive             Boolean             @default(true)
+  crawlIntervalMinutes Int                 @default(360)
+  lastCrawledAt        DateTime?           @db.Timestamptz
+  nextCrawlAt          DateTime?           @db.Timestamptz
+  lastCrawlStatus      GalleryCrawlStatus  @default(PENDING)
+  crawlFailureCount    Int                 @default(0)
+  lastContentHash      String?
+  lastIngestRunId      String?             @db.Uuid
+  createdAt            DateTime            @default(now()) @db.Timestamptz
+  updatedAt            DateTime            @updatedAt @db.Timestamptz
+  venue                Venue               @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  lastIngestRun        IngestRun?          @relation("GallerySourceLastIngestRun", fields: [lastIngestRunId], references: [id], onDelete: SetNull)
+  pages                GalleryPage[]
+  metrics              IngestMetrics[]
+
+  @@unique([venueId, baseUrl])
+  @@index([isActive, nextCrawlAt])
+  @@index([venueId, updatedAt(sort: Desc)])
+}
+
+model GalleryPage {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  gallerySourceId     String                  @db.Uuid
+  url                 String
+  title               String?
+  html                String?
+  contentHash         String?
+  crawlStatus         GalleryCrawlStatus      @default(PENDING)
+  extractionStatus    GalleryExtractionStatus @default(PENDING)
+  changed             Boolean                 @default(true)
+  lastCrawledAt       DateTime?               @db.Timestamptz
+  extractedAt         DateTime?               @db.Timestamptz
+  extractedEventsCount Int                    @default(0)
+  extractedArtistsCount Int                   @default(0)
+  extractedArtworksCount Int                  @default(0)
+  extractionHash      String?
+  createdAt           DateTime                @default(now()) @db.Timestamptz
+  updatedAt           DateTime                @updatedAt @db.Timestamptz
+  gallerySource       GallerySource           @relation(fields: [gallerySourceId], references: [id], onDelete: Cascade)
+
+  @@unique([gallerySourceId, url])
+  @@index([gallerySourceId, lastCrawledAt(sort: Desc)])
+  @@index([extractionStatus, updatedAt(sort: Desc)])
+}
+
+model DirectorySource {
+  id                  String    @id @default(uuid()) @db.Uuid
+  name                String
+  baseUrl             String
+  indexPattern        String
+  linkPattern         String?
+  entityType          String
+  isActive            Boolean   @default(true)
+  crawlIntervalMinutes Int      @default(10080)
+  maxPagesPerLetter   Int       @default(5)
+  pipelineMode        String    @default("manual")
+  lastPipelineRunAt   DateTime? @db.Timestamptz
+  lastPipelineError   String?
+  lastRunFound        Int?
+  lastRunStrategy     String?
+  lastRunError        String?
+  siteProfileId       String?   @db.Uuid
+  createdAt           DateTime  @default(now()) @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @db.Timestamptz
+  siteProfile         SiteProfile? @relation(fields: [siteProfileId], references: [id], onDelete: SetNull)
+  cursor              DirectoryCursor?
+  entities            DirectoryEntity[]
+  crawlRuns           DirectoryCrawlRun[]
+  discoveryLogs       DirectoryDiscoveryLog[]
+
+  @@unique([baseUrl, indexPattern])
+  @@index([isActive, updatedAt(sort: Desc)])
+}
+
+model DirectoryCursor {
+  id                 String          @id @default(uuid()) @db.Uuid
+  directorySourceId  String          @unique @db.Uuid
+  currentLetter      String          @default("A")
+  currentPage        Int             @default(1)
+  queuedAt           DateTime?       @db.Timestamptz
+  lastRunAt          DateTime?       @db.Timestamptz
+  lastSuccessAt      DateTime?       @db.Timestamptz
+  lastError          String?
+  createdAt          DateTime        @default(now()) @db.Timestamptz
+  updatedAt          DateTime        @updatedAt @db.Timestamptz
+  directorySource    DirectorySource @relation(fields: [directorySourceId], references: [id], onDelete: Cascade)
+}
+
+model DirectoryCrawlRun {
+  id                String          @id @default(uuid()) @db.Uuid
+  directorySourceId String          @db.Uuid
+  letter            String
+  page              Int             @default(1)
+  strategy          String
+  found             Int             @default(0)
+  newEntities       Int             @default(0)
+  errorMessage      String?
+  htmlPreview       String?
+  durationMs        Int?
+  crawledAt         DateTime        @default(now()) @db.Timestamptz
+  directorySource   DirectorySource @relation(fields: [directorySourceId], references: [id], onDelete: Cascade)
+
+  @@index([directorySourceId, crawledAt(sort: Desc)])
+}
+
+model DirectoryDiscoveryLog {
+  id                String          @id @default(uuid()) @db.Uuid
+  directorySourceId String          @db.Uuid
+  entityId          String          @db.Uuid
+  entityUrl         String
+  entityName        String?
+  status            String
+  candidateId       String?         @db.Uuid
+  errorMessage      String?
+  model             String?
+  tokensUsed        Int?
+  confidenceScore   Int?
+  confidenceBand    String?
+  artworksExtracted Int             @default(0)
+  durationMs        Int?
+  createdAt         DateTime        @default(now()) @db.Timestamptz
+  directorySource   DirectorySource @relation(fields: [directorySourceId], references: [id], onDelete: Cascade)
+  entity            DirectoryEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([directorySourceId, createdAt(sort: Desc)])
+  @@index([entityId])
+  @@index([candidateId])
+}
+
+model ArtistIdentity {
+  id              String              @id @default(uuid()) @db.Uuid
+  canonicalName   String
+  normalizedName  String              @unique
+  nationality     String?
+  birthYear       Int?
+  bio             String?
+  mediums         String[]            @default([])
+  collections     String[]            @default([])
+  websiteUrl      String?
+  instagramUrl    String?
+  twitterUrl      String?
+  avatarUrl       String?
+  artistId        String?             @unique @db.Uuid
+  artist          Artist?             @relation("ArtistIdentityResolved", fields: [artistId], references: [id], onDelete: SetNull)
+  confidenceScore Int                 @default(0)
+  confidenceBand  String              @default("LOW")
+  createdAt       DateTime            @default(now()) @db.Timestamptz
+  updatedAt       DateTime            @updatedAt @db.Timestamptz
+  observations    ArtistObservation[]
+
+  @@index([normalizedName])
+  @@index([artistId])
+}
+
+model ArtistObservation {
+  id              String         @id @default(uuid()) @db.Uuid
+  identityId      String         @db.Uuid
+  identity        ArtistIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  sourceUrl       String
+  sourceDomain    String
+  siteProfileId   String?        @db.Uuid
+  name            String
+  bio             String?
+  mediums         String[]       @default([])
+  collections     String[]       @default([])
+  websiteUrl      String?
+  instagramUrl    String?
+  twitterUrl      String?
+  avatarUrl       String?
+  birthYear       Int?
+  nationality     String?
+  exhibitionUrls  String[]       @default([])
+  confidenceScore Int            @default(0)
+  extractedAt     DateTime       @default(now()) @db.Timestamptz
+  updatedAt       DateTime       @updatedAt @db.Timestamptz
+
+  @@unique([identityId, sourceDomain])
+  @@index([identityId])
+  @@index([sourceDomain])
+  @@index([sourceUrl])
+}
+
+model SiteProfile {
+  id                   String            @id @default(uuid()) @db.Uuid
+  hostname             String            @unique
+  platform             String?
+  directoryUrl         String?
+  indexPattern         String?
+  linkPattern          String?
+  paginationType       String            @default("letter")
+  exhibitionPattern    String?
+  sampleProfileUrls    String[]          @default([])
+  estimatedArtistCount Int?
+  confidence           Int               @default(0)
+  analysisError        String?
+  reasoning            String?
+  detectedSections     Json?
+  lastProfiledAt       DateTime?         @db.Timestamptz
+  createdAt            DateTime          @default(now()) @db.Timestamptz
+  updatedAt            DateTime          @updatedAt @db.Timestamptz
+  paths                IngestionPath[]
+  directorySources     DirectorySource[]
+
+  @@index([hostname])
+}
+
+model IngestionPath {
+  id                   String      @id @default(uuid()) @db.Uuid
+  siteProfileId        String      @db.Uuid
+  siteProfile          SiteProfile @relation(fields: [siteProfileId], references: [id], onDelete: Cascade)
+  name                 String
+  baseUrl              String
+  contentType          String
+  indexPattern         String?
+  linkPattern          String?
+  paginationType       String      @default("letter")
+  enabled              Boolean     @default(true)
+  crawlDepth           Int         @default(1)
+  crawlIntervalMinutes Int         @default(10080)
+  lastRunAt            DateTime?   @db.Timestamptz
+  lastRunFound         Int?
+  lastRunError         String?
+  createdAt            DateTime    @default(now()) @db.Timestamptz
+  updatedAt            DateTime    @updatedAt @db.Timestamptz
+
+  @@unique([siteProfileId, baseUrl])
+  @@index([siteProfileId])
+  @@index([enabled, contentType])
+}
+
+model DirectoryEntity {
+  id                String          @id @default(uuid()) @db.Uuid
+  directorySourceId String          @db.Uuid
+  entityUrl         String
+  entityName        String?
+  matchedArtistId   String?         @db.Uuid
+  lastSeenAt        DateTime        @db.Timestamptz
+  createdAt         DateTime        @default(now()) @db.Timestamptz
+  updatedAt         DateTime        @updatedAt @db.Timestamptz
+  directorySource   DirectorySource @relation(fields: [directorySourceId], references: [id], onDelete: Cascade)
+  matchedArtist     Artist?         @relation(fields: [matchedArtistId], references: [id], onDelete: SetNull)
+  discoveryLogs     DirectoryDiscoveryLog[]
+
+  @@unique([directorySourceId, entityUrl])
+  @@index([directorySourceId, lastSeenAt(sort: Desc)])
+}
+
+model IngestMetrics {
+  id                String         @id @default(uuid()) @db.Uuid
+  bucketDate        DateTime       @db.Date
+  gallerySourceId   String?        @db.Uuid
+  pagesCrawled      Int            @default(0)
+  pagesExtracted    Int            @default(0)
+  eventsExtracted   Int            @default(0)
+  artistsExtracted  Int            @default(0)
+  artworksExtracted Int            @default(0)
+  succeededJobs     Int            @default(0)
+  failedJobs        Int            @default(0)
+  createdAt         DateTime       @default(now()) @db.Timestamptz
+  updatedAt         DateTime       @updatedAt @db.Timestamptz
+  gallerySource     GallerySource? @relation(fields: [gallerySourceId], references: [id], onDelete: SetNull)
+
+  @@index([bucketDate, gallerySourceId])
+  @@index([bucketDate])
+}
+
 model IngestRun {
   id               String                @id @default(uuid()) @db.Uuid
   createdAt        DateTime              @default(now())
@@ -1117,6 +1414,7 @@ model IngestRun {
   extractedEvents  IngestExtractedEvent[]
   events           Event[]               @relation("EventIngestSourceRun")
   enrichmentLogs   VenueEnrichmentLog[]
+  gallerySources   GallerySource[] @relation("GallerySourceLastIngestRun")
 
   @@index([venueId, createdAt])
   @@index([createdAt])
@@ -1208,6 +1506,8 @@ model IngestExtractedArtist {
   lastApprovalError  String?
   imageImportStatus  String?
   imageImportWarning String?
+  avatarUrl          String?
+  collections        String[]                     @default([])
   createdArtistId    String?                      @db.Uuid
   extractionProvider String
   createdAt          DateTime                     @default(now()) @db.Timestamptz
@@ -1257,6 +1557,7 @@ model IngestExtractedArtwork {
   imageUrl           String?
   artistName         String?
   sourceEventId      String              @db.Uuid
+  matchedArtistId    String?             @db.Uuid
   sourceUrl          String
   status             IngestArtworkStatus @default(PENDING)
   fingerprint        String              @unique
@@ -1272,10 +1573,12 @@ model IngestExtractedArtwork {
   createdAt          DateTime            @default(now()) @db.Timestamptz
   updatedAt          DateTime            @updatedAt @db.Timestamptz
   sourceEvent        Event               @relation("IngestExtractedArtworkSourceEvent", fields: [sourceEventId], references: [id], onDelete: Cascade)
+  matchedArtist      Artist?             @relation("IngestExtractedArtworkMatchedArtist", fields: [matchedArtistId], references: [id], onDelete: SetNull)
   createdArtwork     Artwork?            @relation("IngestExtractedArtworkCreated", fields: [createdArtworkId], references: [id], onDelete: SetNull)
 
   @@index([status, confidenceScore(sort: Desc)])
   @@index([sourceEventId])
+  @@index([matchedArtistId])
 }
 
 
@@ -1285,7 +1588,7 @@ model IngestDiscoveryJob {
   queryTemplate     String
   region            String                     @default("")
   regionId          String?                    @db.Uuid
-  searchProvider    String                     @default("google_pse")
+  searchProvider    String                     @default("brave")
   maxResults        Int                        @default(10)
   status            DiscoveryJobStatus         @default(PENDING)
   resultsCount      Int?
@@ -1405,7 +1708,7 @@ model EnrichmentRun {
   gapFilter      EnrichmentGapFilter     @default(ALL)
   statusFilter   EnrichmentStatusFilter  @default(ALL)
   searchEnabled  Boolean                 @default(true)
-  searchProvider String                  @default("google_pse")
+  searchProvider String                  @default("brave")
   dryRun         Boolean                 @default(false)
   status         EnrichmentRunStatus     @default(PENDING)
   requestedById  String                  @db.Uuid
